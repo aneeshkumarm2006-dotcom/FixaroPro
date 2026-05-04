@@ -164,15 +164,16 @@ model SupplierPrice {
 }
 
 model Client {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   email     String?
   phone     String?
   address   String?
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   jobs      Job[]
+  invoices  Invoice[]
 }
 
 model Job {
@@ -210,6 +211,7 @@ model Job {
   logs              JobLog[]
   addOns            JobAddOn[]
   transactions      Transaction[]
+  invoices          Invoice[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -465,6 +467,48 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+model Invoice {
+  id            String          @id @default(cuid())
+  invoiceNumber String          @unique
+  status        InvoiceStatus   @default(DRAFT)
+  clientId      String
+  jobId         String?
+  subtotal      Float           @default(0)
+  gstAmount     Float           @default(0)
+  qstAmount     Float           @default(0)
+  discountAmount Float          @default(0)
+  totalAmount   Float           @default(0)
+  notes         String?
+  dueDate       DateTime?
+  sentAt        DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  job           Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  lineItems     InvoiceLineItem[]
+
+  @@index([clientId])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float    @default(0)
+  amount      Float    @default(0)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
 model Alert {
   id          String        @id @default(cuid())
   type        AlertType
@@ -524,4 +568,88 @@ enum TargetPeriod {
   MONTHLY
   QUARTERLY
   YEARLY
+}
+
+// ── Phase 8: Sales & Marketing ──
+
+enum SalesAreaType {
+  DOOR_KNOCK
+  FLYER_DROP
+  REFERRAL
+  ONLINE_AD
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+model SalesArea {
+  id        String        @id @default(cuid())
+  name      String
+  type      SalesAreaType
+  latitude  Float
+  longitude Float
+  address   String?
+  notes     String?
+  date      DateTime      @default(now())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([type])
+  @@index([date])
+}
+
+model LandingPage {
+  id          String      @id @default(cuid())
+  title       String
+  slug        String      @unique
+  content     String      @db.Text
+  ctaText     String      @default("Get a Free Quote")
+  ctaLink     String      @default("/")
+  isPublished Boolean     @default(false)
+  campaignId  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  campaign    MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  visits      PageVisit[]
+
+  @@index([slug])
+  @@index([campaignId])
+}
+
+model PageVisit {
+  id            String      @id @default(cuid())
+  landingPageId String
+  ipHash        String?
+  referrer      String?
+  userAgent     String?
+  createdAt     DateTime    @default(now())
+  landingPage   LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+  @@index([landingPageId])
+  @@index([createdAt])
+}
+
+model MarketingCampaign {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  status       CampaignStatus @default(DRAFT)
+  budget       Float          @default(0)
+  spent        Float          @default(0)
+  startDate    DateTime?
+  endDate      DateTime?
+  channel      String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  landingPages LandingPage[]
+
+  @@index([status])
+  @@index([startDate])
 }

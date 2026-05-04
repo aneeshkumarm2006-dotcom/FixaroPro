@@ -40,6 +40,9 @@ export default async function AnalyticsPage() {
     supplierPrices,
     transactions,
     employeeProducts,
+    marketingCampaigns,
+    landingPages,
+    pageVisitCounts,
   ] = await Promise.all([
     db.job.findMany({
       include: {
@@ -95,6 +98,22 @@ export default async function AnalyticsPage() {
       include: {
         product: true,
       },
+    }),
+    db.marketingCampaign.findMany({
+      include: {
+        _count: { select: { landingPages: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.landingPage.findMany({
+      include: {
+        campaign: { select: { id: true, name: true } },
+        _count: { select: { visits: true } },
+      },
+    }),
+    db.pageVisit.groupBy({
+      by: ["landingPageId"],
+      _count: true,
     }),
   ]);
 
@@ -601,6 +620,40 @@ export default async function AnalyticsPage() {
     };
   }).filter((p) => p.warehouse > 0 || p.inCirculation > 0);
 
+  // === MARKETING DATA ===
+  const totalPageVisits = pageVisitCounts.reduce((sum, v) => sum + v._count, 0);
+  const activeCampaignCount = marketingCampaigns.filter(
+    (c) => c.status === "ACTIVE"
+  ).length;
+  const publishedPageCount = landingPages.filter((lp) => lp.isPublished).length;
+
+  const marketingData = {
+    campaigns: marketingCampaigns.map((c) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      budget: c.budget,
+      spent: c.spent,
+      channel: c.channel,
+      startDate: c.startDate?.toISOString() || null,
+      endDate: c.endDate?.toISOString() || null,
+      landingPageCount: c._count.landingPages,
+    })),
+    landingPages: landingPages.map((lp) => ({
+      id: lp.id,
+      title: lp.title,
+      slug: lp.slug,
+      isPublished: lp.isPublished,
+      campaignName: lp.campaign?.name || null,
+      totalVisits: lp._count.visits,
+    })),
+    totalPageVisits,
+    activeCampaigns: activeCampaignCount,
+    publishedPages: publishedPageCount,
+    totalBudget: marketingCampaigns.reduce((sum, c) => sum + c.budget, 0),
+    totalSpent: marketingCampaigns.reduce((sum, c) => sum + c.spent, 0),
+  };
+
   // === SERIALIZE ALERTS ===
   const serializedAlerts = freshAlerts.map((a) => ({
     id: a.id,
@@ -634,6 +687,7 @@ export default async function AnalyticsPage() {
         supplierComparisonData={supplierComparisonData}
         supplierNames={supplierNames}
         inventoryValueData={inventoryValueData}
+        marketingData={marketingData}
       />
     </div>
   );

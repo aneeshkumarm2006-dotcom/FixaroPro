@@ -9,10 +9,8 @@ import Badge from "@/components/ui/Badge";
 import JobModal from "../JobModal";
 import { saveJob } from "../../actions/saveJob";
 import { deleteJob as deleteJobAction } from "../../actions/deleteJob";
-import {
-  togglePaymentReceived,
-  toggleInvoiceSent,
-} from "../../actions/toggleJobPaymentStatus";
+import { togglePaymentReceived } from "../../actions/toggleJobPaymentStatus";
+import { generateInvoiceFromJob } from "../../actions/generateInvoiceFromJob";
 import {
   ArrowLeft,
   MapPin,
@@ -296,19 +294,18 @@ export default function JobDetailView({
     }
   };
 
-  const handleToggleInvoiceSent = async () => {
+  const handleGenerateInvoice = async () => {
     if (!isAdmin || isTogglingInvoice) return;
     setIsTogglingInvoice(true);
-    const previousValue = invoiceSent;
-    setInvoiceSent(!invoiceSent); // Optimistic update
 
     try {
-      const result = await toggleInvoiceSent(job.id);
-      if (!result.success) {
-        setInvoiceSent(previousValue); // Revert on error
+      const result = await generateInvoiceFromJob(job.id);
+      if (result.success && result.invoiceId) {
+        setInvoiceSent(true);
+        router.push(`/invoices/${result.invoiceId}`);
       }
-    } catch (error) {
-      setInvoiceSent(previousValue); // Revert on error
+    } catch {
+      // silently fail
     } finally {
       setIsTogglingInvoice(false);
     }
@@ -541,11 +538,15 @@ export default function JobDetailView({
             <Button
               type="button"
               variant={invoiceSent ? "primary" : "default"}
-              href={`/invoices?job=${job.id}`}
               border={false}
-              disabled={!isAdmin}
+              disabled={!isAdmin || isTogglingInvoice}
+              onClick={handleGenerateInvoice}
               className="flex !justify-start gap-2 items-center px-2 py-3 rounded-xl transition-all duration-200">
-              <Receipt className="w-4 h-4" />
+              {isTogglingInvoice ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Receipt className="w-4 h-4" />
+              )}
               {invoiceSent ? "View Invoice" : "Generate Invoice"}
             </Button>
           </div>

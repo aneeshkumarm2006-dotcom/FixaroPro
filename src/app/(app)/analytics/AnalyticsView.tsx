@@ -196,6 +196,37 @@ interface AlertItem {
   createdAt: string;
 }
 
+interface MarketingCampaignData {
+  id: string;
+  name: string;
+  status: string;
+  budget: number;
+  spent: number;
+  channel: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  landingPageCount: number;
+}
+
+interface MarketingLandingPageData {
+  id: string;
+  title: string;
+  slug: string;
+  isPublished: boolean;
+  campaignName: string | null;
+  totalVisits: number;
+}
+
+interface MarketingData {
+  campaigns: MarketingCampaignData[];
+  landingPages: MarketingLandingPageData[];
+  totalPageVisits: number;
+  activeCampaigns: number;
+  publishedPages: number;
+  totalBudget: number;
+  totalSpent: number;
+}
+
 interface AnalyticsViewProps {
   jobStats: JobStats;
   revenueStats: RevenueStats;
@@ -221,6 +252,7 @@ interface AnalyticsViewProps {
   supplierComparisonData: Array<Record<string, string | number>>;
   supplierNames: string[];
   inventoryValueData: Array<{ name: string; warehouse: number; inCirculation: number }>;
+  marketingData?: MarketingData;
 }
 
 // ── Reusable Sub-components ──
@@ -397,6 +429,7 @@ export default function AnalyticsView({
   supplierComparisonData,
   supplierNames,
   inventoryValueData,
+  marketingData,
 }: AnalyticsViewProps) {
   const [activeView, setActiveView] = useState<TabView>("overview");
 
@@ -1773,28 +1806,178 @@ export default function AnalyticsView({
   };
 
   // ── Tab 10: Marketing ──
-  const MarketingTab = () => (
-    <div className="space-y-6">
-      <Card variant="default" className="p-12 text-center">
-        <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Megaphone className="w-8 h-8 text-[#005F6A]/40" />
-        </div>
-        <p className="text-sm font-[350] text-[#005F6A]/70">
-          Marketing Analytics
-        </p>
-        <p className="text-xs text-[#005F6A]/50 mt-1">
-          Campaign performance and landing page analytics will appear here once
-          the Sales & Marketing module (Phase 8) is configured
-        </p>
-      </Card>
+  const MarketingTab = () => {
+    const md = marketingData;
+    const budgetUsedPct =
+      md && md.totalBudget > 0
+        ? ((md.totalSpent / md.totalBudget) * 100).toFixed(1)
+        : "0";
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard label="Active Campaigns" value="0" subValue="No campaigns yet" />
-        <MetricCard label="Page Visits" value="0" subValue="No landing pages yet" />
-        <MetricCard label="Conversion Rate" value="0%" subValue="No data yet" />
+    return (
+      <div className="space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <MetricCard
+            label="Active Campaigns"
+            value={String(md?.activeCampaigns ?? 0)}
+            subValue={`${md?.campaigns.length ?? 0} total`}
+          />
+          <MetricCard
+            label="Page Visits"
+            value={String(md?.totalPageVisits ?? 0)}
+            subValue={`${md?.publishedPages ?? 0} published pages`}
+          />
+          <MetricCard
+            label="Budget Spent"
+            value={`$${(md?.totalSpent ?? 0).toFixed(0)}`}
+            subValue={`${budgetUsedPct}% of $${(md?.totalBudget ?? 0).toFixed(0)}`}
+          />
+          <MetricCard
+            label="Landing Pages"
+            value={String(md?.landingPages.length ?? 0)}
+            subValue={`${md?.publishedPages ?? 0} live`}
+          />
+        </div>
+
+        {/* Campaigns Table */}
+        <Card variant="default" className="p-5">
+          <h3 className="text-sm font-[400] text-[#005F6A] mb-3">
+            Campaign Performance
+          </h3>
+          {md && md.campaigns.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Campaign
+                    </th>
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Status
+                    </th>
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Channel
+                    </th>
+                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Budget
+                    </th>
+                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Spent
+                    </th>
+                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Pages
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {md.campaigns.map((c) => (
+                    <tr
+                      key={c.id}
+                      className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 font-[350] text-[#005F6A]">
+                        {c.name}
+                      </td>
+                      <td className="py-2">
+                        <Badge
+                          variant={
+                            c.status === "ACTIVE" ? "default" : "secondary"
+                          }
+                          size="sm">
+                          {c.status}
+                        </Badge>
+                      </td>
+                      <td className="py-2 text-[#005F6A]/60">
+                        {c.channel || "-"}
+                      </td>
+                      <td className="py-2 text-right text-[#005F6A]/70">
+                        ${c.budget.toFixed(0)}
+                      </td>
+                      <td className="py-2 text-right text-[#005F6A]/70">
+                        ${c.spent.toFixed(0)}
+                      </td>
+                      <td className="py-2 text-right text-[#005F6A]/70">
+                        {c.landingPageCount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-[#005F6A]/50 text-center py-4">
+              No campaigns yet. Create one from the Sales page.
+            </p>
+          )}
+        </Card>
+
+        {/* Landing Pages Table */}
+        <Card variant="default" className="p-5">
+          <h3 className="text-sm font-[400] text-[#005F6A] mb-3">
+            Landing Page Visits
+          </h3>
+          {md && md.landingPages.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Page
+                    </th>
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Status
+                    </th>
+                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Campaign
+                    </th>
+                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                      Total Visits
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {md.landingPages
+                    .sort((a, b) => b.totalVisits - a.totalVisits)
+                    .map((lp) => (
+                      <tr
+                        key={lp.id}
+                        className="border-b border-gray-50 last:border-0">
+                        <td className="py-2">
+                          <p className="font-[350] text-[#005F6A]">
+                            {lp.title}
+                          </p>
+                          <p className="text-xs text-[#005F6A]/40">
+                            /p/{lp.slug}
+                          </p>
+                        </td>
+                        <td className="py-2">
+                          <Badge
+                            variant={
+                              lp.isPublished ? "default" : "secondary"
+                            }
+                            size="sm">
+                            {lp.isPublished ? "Published" : "Draft"}
+                          </Badge>
+                        </td>
+                        <td className="py-2 text-[#005F6A]/60">
+                          {lp.campaignName || "-"}
+                        </td>
+                        <td className="py-2 text-right font-[400] text-[#005F6A]">
+                          {lp.totalVisits}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-[#005F6A]/50 text-center py-4">
+              No landing pages yet. Create one from the Sales page.
+            </p>
+          )}
+        </Card>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">

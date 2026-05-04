@@ -12,6 +12,7 @@ import {
   Star,
   Shield,
   Truck,
+  MapPin,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -23,6 +24,7 @@ import KitTemplatesTab from "./tabs/KitTemplatesTab";
 import MultipliersTab from "./tabs/MultipliersTab";
 import RolesTab from "./tabs/RolesTab";
 import SuppliersTab from "./tabs/SuppliersTab";
+import InventoryLocationsTab from "./tabs/InventoryLocationsTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -30,6 +32,7 @@ import {
   KitTemplateRecord,
   InventoryRuleRecord,
   SupplierRecord,
+  InventoryLocationRecord,
 } from "./types";
 
 interface SettingsClientProps {
@@ -40,6 +43,7 @@ interface SettingsClientProps {
   kitTemplates: KitTemplateRecord[];
   inventoryRules: InventoryRuleRecord[];
   suppliers: SupplierRecord[];
+  inventoryLocations: InventoryLocationRecord[];
 }
 
 type TabId =
@@ -52,7 +56,8 @@ type TabId =
   | "kitTemplates"
   | "multipliers"
   | "roles"
-  | "suppliers";
+  | "suppliers"
+  | "inventoryLocations";
 
 interface TabDef {
   id: TabId;
@@ -87,6 +92,12 @@ const TABS: TabDef[] = [
   { id: "multipliers", label: "Multipliers", icon: Star, adminOnly: true },
   { id: "roles", label: "Roles", icon: Shield, adminOnly: true },
   { id: "suppliers", label: "Suppliers", icon: Truck, adminOnly: true },
+  {
+    id: "inventoryLocations",
+    label: "Inventory Locations",
+    icon: MapPin,
+    adminOnly: true,
+  },
 ];
 
 export default function SettingsClient({
@@ -97,6 +108,7 @@ export default function SettingsClient({
   kitTemplates,
   inventoryRules,
   suppliers,
+  inventoryLocations,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -171,6 +183,12 @@ export default function SettingsClient({
           {activeTab === "roles" && isAdmin && <RolesTab />}
           {activeTab === "suppliers" && isAdmin && (
             <SuppliersTab products={products} suppliers={suppliers} />
+          )}
+          {activeTab === "inventoryLocations" && isAdmin && (
+            <InventoryLocationsTab
+              products={products}
+              locations={inventoryLocations}
+            />
           )}
         </div>
       </div>

@@ -16,9 +16,12 @@ import {
   LogOut,
   ArrowLeft,
   FileText,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
 import ClockInButton from "../ClockInButton";
 import ClockOutButton from "../ClockOutButton";
+import WhyThisPriceLink from "../WhyThisPriceLink";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -63,13 +66,17 @@ export default async function JobDetailPage({ params }: PageProps) {
     redirect("/my-jobs");
   }
 
-  // Get employee's product inventory for clock out
+  // Get employee's product inventory for clock out (with inventory rule for thresholds)
   const employeeProducts = await db.employeeProduct.findMany({
     where: {
       employeeId: session.user.id,
     },
     include: {
-      product: true,
+      product: {
+        include: {
+          inventoryRule: true,
+        },
+      },
     },
   });
 
@@ -86,6 +93,10 @@ export default async function JobDetailPage({ params }: PageProps) {
 
   const canClockIn = !jobWithClock.clockInTime && job.status !== "COMPLETED";
   const canClockOut = jobWithClock.clockInTime && !jobWithClock.clockOutTime;
+  const instantPayoutEligible =
+    job.status === "COMPLETED" &&
+    job.paymentReceived === true &&
+    isEmployee;
 
   return (
     <div className="space-y-4">
@@ -139,6 +150,37 @@ export default async function JobDetailPage({ params }: PageProps) {
           )}
         </div>
       </Card>
+
+      {/* Instant Payout Eligibility */}
+      {instantPayoutEligible && (
+        <Card variant="cleano_light_bordered" className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-[400] text-neutral-950">
+                  Instant Payout Eligible
+                </h2>
+                <p className="text-sm text-neutral-950/60 mt-1">
+                  Payment received from client. Request a withdrawal of
+                  {job.employeePay !== null
+                    ? ` $${job.employeePay.toFixed(2)} `
+                    : " your earnings "}
+                  from the My Pay page.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/my-pay"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl text-sm bg-[#005F6A] text-white hover:bg-[#005F6A]/90 transition-colors flex-shrink-0">
+              <DollarSign className="w-4 h-4" />
+              Withdraw
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Clock In/Out Actions */}
       {(canClockIn || canClockOut) && (
@@ -320,9 +362,12 @@ export default async function JobDetailPage({ params }: PageProps) {
             )}
             {job.employeePay !== null && isEmployee && (
               <div className="flex justify-between items-center pt-2 border-t border-neutral-950/10">
-                <dt className="text-sm text-neutral-950/60 flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  Your Pay
+                <dt className="text-sm text-neutral-950/60 flex flex-col gap-1">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="w-4 h-4" />
+                    Your Pay
+                  </span>
+                  <WhyThisPriceLink jobId={job.id} />
                 </dt>
                 <dd className="text-lg font-[400] text-neutral-950">
                   ${job.employeePay.toFixed(2)}

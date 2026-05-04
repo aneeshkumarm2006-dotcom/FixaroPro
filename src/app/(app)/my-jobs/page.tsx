@@ -186,6 +186,131 @@ export default async function MyJobsPage({
     return job?.employeeId === session.user.id;
   };
 
+  // Compute missing equipment per upcoming job (for warning icon)
+  const upcomingJobs = filteredJobs.filter(
+    (j) =>
+      j.status !== "COMPLETED" &&
+      j.status !== "CANCELLED" &&
+      !(j as any).clockOutTime
+  );
+
+  const missingEquipmentByJob = new Map<
+    string,
+    { productId: string; productName: string; needed: number; have: number }[]
+  >();
+
+  if (upcomingJobs.length > 0) {
+    const [employeeProducts, kitTemplates, inventoryRules] = await Promise.all([
+      db.employeeProduct.findMany({
+        where: { employeeId: session.user.id },
+        include: { product: true },
+      }),
+      db.kitTemplate.findMany({
+        where: { isActive: true },
+        include: { items: { include: { product: true } } },
+      }),
+      db.inventoryRule.findMany({
+        where: { usagePerJob: { gt: 0 } },
+        include: { product: true },
+      }),
+    ]);
+
+    const employeeInventory = new Map<string, number>();
+    for (const ep of employeeProducts) {
+      employeeInventory.set(ep.productId, ep.quantity);
+    }
+
+    const kitsByName = new Map<string, (typeof kitTemplates)[number]>();
+    for (const k of kitTemplates) {
+      kitsByName.set(k.name.toLowerCase(), k);
+    }
+
+    const jobsWithAddOns = await db.job.findMany({
+      where: { id: { in: upcomingJobs.map((j) => j.id) } },
+      include: { addOns: true },
+    });
+    const addOnsByJobId = new Map<string, string[]>();
+    for (const j of jobsWithAddOns) {
+      addOnsByJobId.set(
+        j.id,
+        j.addOns.map((a) => a.name)
+      );
+    }
+
+    for (const job of upcomingJobs) {
+      const required = new Map<
+        string,
+        { needed: number; productName: string }
+      >();
+
+      const jobTypeKit = job.jobType
+        ? kitsByName.get(job.jobType.toLowerCase())
+        : null;
+      if (jobTypeKit) {
+        for (const item of jobTypeKit.items) {
+          const existing = required.get(item.productId);
+          if (existing) {
+            existing.needed += item.quantity;
+          } else {
+            required.set(item.productId, {
+              needed: item.quantity,
+              productName: item.product.name,
+            });
+          }
+        }
+      }
+
+      const jobAddOns = addOnsByJobId.get(job.id) || [];
+      for (const addOn of jobAddOns) {
+        const addOnKit = kitsByName.get(addOn.toLowerCase());
+        if (addOnKit) {
+          for (const item of addOnKit.items) {
+            const existing = required.get(item.productId);
+            if (existing) {
+              existing.needed += item.quantity;
+            } else {
+              required.set(item.productId, {
+                needed: item.quantity,
+                productName: item.product.name,
+              });
+            }
+          }
+        }
+      }
+
+      // Fall back to inventory rules if no kit-derived requirements
+      if (required.size === 0) {
+        for (const rule of inventoryRules) {
+          required.set(rule.productId, {
+            needed: rule.usagePerJob,
+            productName: rule.product.name,
+          });
+        }
+      }
+
+      const missing: {
+        productId: string;
+        productName: string;
+        needed: number;
+        have: number;
+      }[] = [];
+      for (const [productId, req] of required) {
+        const have = employeeInventory.get(productId) ?? 0;
+        if (have < req.needed) {
+          missing.push({
+            productId,
+            productName: req.productName,
+            needed: req.needed,
+            have,
+          });
+        }
+      }
+      if (missing.length > 0) {
+        missingEquipmentByJob.set(job.id, missing);
+      }
+    }
+  }
+
   return (
     <JobsLoadingProvider>
       <ClearLoadingOnMount dataKey={dataKey} />
@@ -225,6 +350,9 @@ export default async function MyJobsPage({
                 <span className="px-6 py-3 text-left text-xs font-[400] text-gray-500 uppercase tracking-wider flex items-center w-[150px] min-w-[150px]">
                   Actual End
                 </span>
+                <div className="w-[140px] min-w-[140px]">
+                  <TableHeader label="Pay" sortKey="employeePay" />
+                </div>
                 <div className="w-[200px] min-w-[200px]">
                   <TableHeader label="Status" sortKey="status" />
                 </div>
@@ -265,6 +393,7 @@ export default async function MyJobsPage({
                           <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
                           <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
                           <div className="px-6 py-4 w-[150px] min-w-[150px]"></div>
+                          <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
                           <div className="px-6 py-4 w-[200px] min-w-[200px]"></div>
                           <div className="px-6 py-4 w-[160px] min-w-[160px]"></div>
                         </div>
@@ -278,6 +407,9 @@ export default async function MyJobsPage({
                         key={job.id}
                         job={job}
                         isMainEmployee={isMainEmployee(job.id)}
+                        missingEquipment={
+                          missingEquipmentByJob.get(job.id) || []
+                        }
                       />
                     ))}
                     {/* Placeholder rows to fill up to minimum display rows */}

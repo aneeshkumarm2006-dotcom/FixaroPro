@@ -65,6 +65,22 @@ export interface SupplierRecord {
   prices: SupplierPriceRecord[];
 }
 
+export interface InventoryLocationStockRecord {
+  id: string;
+  locationId: string;
+  productId: string;
+  quantity: number;
+}
+
+export interface InventoryLocationRecord {
+  id: string;
+  name: string;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+  stock: InventoryLocationStockRecord[];
+}
+
 // Helpers to read AppSetting values by key with a fallback
 export function getSetting<T>(
   settings: AppSettingRecord[],

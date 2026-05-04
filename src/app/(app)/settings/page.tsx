@@ -26,6 +26,7 @@ export default async function SettingsPage() {
     kitTemplates,
     inventoryRules,
     suppliers,
+    inventoryLocations,
   ] = isAdmin
     ? await Promise.all([
         db.appSetting.findMany(),
@@ -43,8 +44,12 @@ export default async function SettingsPage() {
           },
           orderBy: { name: "asc" },
         }),
+        db.inventoryLocation.findMany({
+          include: { stock: true },
+          orderBy: { name: "asc" },
+        }),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
 
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">
@@ -56,6 +61,7 @@ export default async function SettingsPage() {
         kitTemplates={kitTemplates as never}
         inventoryRules={inventoryRules as never}
         suppliers={suppliers as never}
+        inventoryLocations={inventoryLocations as never}
       />
     </div>
   );

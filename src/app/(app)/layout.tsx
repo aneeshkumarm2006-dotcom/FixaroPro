@@ -86,8 +86,17 @@ export default async function DashboardLayout({
             <NavLink href="/my-pay" icon="my-pay" iconOnly>
               My Pay
             </NavLink>
+            <NavLink href="/my-inventory" icon="my-inventory" iconOnly>
+              My Inventory
+            </NavLink>
             <NavLink href="/calendar" icon="calendar" iconOnly>
               Calendar
+            </NavLink>
+            <NavLink href="/training" icon="training" iconOnly>
+              Training
+            </NavLink>
+            <NavLink href="/documents" icon="documents" iconOnly>
+              Documents
             </NavLink>
           </nav>
 

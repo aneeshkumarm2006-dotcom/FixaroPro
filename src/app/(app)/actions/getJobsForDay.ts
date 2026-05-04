@@ -89,6 +89,54 @@ export async function getJobsForDay(dateStr: string) {
     orderBy: [{ jobDate: "asc" }, { startTime: "asc" }],
   });
 
+  // For employees, check equipment availability
+  let missingEquipmentMap: Record<string, { productName: string; needed: number; have: number }[]> = {};
+  if (!isAdmin && jobs.length > 0) {
+    const [employeeProducts, inventoryRules] = await Promise.all([
+      db.employeeProduct.findMany({
+        where: { employeeId: session.user.id },
+        include: { product: true },
+      }),
+      db.inventoryRule.findMany({
+        include: { product: true },
+      }),
+    ]);
+
+    // Build a map of what the employee has: productId -> quantity
+    const employeeInventory: Record<string, { quantity: number; name: string }> = {};
+    for (const ep of employeeProducts) {
+      employeeInventory[ep.productId] = {
+        quantity: ep.quantity,
+        name: ep.product.name,
+      };
+    }
+
+    // For each job, check if any products needed per job exceed what the employee has
+    for (const job of jobs) {
+      // Only check for upcoming/active jobs
+      if (job.status === "COMPLETED" || job.status === "PAID" || job.status === "CANCELLED") {
+        continue;
+      }
+
+      const missing: { productName: string; needed: number; have: number }[] = [];
+      for (const rule of inventoryRules) {
+        if (rule.usagePerJob > 0) {
+          const have = employeeInventory[rule.productId]?.quantity ?? 0;
+          if (have < rule.usagePerJob) {
+            missing.push({
+              productName: rule.product.name,
+              needed: rule.usagePerJob,
+              have,
+            });
+          }
+        }
+      }
+      if (missing.length > 0) {
+        missingEquipmentMap[job.id] = missing;
+      }
+    }
+  }
+
   return jobs.map((job) => {
     const startTime = new Date(job.startTime);
     const endTime = job.endTime ? new Date(job.endTime) : undefined;
@@ -125,6 +173,7 @@ export async function getJobsForDay(dateStr: string) {
         employeeId: job.employee.id,
         employeeName: job.employee.name,
         cleaners: job.cleaners,
+        missingEquipment: missingEquipmentMap[job.id] || [],
       },
     };
   });

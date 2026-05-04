@@ -7,6 +7,7 @@ import { CalendarRef, CalendarEvent } from "@/components/calendar/types";
 import { CalendarProvider } from "@/components/calendar/CalendarContext";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import { useCalendar } from "@/components/calendar/CalendarContext";
+import CalendarJobActions from "@/components/calendar/CalendarJobActions";
 
 const validViews = new Set(["month", "week", "day"]);
 
@@ -119,6 +120,7 @@ export default function CalendarPageClient() {
       <div className="h-full overflow-hidden">
         <Calendar ref={calendarRef} />
       </div>
+      <CalendarJobActions />
     </CalendarProvider>
   );
 }

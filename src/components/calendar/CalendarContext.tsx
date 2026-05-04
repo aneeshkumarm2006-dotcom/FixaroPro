@@ -448,25 +448,12 @@ export const CalendarProvider = ({
 
   const openEventDetailsModal = useCallback(
     (event: CalendarEvent) => {
-      // If this is a job event, navigate to the job detail page
-      if (event.metadata?.jobId) {
-        // Capture the current calendar URL to return to exact same view
-        const currentParams = new URLSearchParams(searchParams.toString());
-        const calendarUrl = `${pathname}?${currentParams.toString()}`;
-        const encodedCalendarUrl = encodeURIComponent(calendarUrl);
-
-        // Add returnTo parameter with the full calendar URL
-        router.push(
-          `/jobs/${event.metadata.jobId}?returnTo=${encodedCalendarUrl}`
-        );
-        return;
-      }
-
-      // Otherwise, show the event modal (for non-job events)
+      // Show the event details modal for all events (including jobs)
+      // CalendarJobActions will handle job-specific UI when rendered
       setSelectedEvent(event);
       setShowEventModal(true);
     },
-    [router, pathname, searchParams]
+    []
   );
 
   const openEventModal = useCallback(

@@ -35,6 +35,11 @@ export default async function DashboardPage() {
   const isAdmin =
     userWithRole.role === "OWNER" || userWithRole.role === "ADMIN";
 
+  // Redirect employees to calendar as their default landing page
+  if (userWithRole.role === "EMPLOYEE") {
+    redirect("/calendar");
+  }
+
   // Fetch dashboard data
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

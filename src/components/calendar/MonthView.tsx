@@ -179,13 +179,62 @@ export const MonthView = () => {
                                     backgroundColor: styleInfo.color + "30",
                                     color: styleInfo.color,
                                   }}>
-                                  {event.metadata.status
-                                    .replace("_", " ")
-                                    .slice(0, 4)}
+                                  {event.metadata.status.replace("_", " ")}
                                 </div>
                               )}
                             </div>
-                            {event.label && (
+                            {isJob && event.metadata?.location && (
+                              <div className="app-subtitle truncate opacity-70 flex items-center gap-0.5">
+                                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {event.metadata.location}
+                              </div>
+                            )}
+                            {isJob && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {event.metadata?.jobType && (
+                                  <span
+                                    className="app-subtitle !text-[9px] px-1 py-0 rounded"
+                                    style={{
+                                      backgroundColor: styleInfo.color + "20",
+                                      color: styleInfo.color,
+                                    }}>
+                                    {event.metadata.jobType === "R"
+                                      ? "Res"
+                                      : event.metadata.jobType === "C"
+                                      ? "Com"
+                                      : event.metadata.jobType === "PC"
+                                      ? "Post-C"
+                                      : event.metadata.jobType === "F"
+                                      ? "F/Up"
+                                      : event.metadata.jobType}
+                                  </span>
+                                )}
+                                {event.metadata?.employeePay != null && (
+                                  <span className="app-subtitle !text-[9px] font-[450] opacity-80">
+                                    ${Number(event.metadata.employeePay).toFixed(0)}
+                                  </span>
+                                )}
+                                {event.metadata?.missingEquipment?.length > 0 && (
+                                  <svg
+                                    className="w-3 h-3 flex-shrink-0"
+                                    style={{ color: "#F59E0B" }}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}>
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                            {!isJob && event.label && (
                               <div className="app-subtitle truncate opacity-80">
                                 {event.label}
                               </div>

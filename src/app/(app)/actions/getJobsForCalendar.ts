@@ -92,14 +92,56 @@ export async function getJobsForCalendar(startDate?: Date, endDate?: Date) {
     ],
   });
 
+  // For employees, check equipment availability
+  let missingEquipmentMap: Record<string, { productName: string; needed: number; have: number }[]> = {};
+  if (!isAdmin && jobs.length > 0) {
+    const [employeeProducts, inventoryRules] = await Promise.all([
+      db.employeeProduct.findMany({
+        where: { employeeId: session.user.id },
+        include: { product: true },
+      }),
+      db.inventoryRule.findMany({
+        include: { product: true },
+      }),
+    ]);
+
+    const employeeInventory: Record<string, { quantity: number; name: string }> = {};
+    for (const ep of employeeProducts) {
+      employeeInventory[ep.productId] = {
+        quantity: ep.quantity,
+        name: ep.product.name,
+      };
+    }
+
+    for (const job of jobs) {
+      if (job.status === "COMPLETED" || job.status === "PAID" || job.status === "CANCELLED") {
+        continue;
+      }
+
+      const missing: { productName: string; needed: number; have: number }[] = [];
+      for (const rule of inventoryRules) {
+        if (rule.usagePerJob > 0) {
+          const have = employeeInventory[rule.productId]?.quantity ?? 0;
+          if (have < rule.usagePerJob) {
+            missing.push({
+              productName: rule.product.name,
+              needed: rule.usagePerJob,
+              have,
+            });
+          }
+        }
+      }
+      if (missing.length > 0) {
+        missingEquipmentMap[job.id] = missing;
+      }
+    }
+  }
+
   // Transform jobs to calendar event format
   return jobs.map((job) => {
-    // Use jobDate if available, otherwise use startTime
-    const eventDate = job.jobDate || job.startTime;
-    
     // Create start time by combining date with startTime
     const start = new Date(job.startTime);
-    
+
     // Create end time if available
     const end = job.endTime ? new Date(job.endTime) : undefined;
 
@@ -131,6 +173,7 @@ export async function getJobsForCalendar(startDate?: Date, endDate?: Date) {
         employeeId: job.employee.id,
         employeeName: job.employee.name,
         cleaners: job.cleaners,
+        missingEquipment: missingEquipmentMap[job.id] || [],
       },
     };
   });

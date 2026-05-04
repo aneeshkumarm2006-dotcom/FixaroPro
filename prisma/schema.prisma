@@ -29,6 +29,14 @@ model User {
   payouts           Payout[]
   approvedPeriods   PayPeriod[]        @relation("PayPeriodApprover")
   ragWashes         RagWash[]
+  availabilities    EmployeeAvailability[]
+  photos            JobPhoto[]
+  checklists        JobChecklist[]
+  signatures        DocumentSignature[]
+  trainingProgress  TrainingProgress[]
+  ratings           EmployeeRating[]
+  withdrawals       Withdrawal[]
+  checkouts         InventoryCheckout[]
 }
 
 model Account {
@@ -83,6 +91,8 @@ model Product {
   kitItems          KitTemplateItem[]
   inventoryRule     InventoryRule?
   supplierPrices    SupplierPrice[]
+  locationStock     InventoryLocationStock[]
+  checkoutItems     InventoryCheckoutItem[]
 }
 
 model AppSetting {
@@ -212,6 +222,9 @@ model Job {
   addOns            JobAddOn[]
   transactions      Transaction[]
   invoices          Invoice[]
+  photos            JobPhoto[]
+  checklists        JobChecklist[]
+  ratings           EmployeeRating[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -568,6 +581,305 @@ enum TargetPeriod {
   MONTHLY
   QUARTERLY
   YEARLY
+}
+
+// ── Phase E0: Employee Foundation ──
+
+enum AvailabilityDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum DocumentStatus {
+  PENDING
+  SIGNED
+  EXPIRED
+  REVOKED
+}
+
+enum ChecklistItemStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model EmployeeAvailability {
+  id          String          @id @default(cuid())
+  employeeId  String
+  day         AvailabilityDay
+  startTime   String
+  endTime     String
+  isAvailable Boolean         @default(true)
+  isRecurring Boolean         @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  employee    User            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, day])
+  @@index([employeeId])
+}
+
+model JobPhoto {
+  id         String   @id @default(cuid())
+  jobId      String
+  employeeId String
+  url        String
+  caption    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([employeeId])
+}
+
+model ChecklistTemplate {
+  id          String                  @id @default(cuid())
+  name        String
+  jobType     String?
+  addOnName   String?
+  description String?
+  isActive    Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  items       ChecklistTemplateItem[]
+  jobChecklists JobChecklist[]
+}
+
+model ChecklistTemplateItem {
+  id          String            @id @default(cuid())
+  templateId  String
+  title       String
+  description String?
+  isRequired  Boolean           @default(true)
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  template    ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+}
+
+model JobChecklist {
+  id         String             @id @default(cuid())
+  jobId      String
+  employeeId String
+  templateId String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  job        Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employee   User               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  template   ChecklistTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  items      JobChecklistItem[]
+
+  @@index([jobId])
+  @@index([employeeId])
+}
+
+model JobChecklistItem {
+  id          String              @id @default(cuid())
+  checklistId String
+  title       String
+  description String?
+  status      ChecklistItemStatus @default(PENDING)
+  isRequired  Boolean             @default(true)
+  sortOrder   Int                 @default(0)
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  checklist   JobChecklist        @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+}
+
+model Document {
+  id          String              @id @default(cuid())
+  title       String
+  description String?
+  content     String?             @db.Text
+  fileUrl     String?
+  version     String              @default("1.0")
+  dueDate     DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  signatures  DocumentSignature[]
+}
+
+model DocumentSignature {
+  id            String         @id @default(cuid())
+  documentId    String
+  employeeId    String
+  status        DocumentStatus @default(PENDING)
+  signatureUrl  String?
+  signedAt      DateTime?
+  ipAddress     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  employee      User           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, employeeId])
+  @@index([documentId])
+  @@index([employeeId])
+}
+
+model TrainingModule {
+  id          String             @id @default(cuid())
+  title       String
+  description String?
+  videoUrl    String?
+  duration    Int?
+  isRequired  Boolean            @default(false)
+  sortOrder   Int                @default(0)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  quizzes     TrainingQuiz[]
+  progress    TrainingProgress[]
+}
+
+model TrainingQuiz {
+  id         String         @id @default(cuid())
+  moduleId   String
+  question   String
+  options    Json
+  sortOrder  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  module     TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId])
+}
+
+model TrainingProgress {
+  id            String         @id @default(cuid())
+  moduleId      String
+  employeeId    String
+  status        TrainingStatus @default(NOT_STARTED)
+  videoProgress Float          @default(0)
+  quizScore     Float?
+  quizAttempts  Int            @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  module        TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  employee      User           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, employeeId])
+  @@index([moduleId])
+  @@index([employeeId])
+}
+
+model EmployeeRating {
+  id         String   @id @default(cuid())
+  employeeId String
+  jobId      String?
+  rating     Float
+  notes      String?
+  ratedBy    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  job        Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model Withdrawal {
+  id            String           @id @default(cuid())
+  employeeId    String
+  amount        Float
+  status        WithdrawalStatus @default(PENDING)
+  paymentMethod PaymentType?
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  employee      User             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model InventoryLocation {
+  id        String                  @id @default(cuid())
+  name      String
+  address   String?
+  notes     String?
+  isActive  Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  stock     InventoryLocationStock[]
+  checkouts InventoryCheckout[]
+}
+
+model InventoryLocationStock {
+  id         String            @id @default(cuid())
+  locationId String
+  productId  String
+  quantity   Float             @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  location   InventoryLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([locationId])
+  @@index([productId])
+}
+
+model InventoryCheckout {
+  id         String                  @id @default(cuid())
+  employeeId String
+  locationId String
+  notes      String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  employee   User                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location   InventoryLocation       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  items      InventoryCheckoutItem[]
+
+  @@index([employeeId])
+  @@index([locationId])
+}
+
+model InventoryCheckoutItem {
+  id         String            @id @default(cuid())
+  checkoutId String
+  productId  String
+  quantity   Float
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  checkout   InventoryCheckout @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([checkoutId])
+  @@index([productId])
 }
 
 // ── Phase 8: Sales & Marketing ──

@@ -81,12 +81,28 @@ export const EventCard: React.FC<EventCardProps> = ({
             style={{
               backgroundColor: styleInfo.color + "30",
             }}>
-            {event.metadata.status.replace("_", " ").slice(0, 4)}
+            {event.metadata.status.replace("_", " ")}
           </span>
         )}
       </div>
 
-      {layout.height > 30 && event.label && (
+      {layout.height > 30 && event.metadata?.jobId && event.metadata?.jobType && (
+        <div
+          className="app-subtitle truncate text-[10px]"
+          style={{ color: styleInfo.color, opacity: 0.85 }}>
+          {event.metadata.jobType === "R"
+            ? "Residential"
+            : event.metadata.jobType === "C"
+            ? "Commercial"
+            : event.metadata.jobType === "PC"
+            ? "Post-Construction"
+            : event.metadata.jobType === "F"
+            ? "Follow-up"
+            : event.metadata.jobType}
+        </div>
+      )}
+
+      {layout.height > 30 && !event.metadata?.jobType && event.label && (
         <div
           className="app-subtitle truncate"
           style={{ color: styleInfo.color }}>
@@ -97,6 +113,38 @@ export const EventCard: React.FC<EventCardProps> = ({
       {layout.height > 50 &&
         event.metadata?.location &&
         renderLocation?.(event, styleInfo.color)}
+
+      {layout.height > 65 &&
+        event.metadata?.jobId &&
+        event.metadata?.employeePay != null && (
+          <div
+            className="app-subtitle truncate text-[10px] font-[450]"
+            style={{ color: styleInfo.color, opacity: 0.8 }}>
+            ${Number(event.metadata.employeePay).toFixed(2)}
+          </div>
+        )}
+
+      {layout.height > 80 &&
+        event.metadata?.jobId &&
+        event.metadata?.missingEquipment?.length > 0 && (
+          <div
+            className="app-subtitle truncate text-[10px] flex items-center gap-0.5"
+            style={{ color: "#F59E0B" }}>
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+            Missing equipment
+          </div>
+        )}
     </Button>
   );
 };

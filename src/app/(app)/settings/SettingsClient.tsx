@@ -13,6 +13,7 @@ import {
   Shield,
   Truck,
   MapPin,
+  ListChecks,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -25,6 +26,7 @@ import MultipliersTab from "./tabs/MultipliersTab";
 import RolesTab from "./tabs/RolesTab";
 import SuppliersTab from "./tabs/SuppliersTab";
 import InventoryLocationsTab from "./tabs/InventoryLocationsTab";
+import ChecklistTemplatesTab from "./tabs/ChecklistTemplatesTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -33,6 +35,7 @@ import {
   InventoryRuleRecord,
   SupplierRecord,
   InventoryLocationRecord,
+  ChecklistTemplateRecord,
 } from "./types";
 
 interface SettingsClientProps {
@@ -44,6 +47,7 @@ interface SettingsClientProps {
   inventoryRules: InventoryRuleRecord[];
   suppliers: SupplierRecord[];
   inventoryLocations: InventoryLocationRecord[];
+  checklistTemplates: ChecklistTemplateRecord[];
 }
 
 type TabId =
@@ -54,6 +58,7 @@ type TabId =
   | "paymentTypes"
   | "inventoryRules"
   | "kitTemplates"
+  | "checklistTemplates"
   | "multipliers"
   | "roles"
   | "suppliers"
@@ -89,6 +94,12 @@ const TABS: TabDef[] = [
     icon: Package,
     adminOnly: true,
   },
+  {
+    id: "checklistTemplates",
+    label: "Checklist Templates",
+    icon: ListChecks,
+    adminOnly: true,
+  },
   { id: "multipliers", label: "Multipliers", icon: Star, adminOnly: true },
   { id: "roles", label: "Roles", icon: Shield, adminOnly: true },
   { id: "suppliers", label: "Suppliers", icon: Truck, adminOnly: true },
@@ -109,6 +120,7 @@ export default function SettingsClient({
   inventoryRules,
   suppliers,
   inventoryLocations,
+  checklistTemplates,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -175,6 +187,12 @@ export default function SettingsClient({
             <KitTemplatesTab
               products={products}
               kitTemplates={kitTemplates}
+            />
+          )}
+          {activeTab === "checklistTemplates" && isAdmin && (
+            <ChecklistTemplatesTab
+              templates={checklistTemplates}
+              settings={appSettings}
             />
           )}
           {activeTab === "multipliers" && isAdmin && (

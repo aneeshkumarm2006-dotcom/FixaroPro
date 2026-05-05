@@ -65,6 +65,25 @@ export interface SupplierRecord {
   prices: SupplierPriceRecord[];
 }
 
+export interface ChecklistTemplateItemRecord {
+  id: string;
+  templateId: string;
+  title: string;
+  description: string | null;
+  isRequired: boolean;
+  sortOrder: number;
+}
+
+export interface ChecklistTemplateRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  jobType: string | null;
+  addOnName: string | null;
+  isActive: boolean;
+  items: ChecklistTemplateItemRecord[];
+}
+
 export interface InventoryLocationStockRecord {
   id: string;
   locationId: string;

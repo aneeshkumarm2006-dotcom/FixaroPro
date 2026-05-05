@@ -18,12 +18,14 @@ import {
   FileText,
   Zap,
   Camera,
+  ListChecks,
 } from "lucide-react";
 import Link from "next/link";
 import ClockInButton from "../ClockInButton";
 import ClockOutButton from "../ClockOutButton";
 import WhyThisPriceLink from "../WhyThisPriceLink";
 import PhotoGallery from "./PhotoGallery";
+import JobChecklistPanel from "./JobChecklistPanel";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -394,6 +396,32 @@ export default async function JobDetailPage({ params }: PageProps) {
             <p className="text-neutral-950/70 whitespace-pre-wrap leading-relaxed">
               {job.notes}
             </p>
+          </Card>
+        </div>
+      )}
+
+      {/* Checklist */}
+      {(job.status === "SCHEDULED" ||
+        job.status === "IN_PROGRESS" ||
+        job.status === "COMPLETED" ||
+        job.status === "PAID") && (
+        <div id="checklist" className="scroll-mt-20">
+          <h2 className="text-lg font-[400] text-neutral-950 mt-12">
+            Checklist
+          </h2>
+          <Card variant="default" className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-neutral-950/20 rounded-lg">
+                <ListChecks className="w-5 h-5 text-neutral-950" />
+              </div>
+              <h2 className="text-lg font-[400] text-neutral-950">
+                Job Checklist
+              </h2>
+            </div>
+            <JobChecklistPanel
+              jobId={job.id}
+              canEdit={job.status !== "PAID"}
+            />
           </Card>
         </div>
       )}

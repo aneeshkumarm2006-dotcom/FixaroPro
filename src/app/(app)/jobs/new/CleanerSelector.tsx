@@ -3,18 +3,127 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Input from "@/components/ui/Input";
-import { X, Search, Users } from "lucide-react";
+import { X, Search, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
+
+type AvailabilityDay =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
+
+interface AvailabilitySlot {
+  day: AvailabilityDay;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+}
 
 interface User {
   id: string;
   name: string;
   email: string;
+  availability?: AvailabilitySlot[];
 }
 
 interface CleanerSelectorProps {
   users: User[];
   initialSelectedIds?: string[];
+}
+
+type AvailabilityStatus =
+  | "AVAILABLE"
+  | "UNAVAILABLE"
+  | "OUTSIDE_HOURS"
+  | "NO_DATA"
+  | "NO_TIME";
+
+const DAY_BY_INDEX: AvailabilityDay[] = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+];
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map((p) => parseInt(p, 10));
+  return h * 60 + m;
+}
+
+function evaluateAvailability(
+  slots: AvailabilitySlot[] | undefined,
+  start: Date | null,
+  end: Date | null
+): AvailabilityStatus {
+  if (!start) return "NO_TIME";
+  if (!slots || slots.length === 0) return "NO_DATA";
+
+  const effectiveEnd = end ?? new Date(start.getTime() + 60 * 60 * 1000);
+  const day = DAY_BY_INDEX[start.getDay()];
+  const startMin = start.getHours() * 60 + start.getMinutes();
+  const endMin = effectiveEnd.getHours() * 60 + effectiveEnd.getMinutes();
+
+  const dailySlots = slots.filter((s) => {
+    if (s.day !== day) return false;
+    if (s.effectiveFrom && start < new Date(s.effectiveFrom)) return false;
+    if (s.effectiveTo && start > new Date(s.effectiveTo)) return false;
+    return true;
+  });
+
+  if (dailySlots.length === 0) return "OUTSIDE_HOURS";
+
+  const overlaps = (s: AvailabilitySlot) => {
+    const sStart = toMinutes(s.startTime);
+    const sEnd = toMinutes(s.endTime);
+    return startMin < sEnd && endMin > sStart;
+  };
+
+  const blocked = dailySlots.find((s) => !s.isAvailable && overlaps(s));
+  if (blocked) return "UNAVAILABLE";
+
+  const available = dailySlots.filter((s) => s.isAvailable);
+  if (available.length === 0) return "OUTSIDE_HOURS";
+
+  const fullyCovered = available.some((s) => {
+    const sStart = toMinutes(s.startTime);
+    const sEnd = toMinutes(s.endTime);
+    return startMin >= sStart && endMin <= sEnd;
+  });
+
+  return fullyCovered ? "AVAILABLE" : "OUTSIDE_HOURS";
+}
+
+function StatusIndicator({ status }: { status: AvailabilityStatus }) {
+  if (status === "NO_TIME" || status === "NO_DATA") return null;
+  if (status === "AVAILABLE") {
+    return (
+      <span title="Available" className="inline-flex items-center text-green-600">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+  if (status === "UNAVAILABLE") {
+    return (
+      <span title="Marked unavailable" className="inline-flex items-center text-red-600">
+        <X className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+  return (
+    <span
+      title="Outside normal hours"
+      className="inline-flex items-center text-yellow-600">
+      <AlertTriangle className="w-3.5 h-3.5" />
+    </span>
+  );
 }
 
 export default function CleanerSelector({
@@ -32,22 +141,63 @@ export default function CleanerSelector({
     width: 0,
   });
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [scheduledStart, setScheduledStart] = useState<Date | null>(null);
+  const [scheduledEnd, setScheduledEnd] = useState<Date | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Watch the form's date/time fields so we can evaluate availability live
+  useEffect(() => {
+    const startDateEl = document.getElementById("startDate") as HTMLInputElement | null;
+    const startTimeEl = document.getElementById("startTime") as HTMLInputElement | null;
+    const endDateEl = document.getElementById("endDate") as HTMLInputElement | null;
+    const endTimeEl = document.getElementById("endTime") as HTMLInputElement | null;
+
+    const recompute = () => {
+      const sd = startDateEl?.value || "";
+      const st = startTimeEl?.value || "";
+      const ed = endDateEl?.value || "";
+      const et = endTimeEl?.value || "";
+
+      if (sd && st) {
+        const start = new Date(`${sd}T${st}`);
+        setScheduledStart(Number.isNaN(start.getTime()) ? null : start);
+      } else {
+        setScheduledStart(null);
+      }
+
+      if (ed && et) {
+        const end = new Date(`${ed}T${et}`);
+        setScheduledEnd(Number.isNaN(end.getTime()) ? null : end);
+      } else {
+        setScheduledEnd(null);
+      }
+    };
+
+    recompute();
+    const els = [startDateEl, startTimeEl, endDateEl, endTimeEl].filter(
+      (el): el is HTMLInputElement => !!el
+    );
+    els.forEach((el) => el.addEventListener("change", recompute));
+    els.forEach((el) => el.addEventListener("input", recompute));
+    return () => {
+      els.forEach((el) => el.removeEventListener("change", recompute));
+      els.forEach((el) => el.removeEventListener("input", recompute));
+    };
+  }, []);
 
   // Update dropdown position based on input position
   const updateDropdownPosition = () => {
     if (inputContainerRef.current) {
       const rect = inputContainerRef.current.getBoundingClientRect();
       setDropdownPosition({
-        top: rect.bottom + 4, // 4px offset
+        top: rect.bottom + 4,
         left: rect.left,
         width: rect.width,
       });
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -64,7 +214,6 @@ export default function CleanerSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter users based on search term
   const filteredUsers = useMemo(() => {
     const search = searchTerm.toLowerCase().trim();
     if (!search) return users;
@@ -76,17 +225,15 @@ export default function CleanerSelector({
     );
   }, [searchTerm, users]);
 
-  // Get users that haven't been selected yet
   const availableUsers = useMemo(() => {
     const selectedIds = new Set(selectedCleaners.map((c) => c.id));
     return filteredUsers.filter((user) => !selectedIds.has(user.id));
   }, [filteredUsers, selectedCleaners]);
 
-  // Update position when dropdown opens and on scroll/resize
   useEffect(() => {
     if (isDropdownOpen) {
       updateDropdownPosition();
-      setHighlightedIndex(0); // Reset highlighted index when dropdown opens
+      setHighlightedIndex(0);
 
       const handleScrollOrResize = () => {
         updateDropdownPosition();
@@ -102,12 +249,10 @@ export default function CleanerSelector({
     }
   }, [isDropdownOpen]);
 
-  // Reset highlighted index when available users change
   useEffect(() => {
     setHighlightedIndex(0);
   }, [availableUsers.length]);
 
-  // Auto-scroll to highlighted item
   useEffect(() => {
     if (isDropdownOpen && dropdownRef.current) {
       const highlightedElement = dropdownRef.current.querySelector(
@@ -164,7 +309,6 @@ export default function CleanerSelector({
     }
   };
 
-  // Dropdown content with portal
   const dropdownContent = isDropdownOpen && (
     <div
       ref={dropdownRef}
@@ -176,21 +320,33 @@ export default function CleanerSelector({
       }}>
       {availableUsers.length > 0 ? (
         <div className="py-1 overflow-y-auto max-h-60">
-          {availableUsers.map((user, index) => (
-            <button
-              key={user.id}
-              type="button"
-              onClick={() => handleSelectCleaner(user)}
-              onMouseEnter={() => setHighlightedIndex(index)}
-              className={`w-full px-3 py-2 text-left focus:outline-none transition-colors ${
-                index === highlightedIndex ? "bg-gray-100" : "hover:bg-gray-50"
-              }`}>
-              <div className="font-[400] text-sm text-gray-900">
-                {user.name}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
-            </button>
-          ))}
+          {availableUsers.map((user, index) => {
+            const status = evaluateAvailability(
+              user.availability,
+              scheduledStart,
+              scheduledEnd
+            );
+            return (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => handleSelectCleaner(user)}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                className={`w-full px-3 py-2 text-left focus:outline-none transition-colors flex items-center justify-between gap-2 ${
+                  index === highlightedIndex ? "bg-gray-100" : "hover:bg-gray-50"
+                }`}>
+                <div className="min-w-0">
+                  <div className="font-[400] text-sm text-gray-900 truncate">
+                    {user.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5 truncate">
+                    {user.email}
+                  </div>
+                </div>
+                <StatusIndicator status={status} />
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="px-4 py-8 text-center text-sm text-gray-500">
@@ -204,7 +360,6 @@ export default function CleanerSelector({
 
   return (
     <div className="space-y-3">
-      {/* Search Input */}
       <div className="relative" ref={inputContainerRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -224,38 +379,43 @@ export default function CleanerSelector({
         </div>
       </div>
 
-      {/* Portal for dropdown */}
       {typeof document !== "undefined" &&
         createPortal(dropdownContent, document.body)}
 
-      {/* Selected Cleaners - Chip Style */}
       {selectedCleaners.length > 0 && (
         <div>
           <p className="text-sm text-gray-600 mb-2">
             Selected: {selectedCleaners.length}
           </p>
           <div className="flex flex-wrap gap-2">
-            {selectedCleaners.map((cleaner) => (
-              <Badge
-                key={cleaner.id}
-                className="inline-flex items-center gap-2 !px-3 !py-1.5"
-                variant="cleano"
-                size="md">
-                <span>{cleaner.name}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveCleaner(cleaner.id)}
-                  className="hover:bg-neutral-950/10 rounded-full p-0.5 transition-colors"
-                  aria-label={`Remove ${cleaner.name}`}>
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </Badge>
-            ))}
+            {selectedCleaners.map((cleaner) => {
+              const status = evaluateAvailability(
+                cleaner.availability,
+                scheduledStart,
+                scheduledEnd
+              );
+              return (
+                <Badge
+                  key={cleaner.id}
+                  className="inline-flex items-center gap-2 !px-3 !py-1.5"
+                  variant="cleano"
+                  size="md">
+                  <StatusIndicator status={status} />
+                  <span>{cleaner.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCleaner(cleaner.id)}
+                    className="hover:bg-neutral-950/10 rounded-full p-0.5 transition-colors"
+                    aria-label={`Remove ${cleaner.name}`}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </Badge>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* No selection state */}
       {selectedCleaners.length === 0 && (
         <div className="text-sm text-gray-500 flex items-center gap-2 bg-gray-50 px-4 py-3 rounded-2xl border border-gray-200">
           <Users className="w-4 h-4" />
@@ -263,7 +423,6 @@ export default function CleanerSelector({
         </div>
       )}
 
-      {/* Hidden inputs for form submission */}
       {selectedCleaners.map((cleaner) => (
         <input
           key={cleaner.id}

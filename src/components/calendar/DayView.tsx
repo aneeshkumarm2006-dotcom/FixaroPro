@@ -26,6 +26,7 @@ import { CurrentTimeIndicator } from "./calendar-components";
 import { ScheduleBlocksConfig } from "@/types/calendar";
 import EventCard from "./EventCard";
 import ScheduleBlocks from "./ScheduleBlocks";
+import AvailabilityOverlay from "./AvailabilityOverlay";
 import { getCurrentTimeMeta, useTimezoneLabel } from "./time-utils";
 import useDragSelection from "./useDragSelection";
 
@@ -564,6 +565,13 @@ export const DayView: React.FC = () => {
                     officeHours={officeHours}
                     zoomLevel={zoomLevel}
                     roomName={roomName}
+                  />
+
+                  {/* Availability Overlay (current user's self-view) */}
+                  <AvailabilityOverlay
+                    day={currentDate}
+                    officeHours={officeHours}
+                    zoomLevel={zoomLevel}
                   />
 
                   {/* Events */}

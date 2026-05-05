@@ -26,7 +26,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 
-type TabView = "overview" | "jobs" | "products";
+type TabView = "overview" | "jobs" | "products" | "availability";
 
 const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
   [
@@ -44,6 +44,11 @@ const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
       id: "products",
       label: "Products",
       icon: <Package className="w-4 h-4" />,
+    },
+    {
+      id: "availability",
+      label: "Availability",
+      icon: <Calendar className="w-4 h-4" />,
     },
   ];
 
@@ -105,6 +110,30 @@ interface ForecastItem {
   needsRefill: boolean;
 }
 
+interface AvailabilitySlot {
+  id: string;
+  day:
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+  isRecurring: boolean;
+}
+
+interface AvailabilityConflict {
+  jobId: string;
+  clientName: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
 interface EmployeeDetailViewProps {
   employee: Employee;
   stats: {
@@ -121,6 +150,8 @@ interface EmployeeDetailViewProps {
   kitTemplates: KitTemplate[];
   forecast: ForecastItem[];
   upcomingJobCount: number;
+  availability: AvailabilitySlot[];
+  availabilityConflicts: AvailabilityConflict[];
 }
 
 export default function EmployeeDetailView({
@@ -133,6 +164,8 @@ export default function EmployeeDetailView({
   kitTemplates,
   forecast,
   upcomingJobCount,
+  availability,
+  availabilityConflicts,
 }: EmployeeDetailViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -646,6 +679,144 @@ export default function EmployeeDetailView({
     </div>
   );
 
+  // Availability Tab Content
+  const AvailabilityTabContent = () => {
+    const DAYS: AvailabilitySlot["day"][] = [
+      "MONDAY",
+      "TUESDAY",
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+      "SATURDAY",
+      "SUNDAY",
+    ];
+    const byDay = new Map(availability.map((s) => [s.day, s]));
+    const conflictDays = new Set(
+      availabilityConflicts.map((c) =>
+        new Date(c.startTime).toLocaleDateString("en-US", { weekday: "long" })
+      )
+    );
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-[350] tracking-tight text-[#005F6A] mb-2">
+            Weekly Availability
+          </h2>
+          <p className="text-sm text-[#005F6A]/60">
+            Days and hours {employee.name} is typically available.
+          </p>
+        </div>
+
+        {availability.length === 0 ? (
+          <Card variant="ghost" className="p-8">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Calendar className="w-6 h-6 text-[#005F6A]/40" />
+              </div>
+              <p className="text-sm text-[#005F6A]/60">
+                {employee.name} hasn't entered availability yet.
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <Card variant="default" className="p-6">
+            <div className="space-y-2">
+              {DAYS.map((day) => {
+                const slot = byDay.get(day);
+                const label = day.charAt(0) + day.slice(1).toLowerCase();
+                const hasConflict = conflictDays.has(label);
+                if (!slot || !slot.isAvailable) {
+                  return (
+                    <div
+                      key={day}
+                      className="grid grid-cols-[120px_1fr] gap-3 items-center p-3 rounded-xl bg-[#005F6A]/5">
+                      <span className="text-sm font-[400] text-[#005F6A]/60">
+                        {label}
+                      </span>
+                      <span className="text-xs text-[#005F6A]/50">
+                        Unavailable
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={day}
+                    className={`grid grid-cols-[120px_1fr_auto] gap-3 items-center p-3 rounded-xl ${
+                      hasConflict
+                        ? "bg-yellow-50 border border-yellow-200"
+                        : "bg-[#005F6A]/5"
+                    }`}>
+                    <span
+                      className={`text-sm font-[400] ${
+                        hasConflict ? "text-yellow-700" : "text-[#005F6A]"
+                      }`}>
+                      {label}
+                    </span>
+                    <span
+                      className={`text-sm ${
+                        hasConflict ? "text-yellow-700" : "text-[#005F6A]/80"
+                      }`}>
+                      {slot.startTime} – {slot.endTime}
+                    </span>
+                    {hasConflict && (
+                      <Badge variant="warning" size="sm">
+                        Conflict
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        {availabilityConflicts.length > 0 && (
+          <Card variant="warning" className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-yellow-700" />
+              </div>
+              <h3 className="text-sm font-[400] text-yellow-700">
+                Scheduling Conflicts ({availabilityConflicts.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {availabilityConflicts.map((c) => (
+                <div
+                  key={c.jobId}
+                  className="flex items-center justify-between p-3 rounded-xl bg-white">
+                  <div className="flex-1">
+                    <p className="text-sm font-[400] text-[#005F6A]">
+                      {c.clientName}
+                    </p>
+                    <p className="text-xs text-[#005F6A]/60">
+                      {new Date(c.startTime).toLocaleDateString()} at{" "}
+                      {new Date(c.startTime).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {c.reason}
+                    </p>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    border={false}
+                    href={`/jobs/${c.jobId}`}
+                    className="rounded-2xl px-4 py-2.5">
+                    View
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative h-full overflow-y-auto pb-8 px-4">
       <div className="relative z-10 max-w-[80rem] w-full mx-auto space-y-6">
@@ -746,6 +917,7 @@ export default function EmployeeDetailView({
           {activeView === "overview" && <OverviewTab />}
           {activeView === "jobs" && <JobsTab />}
           {activeView === "products" && <ProductsTab />}
+          {activeView === "availability" && <AvailabilityTabContent />}
         </div>
       </div>
 

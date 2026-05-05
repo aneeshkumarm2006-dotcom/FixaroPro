@@ -50,8 +50,32 @@ export default async function JobFormPage({
       id: true,
       name: true,
       email: true,
+      availabilities: {
+        select: {
+          day: true,
+          startTime: true,
+          endTime: true,
+          isAvailable: true,
+          effectiveFrom: true,
+          effectiveTo: true,
+        },
+      },
     },
   });
+
+  const usersForSelector = users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    availability: u.availabilities.map((a) => ({
+      day: a.day,
+      startTime: a.startTime,
+      endTime: a.endTime,
+      isAvailable: a.isAvailable,
+      effectiveFrom: a.effectiveFrom?.toISOString() ?? null,
+      effectiveTo: a.effectiveTo?.toISOString() ?? null,
+    })),
+  }));
 
   // Get all clients for the client selector
   const clients = await db.client.findMany({
@@ -404,7 +428,7 @@ export default async function JobFormPage({
           <div className="grid grid-cols-1 gap-4">
             <div>
               <CleanerSelector
-                users={users}
+                users={usersForSelector}
                 initialSelectedIds={selectedCleanerIds}
               />
             </div>

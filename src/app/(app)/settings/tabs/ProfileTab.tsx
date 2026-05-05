@@ -1,21 +1,120 @@
 "use client";
 
-import { useState } from "react";
-import { User as UserIcon, KeyRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  User as UserIcon,
+  KeyRound,
+  Star,
+  TrendingUp,
+  DollarSign,
+  Bell,
+} from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import {
   updateUserSettings,
   updateUserPassword,
 } from "../../actions/updateUserSettings";
+import { getPerformanceData } from "../../actions/getPerformanceData";
 import { SettingsUser } from "../types";
 import { SectionCard, Field, Feedback, Msg } from "./_shared";
+import PerformanceSection from "./PerformanceSection";
+import IncomeSection from "./IncomeSection";
+import NotificationSection from "./NotificationSection";
 
 interface ProfileTabProps {
   user: SettingsUser;
 }
 
-export default function ProfileTab({ user }: ProfileTabProps) {
+type SubTab = "profile" | "performance" | "income" | "notifications";
+
+const SUB_TABS: { id: SubTab; label: string; icon: typeof UserIcon }[] = [
+  { id: "profile", label: "Profile", icon: UserIcon },
+  { id: "performance", label: "Performance", icon: TrendingUp },
+  { id: "income", label: "My Income", icon: DollarSign },
+  { id: "notifications", label: "Notifications", icon: Bell },
+];
+
+function StarRow({ value }: { value: number }) {
+  const filled = Math.round(value);
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            i < filled
+              ? "fill-[#77C8CC] text-[#77C8CC]"
+              : "text-white/30"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PerformanceHeader({ employeeId }: { employeeId?: string }) {
+  const [rating, setRating] = useState<number | null>(null);
+  const [multiplier, setMultiplier] = useState<number | null>(null);
+  const [tier, setTier] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const res = await getPerformanceData({ employeeId });
+      if (cancelled) return;
+      if (res.success) {
+        setRating(res.data.rating30Day);
+        setMultiplier(res.data.currentMultiplier);
+        setTier(res.data.tierLabel);
+      }
+      setLoading(false);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId]);
+
+  if (loading) return null;
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-r from-[#005F6A] to-[#077B86] p-5 text-white">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-white/60">
+            30-Day Rating
+          </p>
+          {rating !== null ? (
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-2xl font-[300]">{rating.toFixed(2)}</p>
+              <StarRow value={rating} />
+            </div>
+          ) : (
+            <p className="text-2xl font-[300] mt-1 text-white/50">—</p>
+          )}
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-white/60">
+            Pay Multiplier
+          </p>
+          <p className="text-2xl font-[300] mt-1">
+            {multiplier !== null ? `${multiplier.toFixed(2)}x` : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-white/60">
+            Tier
+          </p>
+          <p className="text-2xl font-[300] mt-1">{tier ?? "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileForms({ user }: { user: SettingsUser }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone || "");
@@ -202,6 +301,47 @@ export default function ProfileTab({ user }: ProfileTabProps) {
           </div>
         </form>
       </SectionCard>
+    </div>
+  );
+}
+
+export default function ProfileTab({ user }: ProfileTabProps) {
+  const [subTab, setSubTab] = useState<SubTab>("profile");
+  const isEmployee = user.role === "EMPLOYEE";
+
+  if (!isEmployee) {
+    return <ProfileForms user={user} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <PerformanceHeader />
+
+      <div className="flex items-center gap-1 bg-[#005F6A]/5 rounded-2xl p-1 w-fit flex-wrap">
+        {SUB_TABS.map((t) => {
+          const Icon = t.icon;
+          const active = subTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setSubTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-colors ${
+                active
+                  ? "bg-white text-[#005F6A] font-[500] shadow-sm"
+                  : "text-[#005F6A]/60 hover:text-[#005F6A]"
+              }`}>
+              <Icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {subTab === "profile" && <ProfileForms user={user} />}
+      {subTab === "performance" && <PerformanceSection />}
+      {subTab === "income" && <IncomeSection />}
+      {subTab === "notifications" && <NotificationSection />}
     </div>
   );
 }

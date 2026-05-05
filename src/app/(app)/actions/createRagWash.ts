@@ -17,9 +17,7 @@ export async function createRagWash(params: CreateRagWashParams) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) return { success: false, error: "Not authenticated" };
     const role = (session.user as { role?: string }).role;
-    if (role !== "OWNER" && role !== "ADMIN") {
-      return { success: false, error: "Not authorized" };
-    }
+    const sessionUserId = session.user.id;
 
     const { employeeId, washDate, ragCount, notes } = params;
     if (!employeeId) {
@@ -27,6 +25,13 @@ export async function createRagWash(params: CreateRagWashParams) {
     }
     if (ragCount < 1) {
       return { success: false, error: "Rag count must be at least 1" };
+    }
+
+    const isAdmin = role === "OWNER" || role === "ADMIN";
+    const isEmployeeSelf = role === "EMPLOYEE" && employeeId === sessionUserId;
+
+    if (!isAdmin && !isEmployeeSelf) {
+      return { success: false, error: "Not authorized" };
     }
 
     const employee = await db.user.findUnique({ where: { id: employeeId } });
@@ -43,6 +48,7 @@ export async function createRagWash(params: CreateRagWashParams) {
 
     revalidatePath("/inventory/rag-wash");
     revalidatePath(`/inventory/rag-wash/${employeeId}`);
+    revalidatePath("/my-inventory/rag-wash");
     return { success: true };
   } catch (error) {
     console.error("Error creating rag wash:", error);

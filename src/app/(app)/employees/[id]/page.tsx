@@ -44,6 +44,9 @@ export default async function EmployeePage({
           product: true,
         },
       },
+      availabilities: {
+        orderBy: { day: "asc" },
+      },
     },
   });
 
@@ -196,6 +199,68 @@ export default async function EmployeePage({
     })
     .filter((f) => f.usagePerJob > 0);
 
+  const DAY_BY_INDEX = [
+    "SUNDAY",
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+  ] as const;
+
+  function toMin(t: string) {
+    const [h, m] = t.split(":").map((p) => parseInt(p, 10));
+    return h * 60 + m;
+  }
+
+  const availabilitySlots = employee.availabilities.map((a) => ({
+    id: a.id,
+    day: a.day,
+    startTime: a.startTime,
+    endTime: a.endTime,
+    isAvailable: a.isAvailable,
+    isRecurring: a.isRecurring,
+  }));
+
+  const upcomingForConflicts = employee.jobs.filter((j) => {
+    if (!["CREATED", "SCHEDULED", "IN_PROGRESS"].includes(j.status)) return false;
+    return new Date(j.startTime) >= now;
+  });
+
+  const conflicts = upcomingForConflicts
+    .map((j) => {
+      const start = new Date(j.startTime);
+      const end = j.endTime ? new Date(j.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
+      const dayKey = DAY_BY_INDEX[start.getDay()];
+      const slotsForDay = availabilitySlots.filter((s) => s.day === dayKey);
+      if (slotsForDay.length === 0) return null;
+
+      const startMin = start.getHours() * 60 + start.getMinutes();
+      const endMin = end.getHours() * 60 + end.getMinutes();
+
+      const blocked = slotsForDay.some(
+        (s) =>
+          !s.isAvailable && startMin < toMin(s.endTime) && endMin > toMin(s.startTime)
+      );
+      const covered = slotsForDay.some(
+        (s) =>
+          s.isAvailable && startMin >= toMin(s.startTime) && endMin <= toMin(s.endTime)
+      );
+
+      if (blocked || !covered) {
+        return {
+          jobId: j.id,
+          clientName: j.clientName,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          reason: blocked ? "Marked unavailable" : "Outside availability hours",
+        };
+      }
+      return null;
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
   return (
     <EmployeeDetailView
       employee={{
@@ -205,6 +270,8 @@ export default async function EmployeePage({
         phone: employee.phone,
         role: employee.role as "OWNER" | "ADMIN" | "EMPLOYEE",
       }}
+      availability={availabilitySlots}
+      availabilityConflicts={conflicts}
       stats={{
         completedJobsCount: completedJobs.length,
         totalRevenue,

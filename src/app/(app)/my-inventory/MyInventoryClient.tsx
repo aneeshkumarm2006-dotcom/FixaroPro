@@ -8,6 +8,7 @@ import {
   AlertCircle,
   ShoppingCart,
   RefreshCw,
+  Droplets,
 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -127,6 +128,14 @@ export default function MyInventoryClient({
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="md"
+              submit={false}
+              href="/my-inventory/rag-wash">
+              <Droplets className="w-4 h-4 mr-1.5" />
+              Rag Washes
+            </Button>
             <Button
               variant="primary"
               size="md"

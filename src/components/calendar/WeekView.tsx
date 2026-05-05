@@ -28,6 +28,7 @@ import Button from "@/components/ui/Button";
 import { HiMapPin } from "react-icons/hi2";
 import EventCard from "./EventCard";
 import ScheduleBlocks from "./ScheduleBlocks";
+import AvailabilityOverlay from "./AvailabilityOverlay";
 import { getCurrentTimeMeta, useTimezoneLabel } from "./time-utils";
 import useDragSelection from "./useDragSelection";
 
@@ -572,6 +573,13 @@ export const WeekView: React.FC = () => {
                   <ScheduleBlocks
                     day={day}
                     scheduleBlocks={scheduleBlocks}
+                    officeHours={officeHours}
+                    zoomLevel={zoomLevel}
+                  />
+
+                  {/* Availability Overlay (current user's self-view) */}
+                  <AvailabilityOverlay
+                    day={day}
                     officeHours={officeHours}
                     zoomLevel={zoomLevel}
                   />

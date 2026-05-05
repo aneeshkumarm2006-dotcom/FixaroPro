@@ -14,6 +14,8 @@ import {
   Truck,
   MapPin,
   ListChecks,
+  Calendar as CalendarIcon,
+  GraduationCap,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -27,6 +29,10 @@ import RolesTab from "./tabs/RolesTab";
 import SuppliersTab from "./tabs/SuppliersTab";
 import InventoryLocationsTab from "./tabs/InventoryLocationsTab";
 import ChecklistTemplatesTab from "./tabs/ChecklistTemplatesTab";
+import AvailabilityTab from "./tabs/AvailabilityTab";
+import TrainingTab, {
+  TrainingModuleRecord,
+} from "./tabs/TrainingTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -48,10 +54,12 @@ interface SettingsClientProps {
   suppliers: SupplierRecord[];
   inventoryLocations: InventoryLocationRecord[];
   checklistTemplates: ChecklistTemplateRecord[];
+  trainingModules: TrainingModuleRecord[];
 }
 
 type TabId =
   | "profile"
+  | "availability"
   | "tax"
   | "pricing"
   | "jobTypes"
@@ -59,6 +67,7 @@ type TabId =
   | "inventoryRules"
   | "kitTemplates"
   | "checklistTemplates"
+  | "training"
   | "multipliers"
   | "roles"
   | "suppliers"
@@ -73,6 +82,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: "profile", label: "Profile", icon: UserIcon },
+  { id: "availability", label: "Availability", icon: CalendarIcon },
   { id: "tax", label: "Tax", icon: Percent, adminOnly: true },
   { id: "pricing", label: "Pricing Rules", icon: DollarSign, adminOnly: true },
   { id: "jobTypes", label: "Job Types", icon: Briefcase, adminOnly: true },
@@ -100,6 +110,12 @@ const TABS: TabDef[] = [
     icon: ListChecks,
     adminOnly: true,
   },
+  {
+    id: "training",
+    label: "Training",
+    icon: GraduationCap,
+    adminOnly: true,
+  },
   { id: "multipliers", label: "Multipliers", icon: Star, adminOnly: true },
   { id: "roles", label: "Roles", icon: Shield, adminOnly: true },
   { id: "suppliers", label: "Suppliers", icon: Truck, adminOnly: true },
@@ -121,6 +137,7 @@ export default function SettingsClient({
   suppliers,
   inventoryLocations,
   checklistTemplates,
+  trainingModules,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -165,6 +182,7 @@ export default function SettingsClient({
         {/* Content panel */}
         <div className="flex-1 min-w-0">
           {activeTab === "profile" && <ProfileTab user={user} />}
+          {activeTab === "availability" && <AvailabilityTab />}
           {activeTab === "tax" && isAdmin && (
             <TaxSettingsTab settings={appSettings} />
           )}
@@ -194,6 +212,9 @@ export default function SettingsClient({
               templates={checklistTemplates}
               settings={appSettings}
             />
+          )}
+          {activeTab === "training" && isAdmin && (
+            <TrainingTab modules={trainingModules} />
           )}
           {activeTab === "multipliers" && isAdmin && (
             <MultipliersTab settings={appSettings} />

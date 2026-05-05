@@ -125,7 +125,7 @@ export default function CalendarJobActions() {
 
   const handleUploadPhotos = useCallback(() => {
     if (!event?.metadata?.jobId) return;
-    router.push(`/my-jobs/${event.metadata.jobId}`);
+    router.push(`/my-jobs/${event.metadata.jobId}#photos`);
     handleClose();
   }, [event, router, handleClose]);
 

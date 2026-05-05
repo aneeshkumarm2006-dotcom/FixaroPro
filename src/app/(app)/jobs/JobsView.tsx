@@ -711,8 +711,8 @@ export default function JobsView({
                           <div className="w-[100px] p-4">
                             <p className="app-title-small !text-[#005F6A]/50">
                               {job.jobDate
-                                ? new Date(job.jobDate).toLocaleDateString()
-                                : new Date(job.startTime).toLocaleDateString()}
+                                ? new Date(job.jobDate).toLocaleDateString("en-US")
+                                : new Date(job.startTime).toLocaleDateString("en-US")}
                             </p>
                           </div>
 
@@ -893,8 +893,8 @@ export default function JobsView({
                           <Calendar className="w-3 h-3" />
                           <span>
                             {job.jobDate
-                              ? new Date(job.jobDate).toLocaleDateString()
-                              : new Date(job.startTime).toLocaleDateString()}
+                              ? new Date(job.jobDate).toLocaleDateString("en-US")
+                              : new Date(job.startTime).toLocaleDateString("en-US")}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">

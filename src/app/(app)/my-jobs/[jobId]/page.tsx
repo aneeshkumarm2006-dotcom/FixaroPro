@@ -17,11 +17,13 @@ import {
   ArrowLeft,
   FileText,
   Zap,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 import ClockInButton from "../ClockInButton";
 import ClockOutButton from "../ClockOutButton";
 import WhyThisPriceLink from "../WhyThisPriceLink";
+import PhotoGallery from "./PhotoGallery";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -392,6 +394,29 @@ export default async function JobDetailPage({ params }: PageProps) {
             <p className="text-neutral-950/70 whitespace-pre-wrap leading-relaxed">
               {job.notes}
             </p>
+          </Card>
+        </div>
+      )}
+
+      {/* Photos */}
+      {(job.status === "IN_PROGRESS" ||
+        job.status === "COMPLETED" ||
+        job.status === "PAID") && (
+        <div id="photos" className="scroll-mt-20">
+          <h2 className="text-lg font-[400] text-neutral-950 mt-12">Photos</h2>
+          <Card variant="default" className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-neutral-950/20 rounded-lg">
+                <Camera className="w-5 h-5 text-neutral-950" />
+              </div>
+              <h2 className="text-lg font-[400] text-neutral-950">
+                Job Photos
+              </h2>
+            </div>
+            <PhotoGallery
+              jobId={job.id}
+              canUpload={job.status !== "PAID"}
+            />
           </Card>
         </div>
       )}

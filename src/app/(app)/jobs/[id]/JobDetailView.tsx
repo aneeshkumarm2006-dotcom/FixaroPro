@@ -33,6 +33,8 @@ import {
   ChevronsRight,
   Briefcase,
   Receipt,
+  Camera,
+  X,
 } from "lucide-react";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 
@@ -122,6 +124,17 @@ interface JobLog {
   } | null;
 }
 
+interface JobPhoto {
+  id: string;
+  url: string;
+  caption: string | null;
+  createdAt: string;
+  employee: {
+    id: string;
+    name: string;
+  };
+}
+
 interface User {
   id: string;
   name: string;
@@ -132,6 +145,7 @@ interface JobDetailViewProps {
   job: Job;
   productUsage: ProductUsage[];
   logs: JobLog[];
+  photos?: JobPhoto[];
   totalLogs: number;
   logsPage: number;
   logsPerPage: number;
@@ -146,6 +160,7 @@ export default function JobDetailView({
   job,
   productUsage,
   logs,
+  photos = [],
   totalLogs,
   logsPage,
   logsPerPage,
@@ -167,6 +182,26 @@ export default function JobDetailView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [photoLightboxIndex, setPhotoLightboxIndex] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (photoLightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPhotoLightboxIndex(null);
+      if (e.key === "ArrowLeft")
+        setPhotoLightboxIndex((i) =>
+          i === null ? null : (i - 1 + photos.length) % photos.length
+        );
+      if (e.key === "ArrowRight")
+        setPhotoLightboxIndex((i) =>
+          i === null ? null : (i + 1) % photos.length
+        );
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [photoLightboxIndex, photos.length]);
 
   // Payment toggle states
   const [paymentReceived, setPaymentReceived] = useState(job.paymentReceived);
@@ -726,6 +761,50 @@ export default function JobDetailView({
 
   const LogsTab = () => (
     <div className="space-y-6">
+      {photos.length > 0 && (
+        <Card variant="default" className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
+              <Camera className="w-4 h-4 text-[#005F6A]" />
+            </div>
+            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              Job Photos ({photos.length})
+            </h3>
+          </div>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+            {photos.map((photo, idx) => (
+              <button
+                key={photo.id}
+                type="button"
+                onClick={() => setPhotoLightboxIndex(idx)}
+                className="group relative rounded-2xl overflow-hidden border border-[#005F6A]/10 bg-neutral-100 aspect-square cursor-zoom-in">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.url}
+                  alt={photo.caption || "Job photo"}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 pointer-events-none text-left">
+                  {photo.caption && (
+                    <p className="text-xs text-white truncate">
+                      {photo.caption}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-white/70 truncate">
+                    {photo.employee.name} &middot;{" "}
+                    {new Date(photo.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {logs.length > 0 ? (
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -964,6 +1043,82 @@ export default function JobDetailView({
           title="Delete Job"
           message="This action cannot be undone. All job data will be permanently removed."
         />
+      )}
+
+      {/* Photo Lightbox */}
+      {photoLightboxIndex !== null && photos[photoLightboxIndex] && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setPhotoLightboxIndex(null)}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPhotoLightboxIndex(null);
+            }}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+            aria-label="Close">
+            <X className="w-5 h-5" />
+          </button>
+          {photos.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPhotoLightboxIndex(
+                    (photoLightboxIndex - 1 + photos.length) % photos.length
+                  );
+                }}
+                className="absolute left-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                aria-label="Previous photo">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPhotoLightboxIndex(
+                    (photoLightboxIndex + 1) % photos.length
+                  );
+                }}
+                className="absolute right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                aria-label="Next photo">
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+          <div
+            className="max-w-5xl max-h-[90vh] flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photos[photoLightboxIndex].url}
+              alt={photos[photoLightboxIndex].caption || "Job photo"}
+              className="max-h-[80vh] max-w-full rounded-xl object-contain"
+            />
+            <div className="text-center text-white/90 max-w-2xl">
+              {photos[photoLightboxIndex].caption && (
+                <p className="text-sm font-[400]">
+                  {photos[photoLightboxIndex].caption}
+                </p>
+              )}
+              <p className="text-xs text-white/60 mt-1">
+                {photos[photoLightboxIndex].employee.name} &middot;{" "}
+                {new Date(
+                  photos[photoLightboxIndex].createdAt
+                ).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

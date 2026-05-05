@@ -85,6 +85,15 @@ export default async function JobPage({
     take: logsPerPage,
   });
 
+  // Fetch all photos uploaded for this job
+  const photos = await db.jobPhoto.findMany({
+    where: { jobId: id },
+    include: {
+      employee: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   // Calculate total cost of products used
   const totalProductCost = job.productUsage.reduce((sum, usage) => {
     return sum + usage.quantity * usage.product.costPerUnit;
@@ -168,11 +177,20 @@ export default async function JobPage({
     user: log.user ? { id: log.user.id, name: log.user.name } : null,
   }));
 
+  const photosData = photos.map((photo) => ({
+    id: photo.id,
+    url: photo.url,
+    caption: photo.caption,
+    createdAt: photo.createdAt.toISOString(),
+    employee: { id: photo.employee.id, name: photo.employee.name },
+  }));
+
   return (
     <JobDetailView
       job={jobData}
       productUsage={productUsageData}
       logs={logsData}
+      photos={photosData}
       totalLogs={totalLogs}
       logsPage={logsPage}
       logsPerPage={logsPerPage}

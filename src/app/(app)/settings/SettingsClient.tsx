@@ -16,6 +16,7 @@ import {
   ListChecks,
   Calendar as CalendarIcon,
   GraduationCap,
+  FileSignature,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -33,6 +34,10 @@ import AvailabilityTab from "./tabs/AvailabilityTab";
 import TrainingTab, {
   TrainingModuleRecord,
 } from "./tabs/TrainingTab";
+import DocumentsTab, {
+  DocumentRecord,
+  UserOption,
+} from "./tabs/DocumentsTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -55,6 +60,8 @@ interface SettingsClientProps {
   inventoryLocations: InventoryLocationRecord[];
   checklistTemplates: ChecklistTemplateRecord[];
   trainingModules: TrainingModuleRecord[];
+  documents: DocumentRecord[];
+  users: UserOption[];
 }
 
 type TabId =
@@ -68,6 +75,7 @@ type TabId =
   | "kitTemplates"
   | "checklistTemplates"
   | "training"
+  | "documents"
   | "multipliers"
   | "roles"
   | "suppliers"
@@ -116,6 +124,12 @@ const TABS: TabDef[] = [
     icon: GraduationCap,
     adminOnly: true,
   },
+  {
+    id: "documents",
+    label: "Documents",
+    icon: FileSignature,
+    adminOnly: true,
+  },
   { id: "multipliers", label: "Multipliers", icon: Star, adminOnly: true },
   { id: "roles", label: "Roles", icon: Shield, adminOnly: true },
   { id: "suppliers", label: "Suppliers", icon: Truck, adminOnly: true },
@@ -138,6 +152,8 @@ export default function SettingsClient({
   inventoryLocations,
   checklistTemplates,
   trainingModules,
+  documents,
+  users,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -215,6 +231,9 @@ export default function SettingsClient({
           )}
           {activeTab === "training" && isAdmin && (
             <TrainingTab modules={trainingModules} />
+          )}
+          {activeTab === "documents" && isAdmin && (
+            <DocumentsTab documents={documents} users={users} />
           )}
           {activeTab === "multipliers" && isAdmin && (
             <MultipliersTab settings={appSettings} />

@@ -29,6 +29,8 @@ export default async function SettingsPage() {
     inventoryLocations,
     checklistTemplates,
     trainingModules,
+    documents,
+    users,
   ] = isAdmin
     ? await Promise.all([
         db.appSetting.findMany(),
@@ -67,8 +69,23 @@ export default async function SettingsPage() {
             },
           },
         }),
+        db.document.findMany({
+          orderBy: { createdAt: "desc" },
+          include: {
+            signatures: {
+              include: {
+                employee: { select: { id: true, name: true } },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        }),
+        db.user.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, role: true },
+        }),
       ])
-    : [[], [], [], [], [], [], [], []];
+    : [[], [], [], [], [], [], [], [], [], []];
 
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">
@@ -83,6 +100,8 @@ export default async function SettingsPage() {
         inventoryLocations={inventoryLocations as never}
         checklistTemplates={checklistTemplates as never}
         trainingModules={trainingModules as never}
+        documents={documents as never}
+        users={users as never}
       />
     </div>
   );

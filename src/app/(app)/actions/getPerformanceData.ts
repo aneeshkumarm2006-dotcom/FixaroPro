@@ -3,7 +3,7 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { multiplierForRating } from "./recalculateMultiplier";
+import { multiplierForRating } from "@/lib/pay-multiplier";
 
 export type RecentRating = {
   id: string;

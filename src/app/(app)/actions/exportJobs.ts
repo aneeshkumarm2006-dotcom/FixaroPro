@@ -17,6 +17,25 @@ interface ExportFilters {
   unpaidOnly?: boolean;
 }
 
+export interface JobExportRow {
+  Date: string;
+  Client: string;
+  Employee: string;
+  Location: string;
+  "Job Type": string;
+  Status: string;
+  Price: number | string;
+  Discount: number | string;
+  "Employee Pay": number | string;
+  Tip: number | string;
+  Parking: number | string;
+  "Payment Type": string;
+  "Payment Received": string;
+  "Invoice Sent": string;
+  Bed: number | string;
+  Bath: number | string;
+}
+
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return "";
   const s = String(value);
@@ -27,7 +46,19 @@ function csvEscape(value: unknown): string {
 }
 
 export async function exportJobs(filters: ExportFilters): Promise<
-  | { success: true; format: "csv" | "pdf"; filename: string; content: string }
+  | {
+      success: true;
+      format: "csv";
+      filename: string;
+      content: string;
+    }
+  | {
+      success: true;
+      format: "pdf";
+      filename: string;
+      generatedAt: string;
+      rows: JobExportRow[];
+    }
   | { error: string }
 > {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -131,22 +162,12 @@ export async function exportJobs(filters: ExportFilters): Promise<
       };
     }
 
-    // Plain-text PDF stand-in (client can print-to-PDF).
-    // Lightweight text so we don't require @react-pdf/renderer in a server action.
-    const pdfLines: string[] = [];
-    pdfLines.push(`Cleano — Jobs Export (${timestamp})`);
-    pdfLines.push(`Total jobs: ${rows.length}`);
-    pdfLines.push("");
-    for (const row of rows) {
-      pdfLines.push(
-        `${row.Date} | ${row.Client} | ${row.Status} | $${row.Price || "0"}`
-      );
-    }
     return {
       success: true,
       format: "pdf",
-      filename: `jobs-export-${timestamp}.txt`,
-      content: pdfLines.join("\n"),
+      filename: `jobs-export-${timestamp}.pdf`,
+      generatedAt: timestamp,
+      rows: rows as JobExportRow[],
     };
   } catch (error) {
     console.error("exportJobs error:", error);

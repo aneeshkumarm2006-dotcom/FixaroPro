@@ -98,6 +98,9 @@ export default async function DashboardLayout({
             <NavLink href="/documents" icon="documents" iconOnly>
               Documents
             </NavLink>
+            <NavLink href="/chat" icon="chat" iconOnly>
+              Chat
+            </NavLink>
           </nav>
 
           {/* User Section */}

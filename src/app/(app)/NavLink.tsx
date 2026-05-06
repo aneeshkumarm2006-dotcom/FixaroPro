@@ -21,6 +21,7 @@ import {
   Droplets,
   GraduationCap,
   FileSignature,
+  MessageCircle,
   LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,7 @@ const iconMap: Record<string, LucideIcon> = {
   "rag-wash": Droplets,
   training: GraduationCap,
   documents: FileSignature,
+  chat: MessageCircle,
 };
 
 export default function NavLink({

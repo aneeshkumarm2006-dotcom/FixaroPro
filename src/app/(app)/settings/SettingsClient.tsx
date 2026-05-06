@@ -17,6 +17,7 @@ import {
   Calendar as CalendarIcon,
   GraduationCap,
   FileSignature,
+  MessageCircle,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -38,6 +39,7 @@ import DocumentsTab, {
   DocumentRecord,
   UserOption,
 } from "./tabs/DocumentsTab";
+import ChatSettingsTab from "./tabs/ChatSettingsTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -76,6 +78,7 @@ type TabId =
   | "checklistTemplates"
   | "training"
   | "documents"
+  | "chat"
   | "multipliers"
   | "roles"
   | "suppliers"
@@ -128,6 +131,12 @@ const TABS: TabDef[] = [
     id: "documents",
     label: "Documents",
     icon: FileSignature,
+    adminOnly: true,
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    icon: MessageCircle,
     adminOnly: true,
   },
   { id: "multipliers", label: "Multipliers", icon: Star, adminOnly: true },
@@ -234,6 +243,9 @@ export default function SettingsClient({
           )}
           {activeTab === "documents" && isAdmin && (
             <DocumentsTab documents={documents} users={users} />
+          )}
+          {activeTab === "chat" && isAdmin && (
+            <ChatSettingsTab settings={appSettings} />
           )}
           {activeTab === "multipliers" && isAdmin && (
             <MultipliersTab settings={appSettings} />

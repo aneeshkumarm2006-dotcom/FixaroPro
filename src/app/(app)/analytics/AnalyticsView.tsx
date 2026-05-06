@@ -897,7 +897,12 @@ export default function AnalyticsView({
                   <select
                     name="metric"
                     required
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20">
+                    className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] font-[400] cursor-pointer appearance-none bg-no-repeat focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 hover:border-[#005F6A]/30 transition-colors"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23005F6A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: "right 0.75rem center",
+                      backgroundSize: "1.25em 1.25em",
+                    }}>
                     <option value="REVENUE">Revenue</option>
                     <option value="JOBS_COMPLETED">Jobs Completed</option>
                     <option value="NEW_CLIENTS">New Clients</option>
@@ -913,7 +918,12 @@ export default function AnalyticsView({
                   <select
                     name="period"
                     required
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20">
+                    className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] font-[400] cursor-pointer appearance-none bg-no-repeat focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 hover:border-[#005F6A]/30 transition-colors"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23005F6A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: "right 0.75rem center",
+                      backgroundSize: "1.25em 1.25em",
+                    }}>
                     <option value="WEEKLY">Weekly</option>
                     <option value="MONTHLY">Monthly</option>
                     <option value="QUARTERLY">Quarterly</option>

@@ -986,9 +986,10 @@ export default function JobsView({
                         <div className="flex items-center gap-2">
                           <Clock className="w-3 h-3" />
                           <span>
-                            {new Date(job.startTime).toLocaleTimeString([], {
+                            {new Date(job.startTime).toLocaleTimeString("en-US", {
                               hour: "2-digit",
                               minute: "2-digit",
+                              hour12: true,
                             })}
                           </span>
                         </div>

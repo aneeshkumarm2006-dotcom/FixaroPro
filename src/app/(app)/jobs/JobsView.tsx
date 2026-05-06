@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Search,
   ChevronDown,
@@ -19,6 +19,7 @@ import {
   DollarSign,
   Calendar,
   Clock,
+  Filter,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -233,6 +234,77 @@ export default function JobsView({
     updateURLParams({ rowsPerPage: newRowsPerPage, page: 1 });
   };
 
+  const [showFilters, setShowFilters] = useState(false);
+
+  const hasActiveFilters =
+    !!startDate ||
+    !!endDate ||
+    jobTypeFilter !== "all" ||
+    clientFilter !== "all" ||
+    employeeFilter !== "all" ||
+    paymentTypeFilter !== "all" ||
+    statusFilter !== "all" ||
+    paymentFilter !== "all";
+
+  const clearAllFilters = () => {
+    onStartDateChange?.("");
+    onEndDateChange?.("");
+    onJobTypeFilterChange?.("all");
+    onClientFilterChange?.("all");
+    onEmployeeFilterChange?.("all");
+    onPaymentTypeFilterChange?.("all");
+    onStatusFilterChange("all");
+    onPaymentFilterChange("all");
+    onPageChange(1);
+    updateURLParams({ status: "all", payment: "all", page: 1 });
+  };
+
+  const jobTypeLabel = (() => {
+    const map: Record<string, string> = {
+      all: "All Types",
+      R: "Residential (R)",
+      C: "Commercial (C)",
+      PC: "Post-Construction (PC)",
+      F: "Follow-up (F)",
+    };
+    return map[jobTypeFilter] || "All Types";
+  })();
+
+  const paymentTypeLabel = (() => {
+    const map: Record<string, string> = {
+      all: "All",
+      CASH: "Cash",
+      CHEQUE: "Cheque",
+      E_TRANSFER: "E-Transfer",
+      CREDIT_CARD: "Credit Card",
+      OTHER: "Other",
+    };
+    return map[paymentTypeFilter] || "All";
+  })();
+
+  const statusLabel =
+    [
+      { value: "all", label: "All Status" },
+      { value: "CREATED", label: "Created" },
+      { value: "SCHEDULED", label: "Scheduled" },
+      { value: "IN_PROGRESS", label: "In Progress" },
+      { value: "COMPLETED", label: "Completed" },
+      { value: "CANCELLED", label: "Cancelled" },
+    ].find((opt) => opt.value === statusFilter)?.label || "All Status";
+
+  const paymentStatusLabel =
+    [
+      { value: "all", label: "All Payment" },
+      { value: "paid", label: "Paid" },
+      { value: "pending", label: "Pending" },
+    ].find((opt) => opt.value === paymentFilter)?.label || "All Payment";
+
+  const filterFieldLabelClass =
+    "text-[11px] uppercase tracking-wider !text-[#005F6A]/50 font-[400] mb-1.5";
+  const filterTriggerClass =
+    "w-full h-[42px] px-4 py-3 flex items-center justify-between";
+  const filterTriggerTextClass = "text-left w-full text-sm font-[350] truncate";
+
   // Metric Card Component
   const MetricCard = ({
     label,
@@ -315,8 +387,8 @@ export default function JobsView({
         )}
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col lg:flex-row gap-2 mb-6">
+      {/* Search and Filters Toggle */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4 items-stretch sm:items-center">
         {/* Search */}
         <div className="flex-1">
           <div className="relative">
@@ -337,132 +409,23 @@ export default function JobsView({
           </div>
         </div>
 
-        {/* Filters Row */}
         <div className="flex items-center gap-2">
-          {/* Status Filter */}
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="default"
-                size="md"
-                border={false}
-                type="button"
-                className="min-w-32 h-[42px] px-4 py-3 flex items-center justify-between w-fit">
-                <span className="text-left w-full text-sm font-[350]">
-                  {[
-                    { value: "all", label: "All Status" },
-                    { value: "CREATED", label: "Created" },
-                    { value: "SCHEDULED", label: "Scheduled" },
-                    { value: "IN_PROGRESS", label: "In Progress" },
-                    { value: "COMPLETED", label: "Completed" },
-                    { value: "CANCELLED", label: "Cancelled" },
-                  ].find((opt) => opt.value === statusFilter)?.label ||
-                    "All Status"}
-                </span>
-                <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-              </Button>
-            }
-            options={[
-              {
-                label: "All Status",
-                onClick: () => {
-                  onStatusFilterChange("all");
-                  onPageChange(1);
-                  updateURLParams({ status: "all", page: 1 });
-                },
-              },
-              {
-                label: "Created",
-                onClick: () => {
-                  onStatusFilterChange("CREATED");
-                  onPageChange(1);
-                  updateURLParams({ status: "CREATED", page: 1 });
-                },
-              },
-              {
-                label: "Scheduled",
-                onClick: () => {
-                  onStatusFilterChange("SCHEDULED");
-                  onPageChange(1);
-                  updateURLParams({ status: "SCHEDULED", page: 1 });
-                },
-              },
-              {
-                label: "In Progress",
-                onClick: () => {
-                  onStatusFilterChange("IN_PROGRESS");
-                  onPageChange(1);
-                  updateURLParams({ status: "IN_PROGRESS", page: 1 });
-                },
-              },
-              {
-                label: "Completed",
-                onClick: () => {
-                  onStatusFilterChange("COMPLETED");
-                  onPageChange(1);
-                  updateURLParams({ status: "COMPLETED", page: 1 });
-                },
-              },
-              {
-                label: "Cancelled",
-                onClick: () => {
-                  onStatusFilterChange("CANCELLED");
-                  onPageChange(1);
-                  updateURLParams({ status: "CANCELLED", page: 1 });
-                },
-              },
-            ]}
-            maxHeight="16rem"
-          />
-
-          {/* Payment Filter */}
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="default"
-                size="md"
-                border={false}
-                type="button"
-                className="min-w-34 h-[42px] px-4 py-3 flex items-center justify-between w-fit">
-                <span className="text-left w-full text-sm font-[350]">
-                  {[
-                    { value: "all", label: "All Payment" },
-                    { value: "paid", label: "Paid" },
-                    { value: "pending", label: "Pending" },
-                  ].find((opt) => opt.value === paymentFilter)?.label ||
-                    "All Payment"}
-                </span>
-                <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-              </Button>
-            }
-            options={[
-              {
-                label: "All Payment",
-                onClick: () => {
-                  onPaymentFilterChange("all");
-                  onPageChange(1);
-                  updateURLParams({ payment: "all", page: 1 });
-                },
-              },
-              {
-                label: "Paid",
-                onClick: () => {
-                  onPaymentFilterChange("paid");
-                  onPageChange(1);
-                  updateURLParams({ payment: "paid", page: 1 });
-                },
-              },
-              {
-                label: "Pending",
-                onClick: () => {
-                  onPaymentFilterChange("pending");
-                  onPageChange(1);
-                  updateURLParams({ payment: "pending", page: 1 });
-                },
-              },
-            ]}
-            maxHeight="12rem"
-          />
+          {/* Filters Toggle */}
+          <Button
+            variant={showFilters ? "cleano" : "default"}
+            size="md"
+            border={false}
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className="h-[42px] px-4 py-3 flex items-center gap-2">
+            <Filter className="w-4 h-4" />
+            <span className="text-sm font-[350]">Filters</span>
+            {hasActiveFilters && (
+              <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#005F6A] text-white text-[10px] font-[400]">
+                •
+              </span>
+            )}
+          </Button>
 
           {/* Rows Per Page */}
           <CustomDropdown
@@ -489,156 +452,279 @@ export default function JobsView({
         </div>
       </div>
 
-      {/* Extended Filters Row */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => onStartDateChange?.(e.target.value)}
-          className="h-[38px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20"
-          placeholder="Start date"
-        />
-        <span className="text-xs text-[#005F6A]/50">to</span>
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => onEndDateChange?.(e.target.value)}
-          className="h-[38px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20"
-          placeholder="End date"
-        />
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="bg-white rounded-2xl p-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Date Range */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Date Range</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => onStartDateChange?.(e.target.value)}
+                  className="flex-1 min-w-0 h-[42px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20"
+                />
+                <span className="text-xs text-[#005F6A]/50">to</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => onEndDateChange?.(e.target.value)}
+                  className="flex-1 min-w-0 h-[42px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20"
+                />
+              </div>
+            </div>
 
-        <CustomDropdown
-          trigger={
-            <Button
-              variant="default"
-              size="sm"
-              border={false}
-              type="button"
-              className="h-[38px] px-3 flex items-center gap-2">
-              <span className="text-xs font-[350]">
-                Type:{" "}
-                {jobTypeFilter === "all" ? "All" : jobTypeFilter}
-              </span>
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          }
-          options={[
-            { label: "All Types", onClick: () => onJobTypeFilterChange?.("all") },
-            { label: "Residential (R)", onClick: () => onJobTypeFilterChange?.("R") },
-            { label: "Commercial (C)", onClick: () => onJobTypeFilterChange?.("C") },
-            { label: "Post-Construction (PC)", onClick: () => onJobTypeFilterChange?.("PC") },
-            { label: "Follow-up (F)", onClick: () => onJobTypeFilterChange?.("F") },
-          ]}
-          maxHeight="14rem"
-        />
+            {/* Job Type */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Job Type</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>{jobTypeLabel}</span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  { label: "All Types", onClick: () => onJobTypeFilterChange?.("all") },
+                  { label: "Residential (R)", onClick: () => onJobTypeFilterChange?.("R") },
+                  { label: "Commercial (C)", onClick: () => onJobTypeFilterChange?.("C") },
+                  { label: "Post-Construction (PC)", onClick: () => onJobTypeFilterChange?.("PC") },
+                  { label: "Follow-up (F)", onClick: () => onJobTypeFilterChange?.("F") },
+                ]}
+                maxHeight="14rem"
+              />
+            </div>
 
-        {clients.length > 0 && (
-          <CustomDropdown
-            trigger={
+            {/* Client */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Client</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>
+                      {clientFilter === "all"
+                        ? "All Clients"
+                        : clients.find((c) => c.id === clientFilter)?.name || "All Clients"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  { label: "All Clients", onClick: () => onClientFilterChange?.("all") },
+                  ...clients.map((c) => ({
+                    label: c.name,
+                    onClick: () => onClientFilterChange?.(c.id),
+                  })),
+                ]}
+                maxHeight="18rem"
+              />
+            </div>
+
+            {/* Employee */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Employee</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>
+                      {employeeFilter === "all"
+                        ? "All Employees"
+                        : users.find((u) => u.id === employeeFilter)?.name || "All Employees"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  { label: "All Employees", onClick: () => onEmployeeFilterChange?.("all") },
+                  ...users.map((u) => ({
+                    label: u.name,
+                    onClick: () => onEmployeeFilterChange?.(u.id),
+                  })),
+                ]}
+                maxHeight="18rem"
+              />
+            </div>
+
+            {/* Job Status */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Job Status</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>{statusLabel}</span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  {
+                    label: "All Status",
+                    onClick: () => {
+                      onStatusFilterChange("all");
+                      onPageChange(1);
+                      updateURLParams({ status: "all", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Created",
+                    onClick: () => {
+                      onStatusFilterChange("CREATED");
+                      onPageChange(1);
+                      updateURLParams({ status: "CREATED", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Scheduled",
+                    onClick: () => {
+                      onStatusFilterChange("SCHEDULED");
+                      onPageChange(1);
+                      updateURLParams({ status: "SCHEDULED", page: 1 });
+                    },
+                  },
+                  {
+                    label: "In Progress",
+                    onClick: () => {
+                      onStatusFilterChange("IN_PROGRESS");
+                      onPageChange(1);
+                      updateURLParams({ status: "IN_PROGRESS", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Completed",
+                    onClick: () => {
+                      onStatusFilterChange("COMPLETED");
+                      onPageChange(1);
+                      updateURLParams({ status: "COMPLETED", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Cancelled",
+                    onClick: () => {
+                      onStatusFilterChange("CANCELLED");
+                      onPageChange(1);
+                      updateURLParams({ status: "CANCELLED", page: 1 });
+                    },
+                  },
+                ]}
+                maxHeight="16rem"
+              />
+            </div>
+
+            {/* Pay Type */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Pay Type</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>{paymentTypeLabel}</span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  { label: "All", onClick: () => onPaymentTypeFilterChange?.("all") },
+                  { label: "Cash", onClick: () => onPaymentTypeFilterChange?.("CASH") },
+                  { label: "Cheque", onClick: () => onPaymentTypeFilterChange?.("CHEQUE") },
+                  { label: "E-Transfer", onClick: () => onPaymentTypeFilterChange?.("E_TRANSFER") },
+                  { label: "Credit Card", onClick: () => onPaymentTypeFilterChange?.("CREDIT_CARD") },
+                  { label: "Other", onClick: () => onPaymentTypeFilterChange?.("OTHER") },
+                ]}
+                maxHeight="14rem"
+              />
+            </div>
+
+            {/* Payment Status */}
+            <div className="flex flex-col">
+              <label className={filterFieldLabelClass}>Payment Status</label>
+              <CustomDropdown
+                trigger={
+                  <Button
+                    variant="default"
+                    size="md"
+                    border={false}
+                    type="button"
+                    className={filterTriggerClass}>
+                    <span className={filterTriggerTextClass}>{paymentStatusLabel}</span>
+                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+                  </Button>
+                }
+                options={[
+                  {
+                    label: "All Payment",
+                    onClick: () => {
+                      onPaymentFilterChange("all");
+                      onPageChange(1);
+                      updateURLParams({ payment: "all", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Paid",
+                    onClick: () => {
+                      onPaymentFilterChange("paid");
+                      onPageChange(1);
+                      updateURLParams({ payment: "paid", page: 1 });
+                    },
+                  },
+                  {
+                    label: "Pending",
+                    onClick: () => {
+                      onPaymentFilterChange("pending");
+                      onPageChange(1);
+                      updateURLParams({ payment: "pending", page: 1 });
+                    },
+                  },
+                ]}
+                maxHeight="12rem"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-end justify-end gap-2">
               <Button
-                variant="default"
-                size="sm"
+                variant="ghost"
+                size="md"
                 border={false}
-                type="button"
-                className="h-[38px] px-3 flex items-center gap-2 max-w-[200px]">
-                <span className="text-xs font-[350] truncate">
-                  Client:{" "}
-                  {clientFilter === "all"
-                    ? "All"
-                    : clients.find((c) => c.id === clientFilter)?.name || "—"}
-                </span>
-                <ChevronDown className="w-3 h-3" />
+                onClick={clearAllFilters}
+                className="h-[42px] px-4">
+                <span className="text-sm font-[350]">Clear</span>
               </Button>
-            }
-            options={[
-              { label: "All Clients", onClick: () => onClientFilterChange?.("all") },
-              ...clients.map((c) => ({
-                label: c.name,
-                onClick: () => onClientFilterChange?.(c.id),
-              })),
-            ]}
-            maxHeight="18rem"
-          />
-        )}
-
-        {users.length > 0 && (
-          <CustomDropdown
-            trigger={
               <Button
-                variant="default"
-                size="sm"
+                variant="cleano"
+                size="md"
                 border={false}
-                type="button"
-                className="h-[38px] px-3 flex items-center gap-2 max-w-[200px]">
-                <span className="text-xs font-[350] truncate">
-                  Employee:{" "}
-                  {employeeFilter === "all"
-                    ? "All"
-                    : users.find((u) => u.id === employeeFilter)?.name || "—"}
-                </span>
-                <ChevronDown className="w-3 h-3" />
+                onClick={() => setShowFilters(false)}
+                className="h-[42px] px-4">
+                <span className="text-sm font-[350]">Apply Filters</span>
               </Button>
-            }
-            options={[
-              { label: "All Employees", onClick: () => onEmployeeFilterChange?.("all") },
-              ...users.map((u) => ({
-                label: u.name,
-                onClick: () => onEmployeeFilterChange?.(u.id),
-              })),
-            ]}
-            maxHeight="18rem"
-          />
-        )}
-
-        <CustomDropdown
-          trigger={
-            <Button
-              variant="default"
-              size="sm"
-              border={false}
-              type="button"
-              className="h-[38px] px-3 flex items-center gap-2">
-              <span className="text-xs font-[350]">
-                Pay:{" "}
-                {paymentTypeFilter === "all" ? "All" : paymentTypeFilter}
-              </span>
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          }
-          options={[
-            { label: "All Payment Types", onClick: () => onPaymentTypeFilterChange?.("all") },
-            { label: "Cash", onClick: () => onPaymentTypeFilterChange?.("CASH") },
-            { label: "Cheque", onClick: () => onPaymentTypeFilterChange?.("CHEQUE") },
-            { label: "E-Transfer", onClick: () => onPaymentTypeFilterChange?.("E_TRANSFER") },
-            { label: "Credit Card", onClick: () => onPaymentTypeFilterChange?.("CREDIT_CARD") },
-            { label: "Other", onClick: () => onPaymentTypeFilterChange?.("OTHER") },
-          ]}
-          maxHeight="14rem"
-        />
-
-        {(startDate ||
-          endDate ||
-          jobTypeFilter !== "all" ||
-          clientFilter !== "all" ||
-          employeeFilter !== "all" ||
-          paymentTypeFilter !== "all") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            border={false}
-            className="h-[38px] px-3 text-xs"
-            onClick={() => {
-              onStartDateChange?.("");
-              onEndDateChange?.("");
-              onJobTypeFilterChange?.("all");
-              onClientFilterChange?.("all");
-              onEmployeeFilterChange?.("all");
-              onPaymentTypeFilterChange?.("all");
-            }}>
-            Clear
-          </Button>
-        )}
-      </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading ? (

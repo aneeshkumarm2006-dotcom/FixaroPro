@@ -23,6 +23,8 @@ import {
   Megaphone,
   PieChart,
   Activity,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import RevenueTrendChart from "./charts/RevenueTrendChart";
 import InventoryValueChart from "./charts/InventoryValueChart";
@@ -33,6 +35,7 @@ import { CBarChart, CPieChart } from "@/components/ui/Chart";
 import { dismissAlert, markAlertRead } from "@/app/(app)/actions/createAlert";
 import { createTarget } from "@/app/(app)/actions/createTarget";
 import { updateTarget } from "@/app/(app)/actions/updateTarget";
+import { deleteTarget } from "@/app/(app)/actions/deleteTarget";
 
 type TabView =
   | "overview"
@@ -855,6 +858,8 @@ export default function AnalyticsView({
   // ── Tab 5: Targets vs Actuals ──
   const TargetsTab = () => {
     const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const metricLabels: Record<string, string> = {
       REVENUE: "Revenue",
@@ -1011,6 +1016,10 @@ export default function AnalyticsView({
                     ? "default"
                     : "error";
 
+                const isEditing = editingId === target.id;
+                const isConfirmingDelete = deletingId === target.id;
+                const valuePrecision = target.metric === "PROFIT_MARGIN" ? 1 : 2;
+
                 return (
                   <Card key={target.id} variant="default" className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -1026,10 +1035,8 @@ export default function AnalyticsView({
                       <div className="text-right flex items-center gap-3">
                         <div>
                           <p className="text-sm font-[400] text-[#005F6A]">
-                            {target.actual.toFixed(
-                              target.metric === "PROFIT_MARGIN" ? 1 : 2
-                            )}{" "}
-                            / {target.targetValue.toFixed(target.metric === "PROFIT_MARGIN" ? 1 : 2)}
+                            {target.actual.toFixed(valuePrecision)}{" "}
+                            / {target.targetValue.toFixed(valuePrecision)}
                           </p>
                           <p className="text-xs text-[#005F6A]/60">
                             Variance: {target.variance >= 0 ? "+" : ""}
@@ -1039,6 +1046,32 @@ export default function AnalyticsView({
                         <Badge variant={badgeVariant as any} size="sm">
                           {target.progress.toFixed(0)}%
                         </Badge>
+                        {!isEditing && !isConfirmingDelete && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label="Edit target"
+                              title="Edit target"
+                              onClick={() => {
+                                setDeletingId(null);
+                                setEditingId(target.id);
+                              }}
+                              className="p-1.5 rounded-lg text-[#005F6A]/60 hover:text-[#005F6A] hover:bg-[#005F6A]/10 transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Delete target"
+                              title="Delete target"
+                              onClick={() => {
+                                setEditingId(null);
+                                setDeletingId(target.id);
+                              }}
+                              className="p-1.5 rounded-lg text-red-500/70 hover:text-red-600 hover:bg-red-500/10 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="h-2 bg-[#005F6A]/10 rounded-full overflow-hidden">
@@ -1047,10 +1080,99 @@ export default function AnalyticsView({
                         style={{ width: `${Math.min(target.progress, 100)}%` }}
                       />
                     </div>
-                    {target.notes && (
+                    {target.notes && !isEditing && (
                       <p className="text-xs text-[#005F6A]/50 mt-2">
                         {target.notes}
                       </p>
+                    )}
+
+                    {isEditing && (
+                      <form
+                        action={async (formData) => {
+                          await updateTarget(formData);
+                          setEditingId(null);
+                        }}
+                        className="mt-4 pt-4 border-t border-[#005F6A]/10 space-y-3">
+                        <input type="hidden" name="targetId" value={target.id} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                              Target Value
+                            </label>
+                            <input
+                              type="number"
+                              name="targetValue"
+                              step="0.01"
+                              required
+                              defaultValue={target.targetValue}
+                              className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                              Notes
+                            </label>
+                            <input
+                              type="text"
+                              name="notes"
+                              defaultValue={target.notes ?? ""}
+                              className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="submit"
+                            variant="action"
+                            size="sm"
+                            border={false}
+                            className="rounded-xl px-4 py-2">
+                            Save Changes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            border={false}
+                            onClick={() => setEditingId(null)}
+                            className="rounded-xl px-4 py-2">
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+
+                    {isConfirmingDelete && (
+                      <div className="mt-4 pt-4 border-t border-[#005F6A]/10 flex items-center justify-between gap-3 flex-wrap">
+                        <p className="text-xs text-[#005F6A]/70">
+                          Delete this target? This cannot be undone.
+                        </p>
+                        <form
+                          action={async (formData) => {
+                            await deleteTarget(formData);
+                            setDeletingId(null);
+                          }}
+                          className="flex items-center gap-2">
+                          <input type="hidden" name="targetId" value={target.id} />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            border={false}
+                            onClick={() => setDeletingId(null)}
+                            className="rounded-xl px-4 py-2">
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            variant="destructive"
+                            size="sm"
+                            border={false}
+                            className="rounded-xl px-4 py-2">
+                            Delete
+                          </Button>
+                        </form>
+                      </div>
                     )}
                   </Card>
                 );

@@ -3,17 +3,7 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-
-export type JobPhotoDTO = {
-  id: string;
-  jobId: string;
-  employeeId: string;
-  employeeName: string;
-  url: string;
-  caption: string | null;
-  createdAt: Date;
-  canDelete: boolean;
-};
+import type { JobPhotoDTO } from "./getJobPhotos.types";
 
 export async function getJobPhotos(
   jobId: string

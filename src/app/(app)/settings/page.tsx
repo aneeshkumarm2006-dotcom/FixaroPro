@@ -13,8 +13,31 @@ export default async function SettingsPage() {
     redirect("/sign-in");
   }
 
-  const userWithRole = session.user as typeof session.user & {
+  const sessionUser = session.user as typeof session.user & {
     role: "OWNER" | "ADMIN" | "EMPLOYEE";
+  };
+
+  const dbUser = await db.user.findUnique({
+    where: { id: sessionUser.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+    },
+  });
+
+  if (!dbUser) {
+    redirect("/sign-in");
+  }
+
+  const userWithRole = {
+    ...sessionUser,
+    name: dbUser.name,
+    email: dbUser.email,
+    phone: dbUser.phone,
+    role: dbUser.role as "OWNER" | "ADMIN" | "EMPLOYEE",
   };
   const isAdmin =
     userWithRole.role === "OWNER" || userWithRole.role === "ADMIN";

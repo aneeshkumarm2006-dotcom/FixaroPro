@@ -171,7 +171,7 @@ function CustomDatePicker({
   }, [isOpen]);
 
   const selectedDate = value ? new Date(`${value}T00:00:00`) : null;
-  const monthLabel = viewDate.toLocaleDateString(undefined, {
+  const monthLabel = viewDate.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
@@ -237,7 +237,7 @@ function CustomDatePicker({
                 value ? "text-[#005F6A]" : "text-[#005F6A]/50"
               }`}>
               {value
-                ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+                ? new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
                     weekday: "short",
                     month: "short",
                     day: "numeric",

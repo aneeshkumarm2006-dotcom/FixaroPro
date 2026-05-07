@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import CustomDropdown from "@/components/ui/custom-dropdown";
 import Modal from "@/components/ui/Modal";
 import { exportJobs } from "../actions/exportJobs";
-import type { JobExportRow } from "../actions/exportJobs";
+import type { JobExportRow } from "../actions/exportJobs.types";
 
 interface ExportButtonProps {
   filters: {

@@ -45,7 +45,7 @@ interface DocumentSigningViewProps {
 
 function formatDate(value: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleDateString(undefined, {
+  return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -73,7 +73,7 @@ export default function DocumentSigningView({
     signature.status === "EXPIRED" ||
     signature.status === "REVOKED";
 
-  const today = new Date().toLocaleDateString(undefined, {
+  const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",

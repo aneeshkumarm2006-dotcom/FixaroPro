@@ -1,13 +1,9 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
-import ChatClient from "./ChatClient";
-import {
-  CHAT_CHANNELS_KEY,
-  DEFAULT_CHAT_CHANNELS,
-  type ChatChannelsConfig,
-} from "./types";
+import AdminChatClient from "./AdminChatClient";
+import EmployeeChatClient from "./EmployeeChatClient";
+import { getAdminChatList, getEmployeeChat } from "./actions";
 
 export default async function ChatPage() {
   const session = await auth.api.getSession({
@@ -18,20 +14,23 @@ export default async function ChatPage() {
     redirect("/sign-in");
   }
 
-  const userWithRole = session.user as typeof session.user & {
-    role: "OWNER" | "ADMIN" | "EMPLOYEE";
-  };
+  const role = (session.user as { role?: "OWNER" | "ADMIN" | "EMPLOYEE" }).role ?? "EMPLOYEE";
 
-  const setting = await db.appSetting.findUnique({
-    where: { key: CHAT_CHANNELS_KEY },
-  });
+  if (role === "OWNER" || role === "ADMIN") {
+    const list = await getAdminChatList();
+    const initial = list.success ? list.data : [];
+    return (
+      <div className="h-full overflow-hidden">
+        <AdminChatClient initialList={initial} />
+      </div>
+    );
+  }
 
-  const config =
-    (setting?.value as ChatChannelsConfig | undefined) ?? DEFAULT_CHAT_CHANNELS;
-
+  const chat = await getEmployeeChat();
+  const initial = chat.success ? chat.data : { conversationId: "", messages: [] };
   return (
-    <div className="h-full overflow-hidden overflow-y-auto p-8">
-      <ChatClient role={userWithRole.role} config={config} />
+    <div className="h-full overflow-hidden">
+      <EmployeeChatClient initial={initial} />
     </div>
   );
 }

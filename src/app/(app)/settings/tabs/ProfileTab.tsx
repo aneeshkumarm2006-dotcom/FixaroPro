@@ -8,6 +8,8 @@ import {
   TrendingUp,
   DollarSign,
   Bell,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -121,6 +123,9 @@ function ProfileForms({ user }: { user: SettingsUser }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
@@ -255,36 +260,63 @@ function ProfileForms({ user }: { user: SettingsUser }) {
         icon={KeyRound}>
         <form onSubmit={handlePasswordUpdate} className="space-y-4">
           <Field label="Current Password">
-            <Input
-              variant="form"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
-              required
-            />
+            <div className="relative">
+              <Input
+                variant="form"
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                className="pr-9"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+                {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </Field>
           <Field
             label="New Password"
             hint="Must be at least 8 characters.">
-            <Input
-              variant="form"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
-              required
-            />
+            <div className="relative">
+              <Input
+                variant="form"
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="pr-9"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </Field>
           <Field label="Confirm New Password">
-            <Input
-              variant="form"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              required
-            />
+            <div className="relative">
+              <Input
+                variant="form"
+                type={showConfirm ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="pr-9"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+                {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </Field>
 
           {passwordMsg && <Feedback msg={passwordMsg} />}

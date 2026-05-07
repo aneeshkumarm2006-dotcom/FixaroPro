@@ -14,8 +14,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { createInventoryRequest } from "../../actions/createInventoryRequest";
-import { ProductLocationStock } from "../../actions/getLocationStock";
-import { MissingEquipmentItem } from "../../actions/checkEquipmentForJob";
+import type { ProductLocationStock } from "../../actions/getLocationStock.types";
+import type { MissingEquipmentItem } from "../../actions/checkEquipmentForJob.types";
 
 interface JobInfo {
   id: string;

@@ -108,12 +108,12 @@ export default function PayPeriodDetail({ period, onError }: Props) {
         <div className="mt-4 pt-4 border-t border-[#005F6A]/10 text-xs text-[#005F6A]/60 space-y-1">
           {period.approvedAt && (
             <p>
-              Approved {new Date(period.approvedAt).toLocaleDateString()}
+              Approved {new Date(period.approvedAt).toLocaleDateString("en-US")}
               {period.approvedBy && ` by ${period.approvedBy.name}`}
             </p>
           )}
           {period.paidAt && (
-            <p>Paid {new Date(period.paidAt).toLocaleDateString()}</p>
+            <p>Paid {new Date(period.paidAt).toLocaleDateString("en-US")}</p>
           )}
         </div>
       )}

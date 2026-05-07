@@ -2,10 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { Trash2, X, Loader, ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  getJobPhotos,
-  type JobPhotoDTO,
-} from "@/app/(app)/actions/getJobPhotos";
+import { getJobPhotos } from "@/app/(app)/actions/getJobPhotos";
+import type { JobPhotoDTO } from "@/app/(app)/actions/getJobPhotos.types";
 import { deleteJobPhoto } from "@/app/(app)/actions/deleteJobPhoto";
 import PhotoUpload from "./PhotoUpload";
 

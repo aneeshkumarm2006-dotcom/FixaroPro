@@ -6,11 +6,11 @@ import Card from "@/components/ui/Card";
 import { Download, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { generateProviderInvoice } from "../actions/generateProviderInvoice";
 import { approveProviderInvoice } from "../actions/approveProviderInvoice";
-import type { ProviderInvoice } from "../actions/generateProviderInvoice";
+import type { ProviderInvoice } from "../actions/generateProviderInvoice.types";
 
 function formatDate(s: string | null) {
   if (!s) return "—";
-  return new Date(s).toLocaleDateString(undefined, {
+  return new Date(s).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

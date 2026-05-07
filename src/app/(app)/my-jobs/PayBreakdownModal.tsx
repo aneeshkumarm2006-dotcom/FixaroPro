@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { DollarSign, Info } from "lucide-react";
-import {
-  getPayBreakdown,
-  type PayBreakdown,
-} from "../actions/getPayBreakdown";
+import { getPayBreakdown } from "../actions/getPayBreakdown";
+import type { PayBreakdown } from "../actions/getPayBreakdown.types";
 
 interface PayBreakdownModalProps {
   jobId: string;

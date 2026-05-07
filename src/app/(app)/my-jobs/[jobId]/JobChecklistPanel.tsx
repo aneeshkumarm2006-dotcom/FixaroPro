@@ -11,7 +11,8 @@ import {
   X,
 } from "lucide-react";
 import { generateJobChecklist } from "@/app/(app)/actions/generateJobChecklist";
-import { getJobChecklist, type JobChecklistDTO } from "@/app/(app)/actions/getJobChecklist";
+import { getJobChecklist } from "@/app/(app)/actions/getJobChecklist";
+import type { JobChecklistDTO } from "@/app/(app)/actions/getJobChecklist.types";
 import { updateChecklistItem } from "@/app/(app)/actions/updateChecklistItem";
 import type { ChecklistItemStatus } from "@prisma/client";
 

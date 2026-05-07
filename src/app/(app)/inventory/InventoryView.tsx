@@ -155,7 +155,7 @@ export default function InventoryView({
         {/* Search */}
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A] z-[100] w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A] z-10 w-4 h-4" />
             <Input
               placeholder="Search by product name, description, or ID..."
               value={searchTerm}

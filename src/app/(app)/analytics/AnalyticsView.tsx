@@ -1020,7 +1020,7 @@ export default function AnalyticsView({
                         </p>
                         <p className="text-xs text-[#005F6A]/60">
                           {target.period} from{" "}
-                          {new Date(target.periodStart).toLocaleDateString()}
+                          {new Date(target.periodStart).toLocaleDateString("en-US")}
                         </p>
                       </div>
                       <div className="text-right flex items-center gap-3">
@@ -1527,10 +1527,10 @@ export default function AnalyticsView({
                 {(startDate || endDate) && (
                   <p className="text-xs text-[#005F6A]/60 mt-2">
                     {startDate && endDate
-                      ? `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`
+                      ? `${new Date(startDate).toLocaleDateString("en-US")} - ${new Date(endDate).toLocaleDateString("en-US")}`
                       : startDate
-                      ? `From ${new Date(startDate).toLocaleDateString()}`
-                      : `Until ${new Date(endDate).toLocaleDateString()}`}
+                      ? `From ${new Date(startDate).toLocaleDateString("en-US")}`
+                      : `Until ${new Date(endDate).toLocaleDateString("en-US")}`}
                   </p>
                 )}
               </div>
@@ -1761,7 +1761,7 @@ export default function AnalyticsView({
                               {alert.type.replace(/_/g, " ")}
                             </Badge>
                             <span className="text-xs text-[#005F6A]/40">
-                              {new Date(alert.createdAt).toLocaleDateString()}{" "}
+                              {new Date(alert.createdAt).toLocaleDateString("en-US")}{" "}
                               {new Date(alert.createdAt).toLocaleTimeString()}
                             </span>
                           </div>

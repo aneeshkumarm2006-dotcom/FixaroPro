@@ -65,7 +65,7 @@ const WITHDRAWAL_STATUS_STYLES: Record<string, string> = {
 };
 
 function formatDate(d: Date) {
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

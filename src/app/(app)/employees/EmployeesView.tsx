@@ -171,7 +171,7 @@ export default function EmployeesView({
   );
 
   return (
-    <div className="">
+    <div className="max-w-[80rem] mx-auto w-full">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -212,7 +212,7 @@ export default function EmployeesView({
         {/* Search */}
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-[100] w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-[10] w-4 h-4" />
             <Input
               placeholder="Search by name, email, or phone..."
               value={searchTerm}
@@ -415,7 +415,7 @@ export default function EmployeesView({
                       },
                       { label: "Active", className: "w-[100px] text-center" },
                       { label: "Revenue", className: "w-[120px] text-right" },
-                      { label: "Actions", className: "w-[160px] text-left" },
+                      { label: "Actions", className: "w-[160px] text-left pl-12" },
                     ].map((col) => (
                       <div
                         key={col.label}
@@ -488,7 +488,7 @@ export default function EmployeesView({
                         </div>
 
                         {/* Actions */}
-                        <div className="w-[160px] p-4">
+                        <div className="w-[160px] p-4 pl-12">
                           <div className="flex items-center gap-2">
                             <Button
                               variant="default"

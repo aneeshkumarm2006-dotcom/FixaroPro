@@ -15,9 +15,13 @@ interface User {
 interface UserActionsProps {
   user: User;
   signOutAction: () => Promise<void>;
+  expanded?: boolean;
 }
 
-export default function UserActions({ signOutAction }: UserActionsProps) {
+export default function UserActions({
+  signOutAction,
+  expanded = false,
+}: UserActionsProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -29,6 +33,29 @@ export default function UserActions({ signOutAction }: UserActionsProps) {
       setIsSigningOut(false);
     }
   };
+
+  if (expanded) {
+    return (
+      <div className="flex flex-col items-stretch gap-1 w-full">
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 h-12 px-3 rounded-xl text-sm font-[350] text-[#005F6A] hover:bg-[#005F6A]/10 transition-colors">
+          <Settings className="w-5 h-5 shrink-0" />
+          <span className="truncate">Settings</span>
+        </Link>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="flex items-center gap-3 h-12 px-3 rounded-xl text-sm font-[350] text-[#005F6A] hover:bg-[#005F6A]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <LogOut className="w-5 h-5 shrink-0" />
+          <span className="truncate">
+            {isSigningOut ? "Signing out..." : "Logout"}
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-2">

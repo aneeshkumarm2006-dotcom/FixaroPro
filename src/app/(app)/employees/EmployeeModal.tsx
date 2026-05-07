@@ -107,7 +107,7 @@ export function EmployeeModal({
     },
   });
 
-  const form = mode === "create" ? createForm : editForm;
+  const form: any = mode === "create" ? createForm : editForm;
   const {
     register,
     handleSubmit,

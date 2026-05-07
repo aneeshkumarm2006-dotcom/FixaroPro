@@ -92,7 +92,7 @@ const ROLES: Role[] = ["OWNER", "ADMIN", "EMPLOYEE"];
 
 function formatDate(value: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleDateString(undefined, {
+  return new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",

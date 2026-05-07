@@ -3,22 +3,7 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-
-export type IncomeData = {
-  year: number;
-  grossYTD: number;
-  netYTD: number;
-  deductionsYTD: number;
-  adjustmentsYTD: number;
-  reimbursementsYTD: number;
-  estimatedTaxes: number;
-  estimatedTaxRate: number;
-  totalHoursYTD: number;
-  jobsCompletedYTD: number;
-  paidPayoutCount: number;
-  pendingAmount: number;
-  withdrawnYTD: number;
-};
+import type { IncomeData } from "./getIncomeData.types";
 
 interface GetInput {
   employeeId?: string;

@@ -4,34 +4,11 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { multiplierForRating } from "@/lib/pay-multiplier";
-
-export type RecentRating = {
-  id: string;
-  rating: number;
-  notes: string | null;
-  createdAt: string;
-  jobId: string | null;
-  clientName: string | null;
-};
-
-export type TrendPoint = {
-  date: string;
-  average: number;
-  count: number;
-};
-
-export type PerformanceData = {
-  currentMultiplier: number;
-  rating30Day: number | null;
-  ratingCount30Day: number;
-  tierLabel: string;
-  nextTierAt: number | null;
-  nextTierMultiplier: number | null;
-  trend90Day: TrendPoint[];
-  recentRatings: RecentRating[];
-  oldestRating30DayAt: string | null;
-  expiringSoon: number;
-};
+import type {
+  PerformanceData,
+  RecentRating,
+  TrendPoint,
+} from "./getPerformanceData.types";
 
 const RATING_EXPIRY_DAYS = 30;
 

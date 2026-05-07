@@ -134,7 +134,7 @@ export default function SalesMapView({
                   <p className="text-xs text-gray-400 mt-1">{area.address}</p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                  {new Date(area.date).toLocaleDateString()}
+                  {new Date(area.date).toLocaleDateString("en-US")}
                 </p>
               </div>
             </Popup>

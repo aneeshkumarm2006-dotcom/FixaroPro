@@ -3,21 +3,10 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-
-export type LocationStockEntry = {
-  locationId: string;
-  locationName: string;
-  locationAddress: string | null;
-  quantity: number;
-};
-
-export type ProductLocationStock = {
-  productId: string;
-  productName: string;
-  unit: string;
-  totalAcrossLocations: number;
-  locations: LocationStockEntry[];
-};
+import type {
+  LocationStockEntry,
+  ProductLocationStock,
+} from "./getLocationStock.types";
 
 export async function getLocationStock(
   productIds?: string[]

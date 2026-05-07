@@ -3,7 +3,7 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import { LocationProductEntry } from "../../actions/getLocationProducts";
+import type { LocationProductEntry } from "../../actions/getLocationProducts.types";
 
 interface CartItemProps {
   product: LocationProductEntry;

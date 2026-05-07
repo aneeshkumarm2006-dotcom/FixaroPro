@@ -175,9 +175,9 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                       {campaign.startDate && (
                         <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {new Date(campaign.startDate).toLocaleDateString()}
+                          {new Date(campaign.startDate).toLocaleDateString("en-US")}
                           {campaign.endDate &&
-                            ` - ${new Date(campaign.endDate).toLocaleDateString()}`}
+                            ` - ${new Date(campaign.endDate).toLocaleDateString("en-US")}`}
                         </span>
                       )}
                       <span className="text-xs text-[#005F6A]/40">

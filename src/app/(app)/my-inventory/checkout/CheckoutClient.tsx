@@ -17,10 +17,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
-import {
-  getLocationProducts,
-  LocationProductEntry,
-} from "../../actions/getLocationProducts";
+import { getLocationProducts } from "../../actions/getLocationProducts";
+import type { LocationProductEntry } from "../../actions/getLocationProducts.types";
 import { checkoutInventory } from "../../actions/checkoutInventory";
 import CartItem from "./CartItem";
 import CheckoutSummary from "./CheckoutSummary";

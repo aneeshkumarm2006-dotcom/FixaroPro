@@ -230,8 +230,8 @@ export default function ClientDetailView({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-[400] text-[#005F6A]">
                         {j.jobDate
-                          ? new Date(j.jobDate).toLocaleDateString()
-                          : new Date(j.startTime).toLocaleDateString()}
+                          ? new Date(j.jobDate).toLocaleDateString("en-US")
+                          : new Date(j.startTime).toLocaleDateString("en-US")}
                       </span>
                       {getStatusBadge(j.status)}
                       {j.jobType && (
@@ -289,8 +289,8 @@ export default function ClientDetailView({
                     <div className="flex-1">
                       <p className="text-sm text-[#005F6A]">
                         {j.jobDate
-                          ? new Date(j.jobDate).toLocaleDateString()
-                          : new Date(j.startTime).toLocaleDateString()}
+                          ? new Date(j.jobDate).toLocaleDateString("en-US")
+                          : new Date(j.startTime).toLocaleDateString("en-US")}
                       </p>
                       {j.paymentType && (
                         <p className="text-xs text-[#005F6A]/60">

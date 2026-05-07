@@ -216,7 +216,7 @@ export default function ClientsPageClient({
       {/* Search */}
       <div className="flex flex-col lg:flex-row gap-2 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#005F6A]/60 z-[100] w-4 h-4" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#005F6A]/60 z-10 w-4 h-4" />
           <Input
             placeholder="Search clients by name, email, phone, or address..."
             value={searchTerm}
@@ -357,7 +357,7 @@ export default function ClientsPageClient({
                     <div className="w-[140px] p-4">
                       <span className="app-title-small !text-[#005F6A]/60 text-xs">
                         {c.lastJobDate
-                          ? new Date(c.lastJobDate).toLocaleDateString()
+                          ? new Date(c.lastJobDate).toLocaleDateString("en-US")
                           : "—"}
                       </span>
                     </div>

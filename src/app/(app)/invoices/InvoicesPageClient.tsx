@@ -261,7 +261,7 @@ export default function InvoicesPageClient({
       {/* Search & Filters */}
       <div className="flex flex-col lg:flex-row gap-2 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#005F6A]/60 z-[100] w-4 h-4" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#005F6A]/60 z-10 w-4 h-4" />
           <Input
             placeholder="Search by invoice number, client name..."
             value={searchTerm}
@@ -372,20 +372,20 @@ export default function InvoicesPageClient({
                       <p className="app-title-small text-[#005F6A] truncate">{inv.clientName}</p>
                       {inv.jobId && (
                         <p className="text-[10px] text-[#005F6A]/50 truncate">
-                          Job: {inv.jobType || "—"}{inv.jobDate ? ` · ${new Date(inv.jobDate).toLocaleDateString()}` : ""}
+                          Job: {inv.jobType || "—"}{inv.jobDate ? ` · ${new Date(inv.jobDate).toLocaleDateString("en-US")}` : ""}
                         </p>
                       )}
                     </div>
 
                     <div className="w-[120px] p-4">
                       <span className="app-title-small !text-[#005F6A]/60 text-xs">
-                        {new Date(inv.createdAt).toLocaleDateString()}
+                        {new Date(inv.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
 
                     <div className="w-[120px] p-4">
                       <span className="app-title-small !text-[#005F6A]/60 text-xs">
-                        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
+                        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-US") : "—"}
                       </span>
                     </div>
 
@@ -470,8 +470,8 @@ export default function InvoicesPageClient({
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-[#005F6A]/60">
-                    <span>{new Date(inv.createdAt).toLocaleDateString()}</span>
-                    {inv.dueDate && <span>Due: {new Date(inv.dueDate).toLocaleDateString()}</span>}
+                    <span>{new Date(inv.createdAt).toLocaleDateString("en-US")}</span>
+                    {inv.dueDate && <span>Due: {new Date(inv.dueDate).toLocaleDateString("en-US")}</span>}
                   </div>
                   <div className="flex gap-2">
                     <Button

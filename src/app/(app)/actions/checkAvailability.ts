@@ -4,20 +4,10 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import type { AvailabilityDay } from "@prisma/client";
-
-export type AvailabilityResult =
-  | "AVAILABLE"
-  | "UNAVAILABLE"
-  | "OUTSIDE_HOURS"
-  | "NO_DATA";
-
-export interface CheckAvailabilityInput {
-  employeeId: string;
-  /** ISO datetime string for the start of the work block. */
-  startISO: string;
-  /** ISO datetime string for the end. If omitted, treats as a single moment. */
-  endISO?: string;
-}
+import type {
+  AvailabilityResult,
+  CheckAvailabilityInput,
+} from "./checkAvailability.types";
 
 const DAY_BY_INDEX: AvailabilityDay[] = [
   "SUNDAY",

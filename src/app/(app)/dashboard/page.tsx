@@ -421,7 +421,7 @@ export default async function DashboardPage() {
                         </p>
                         <p className="text-xs text-[#005F6A]/60">
                           {job.jobDate
-                            ? new Date(job.jobDate).toLocaleDateString()
+                            ? new Date(job.jobDate).toLocaleDateString("en-US")
                             : "No date"}{" "}
                           •{" "}
                           {job.cleaners.length > 0
@@ -483,7 +483,7 @@ export default async function DashboardPage() {
                           {job.clientName}
                         </p>
                         <p className="text-xs text-[#005F6A]/60">
-                          {new Date(job.updatedAt).toLocaleDateString()}
+                          {new Date(job.updatedAt).toLocaleDateString("en-US")}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -636,7 +636,7 @@ export default async function DashboardPage() {
                       </p>
                       <p className="text-xs text-[#005F6A]/60">
                         {job.jobDate
-                          ? new Date(job.jobDate).toLocaleDateString()
+                          ? new Date(job.jobDate).toLocaleDateString("en-US")
                           : "No date"}{" "}
                         at{" "}
                         {new Date(job.startTime).toLocaleTimeString([], {

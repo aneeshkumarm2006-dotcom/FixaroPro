@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Star, TrendingUp, Award, Clock } from "lucide-react";
-import {
-  getPerformanceData,
-  type PerformanceData,
-} from "../../actions/getPerformanceData";
+import { getPerformanceData } from "../../actions/getPerformanceData";
+import type { PerformanceData } from "../../actions/getPerformanceData.types";
 import { SectionCard } from "./_shared";
 
 function StarRow({ value }: { value: number }) {
@@ -90,7 +88,7 @@ function TrendChart({ data }: { data: PerformanceData["trend90Day"] }) {
         ))}
       </svg>
       <div className="flex justify-between text-[10px] text-[#005F6A]/50 mt-1">
-        <span>{new Date(data[0].date).toLocaleDateString()}</span>
+        <span>{new Date(data[0].date).toLocaleDateString("en-US")}</span>
         <span>Latest: {last.average.toFixed(2)}★</span>
       </div>
     </div>
@@ -98,7 +96,7 @@ function TrendChart({ data }: { data: PerformanceData["trend90Day"] }) {
 }
 
 function formatDate(s: string) {
-  return new Date(s).toLocaleDateString(undefined, {
+  return new Date(s).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

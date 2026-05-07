@@ -346,7 +346,7 @@ export default function ProductDetailView({
                   </p>
                   <p className="text-xs text-[#005F6A]/60">
                     {usage.job.employee.name} •{" "}
-                    {new Date(usage.createdAt).toLocaleDateString()}
+                    {new Date(usage.createdAt).toLocaleDateString("en-US")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -404,7 +404,7 @@ export default function ProductDetailView({
           <div className="flex flex-col lg:flex-row gap-2">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-[100] w-4 h-4" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-10 w-4 h-4" />
                 <Input
                   placeholder="Search by employee name, email, or notes..."
                   value={searchTerm}
@@ -510,7 +510,7 @@ export default function ProductDetailView({
                           <p className="app-title-small !text-[#005F6A]/50">
                             {new Date(
                               assignment.assignedAt
-                            ).toLocaleDateString()}
+                            ).toLocaleDateString("en-US")}
                           </p>
                         </div>
                         <div className="w-[200px] p-4">
@@ -579,7 +579,7 @@ export default function ProductDetailView({
                     </div>
                     <div className="flex items-center justify-between text-xs text-[#005F6A]/60">
                       <span>
-                        {new Date(assignment.assignedAt).toLocaleDateString()}
+                        {new Date(assignment.assignedAt).toLocaleDateString("en-US")}
                       </span>
                       <span className="text-sm font-[400] text-[#005F6A]">
                         $

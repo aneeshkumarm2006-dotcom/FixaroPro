@@ -146,7 +146,7 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
                       {emp.lastWashDate ? (
                         <div>
                           <p className="text-sm font-[350] text-[#005F6A]">
-                            {new Date(emp.lastWashDate).toLocaleDateString()}
+                            {new Date(emp.lastWashDate).toLocaleDateString("en-US")}
                           </p>
                           <p className="text-xs text-[#005F6A]/50">
                             {emp.lastWashRagCount} rags
@@ -202,7 +202,7 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
                   <span>{emp.totalRags} rags total</span>
                   {emp.lastWashDate && (
                     <span>
-                      Last: {new Date(emp.lastWashDate).toLocaleDateString()}
+                      Last: {new Date(emp.lastWashDate).toLocaleDateString("en-US")}
                     </span>
                   )}
                 </div>

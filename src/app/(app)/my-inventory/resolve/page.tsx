@@ -3,10 +3,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { checkEquipmentForJob } from "../../actions/checkEquipmentForJob";
-import {
-  getLocationStock,
-  ProductLocationStock,
-} from "../../actions/getLocationStock";
+import { getLocationStock } from "../../actions/getLocationStock";
+import type { ProductLocationStock } from "../../actions/getLocationStock.types";
 import ResolveClient from "./ResolveClient";
 
 type SearchParams = Promise<{

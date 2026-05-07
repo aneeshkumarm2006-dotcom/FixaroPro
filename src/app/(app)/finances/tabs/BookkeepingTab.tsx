@@ -477,7 +477,7 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
                   key={t.id}
                   className="border-t border-[#005F6A]/5 hover:bg-[#005F6A]/3">
                   <td className="px-4 py-3 text-[#005F6A]/80 whitespace-nowrap">
-                    {new Date(t.date).toLocaleDateString()}
+                    {new Date(t.date).toLocaleDateString("en-US")}
                   </td>
                   <td className="px-4 py-3">
                     <span

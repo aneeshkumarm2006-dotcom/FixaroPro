@@ -45,23 +45,23 @@ export const eventOverlapsDay = (event: CalendarEvent, day: Date) => {
 export const format = (d: Date, token: string) => {
   if (token === "d") return d.getDate().toString();
   if (token === "MMMM yyyy")
-    return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   if (token === "EEE d")
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString("en-US", {
       weekday: "short",
       day: "numeric",
     });
   if (token === "EEEE, d MMMM yyyy")
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString("en-US", {
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     });
   if (token === "d MMM")
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
   if (token === "d MMM yyyy")
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString("en-US", {
       day: "numeric",
       month: "short",
       year: "numeric",

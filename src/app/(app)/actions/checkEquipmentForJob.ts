@@ -3,25 +3,10 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-
-export type MissingEquipmentItem = {
-  productId: string;
-  productName: string;
-  unit: string;
-  needed: number;
-  have: number;
-  shortBy: number;
-  source: "JOB_TYPE_KIT" | "ADD_ON" | "USAGE_RULE";
-};
-
-export type EquipmentCheckResult = {
-  jobId: string;
-  clientName: string;
-  jobDate: Date | null;
-  jobType: string | null;
-  addOns: string[];
-  missing: MissingEquipmentItem[];
-};
+import type {
+  MissingEquipmentItem,
+  EquipmentCheckResult,
+} from "./checkEquipmentForJob.types";
 
 export async function checkEquipmentForJob(
   jobId: string,

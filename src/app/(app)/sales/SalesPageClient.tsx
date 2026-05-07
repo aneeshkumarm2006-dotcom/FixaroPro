@@ -282,7 +282,7 @@ export default function SalesPageClient({
                             </p>
                           )}
                           <p className="text-xs text-[#005F6A]/40 mt-0.5">
-                            {new Date(area.date).toLocaleDateString()}
+                            {new Date(area.date).toLocaleDateString("en-US")}
                           </p>
                         </div>
                         <Pencil className="w-3.5 h-3.5 text-[#005F6A]/30 flex-shrink-0 mt-0.5" />

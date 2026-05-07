@@ -1,0 +1,21 @@
+export type PayBreakdown = {
+  jobId: string;
+  clientName: string;
+  bedCount: number | null;
+  bathCount: number | null;
+  basePrice: number | null;
+  basePriceSource: "PRICING_RULE" | "JOB_PRICE" | "NONE";
+  addOns: Array<{ name: string; price: number }>;
+  addOnsTotal: number;
+  discount: number;
+  parking: number;
+  clientTotal: number;
+  employeeBasePay: number;
+  payMultiplier: number;
+  payAfterMultiplier: number;
+  totalTip: number;
+  teamSize: number;
+  tipShare: number;
+  totalEmployeePay: number;
+  isLead: boolean;
+};

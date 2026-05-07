@@ -286,96 +286,104 @@ export default function EmployeeDetailView({
   );
 
   // Overview Tab Content
-  const OverviewTab = () => (
-    <div className="space-y-6">
-      {/* Contact Info */}
-      <div className="w-1/2 grid grid-cols-1 gap-12">
-        <Card variant="ghost" className="!p-0">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <User className="w-4 h-4 text-[#005F6A]" />
-            </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
-              Contact Information
-            </h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/5">
-              <span className="input-label !text-[#005F6A]/70">Email</span>
-              <span className="app-title-small text-[#005F6A]">
-                {employee.email}
-              </span>
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/5">
-              <span className="input-label !text-[#005F6A]/70">Phone</span>
-              <span className="app-title-small text-[#005F6A]">
-                {employee.phone || "-"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/5">
-              <span className="input-label !text-[#005F6A]/70">Role</span>
-              {getRoleBadge(employee.role)}
-            </div>
-          </div>
-        </Card>
+  const OverviewTab = () => {
+    const InfoRow = ({
+      label,
+      value,
+      valueNode,
+    }: {
+      label: string;
+      value?: string;
+      valueNode?: React.ReactNode;
+    }) => (
+      <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+        <span className="text-sm text-gray-500">{label}</span>
+        {valueNode ?? (
+          <span className="text-sm font-[450] text-gray-800 text-right">
+            {value}
+          </span>
+        )}
+      </div>
+    );
 
-        {/* Financial Summary */}
-        <Card variant="ghost" className="!p-0">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <DollarSign className="w-4 h-4 text-[#005F6A]" />
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Contact Details */}
+          <Card variant="default" className="p-5">
+            <h3 className="text-sm font-[600] text-gray-800 mb-1">
+              Contact Details
+            </h3>
+            <div>
+              <InfoRow label="Email" value={employee.email} />
+              <InfoRow label="Phone" value={employee.phone || "-"} />
+              <InfoRow
+                label="Role"
+                valueNode={getRoleBadge(employee.role)}
+              />
             </div>
-            <h3 className="input-label !text-[#005F6A]/70">
+          </Card>
+
+          {/* Financial Summary */}
+          <Card variant="default" className="p-5">
+            <h3 className="text-sm font-[600] text-gray-800 mb-1">
               Financial Summary
             </h3>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/5">
-              <span className="input-label !text-[#005F6A]/70">
-                Total Revenue Generated
-              </span>
-              <span className="app-title-small text-[#005F6A]">
-                ${stats.totalRevenue.toFixed(2)}
-              </span>
+            <div>
+              <InfoRow
+                label="Total Revenue Generated"
+                value={`$${stats.totalRevenue.toFixed(2)}`}
+              />
+              <InfoRow
+                label="Total Employee Pay"
+                value={`$${stats.totalPaid.toFixed(2)}`}
+              />
+              <InfoRow
+                label="Total Tips"
+                valueNode={
+                  <span
+                    className={`text-sm font-[450] ${
+                      stats.totalTips > 0 ? "text-green-600" : "text-gray-800"
+                    }`}>
+                    {stats.totalTips > 0
+                      ? `+$${stats.totalTips.toFixed(2)}`
+                      : "-"}
+                  </span>
+                }
+              />
+              <InfoRow
+                label="Unpaid Jobs"
+                valueNode={
+                  stats.unpaidJobs > 0 ? (
+                    <span className="text-sm font-[450] text-yellow-600">
+                      {stats.unpaidJobs}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-[450] text-gray-800">0</span>
+                  )
+                }
+              />
             </div>
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/5">
-              <span className="input-label !text-[#005F6A]/70">
-                Total Employee Pay
-              </span>
-              <span className="app-title-small text-[#005F6A]">
-                ${stats.totalPaid.toFixed(2)}
-              </span>
-            </div>
-            {stats.totalTips > 0 && (
-              <div className="flex justify-between items-center p-3 rounded-xl bg-green-50">
-                <span className="input-label !text-[#005F6A]/70">
-                  Total Tips
-                </span>
-                <span className="app-title-small text-green-600">
-                  +${stats.totalTips.toFixed(2)}
-                </span>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Unpaid Jobs Warning */}
-      {stats.unpaidJobs > 0 && (
-        <div className="rounded-2xl p-4 flex items-start gap-3 bg-yellow-50 border border-yellow-200">
-          <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-          <div>
-            <p className="text-sm text-yellow-700 font-[400]">
-              {stats.unpaidJobs} unpaid job{stats.unpaidJobs > 1 ? "s" : ""}
-            </p>
-            <p className="text-xs text-yellow-600/70 mt-1">
-              Review and process pending payments
-            </p>
-          </div>
+          </Card>
         </div>
-      )}
-    </div>
-  );
+
+        {/* Unpaid Jobs Warning */}
+        {stats.unpaidJobs > 0 && (
+          <div className="rounded-2xl p-4 flex items-start gap-3 bg-yellow-50 border border-yellow-200">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-yellow-700 font-[400]">
+                {stats.unpaidJobs} unpaid job{stats.unpaidJobs > 1 ? "s" : ""}
+              </p>
+              <p className="text-xs text-yellow-600/70 mt-1">
+                Review and process pending payments
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Jobs Tab Content
   const JobsTab = () => (
@@ -418,7 +426,7 @@ export default function EmployeeDetailView({
                     {job.clientName}
                   </p>
                   <p className="text-xs text-[#005F6A]/60">
-                    {new Date(job.startTime).toLocaleDateString()} at{" "}
+                    {new Date(job.startTime).toLocaleDateString("en-US")} at{" "}
                     {new Date(job.startTime).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -474,7 +482,7 @@ export default function EmployeeDetailView({
                     {job.clientName}
                   </p>
                   <p className="app-subtitle !text-[#005F6A]/60">
-                    {new Date(job.startTime).toLocaleDateString()}
+                    {new Date(job.startTime).toLocaleDateString("en-US")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -792,7 +800,7 @@ export default function EmployeeDetailView({
                       {c.clientName}
                     </p>
                     <p className="text-xs text-[#005F6A]/60">
-                      {new Date(c.startTime).toLocaleDateString()} at{" "}
+                      {new Date(c.startTime).toLocaleDateString("en-US")} at{" "}
                       {new Date(c.startTime).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -818,51 +826,59 @@ export default function EmployeeDetailView({
   };
 
   return (
-    <div className="relative h-full overflow-y-auto pb-8 px-4">
+    <div className="relative h-full overflow-y-auto py-8 px-4">
       <div className="relative z-10 max-w-[80rem] w-full mx-auto space-y-6">
-        {/* Back Button */}
-        <Link href="/employees">
-          <Button
-            variant="default"
-            size="sm"
-            border={false}
-            className="mb-2 px-6 py-3">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Employees
-          </Button>
-        </Link>
+        {/* Header Card */}
+        <div className="rounded-2xl bg-[#005F6A]/5 p-5">
+          {/* Back + Edit row */}
+          <div className="flex items-center justify-between mb-5">
+            <Link href="/employees">
+              <Button
+                variant="ghost"
+                size="sm"
+                border={false}
+                className="-ml-1 px-3 py-2">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Employees
+              </Button>
+            </Link>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsEditModalOpen(true)}
+              border={false}
+              className="px-6 py-3">
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit Employee
+            </Button>
+          </div>
 
-        {/* Header */}
-        <div className="w-full flex flex-col md:flex-row items-start justify-between gap-4 my-10">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-                {employee.name}
-              </h1>
-              {getRoleBadge(employee.role)}
+          {/* Employee identity */}
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#005F6A]/10 flex items-center justify-center shrink-0">
+              <User className="w-7 h-7 text-[#005F6A]" />
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 text-[#005F6A]/70 mt-2">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                <span className="text-sm">{employee.email}</span>
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+                  {employee.name}
+                </h1>
+                {getRoleBadge(employee.role)}
               </div>
-              {employee.phone && (
+              <div className="flex flex-col sm:flex-row gap-4 text-[#005F6A]/70 mt-2">
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  <span className="text-sm">{employee.phone}</span>
+                  <Mail className="w-4 h-4" />
+                  <span className="text-sm">{employee.email}</span>
                 </div>
-              )}
+                {employee.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    <span className="text-sm">{employee.phone}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setIsEditModalOpen(true)}
-            border={false}
-            className="px-6 py-3">
-            <Pencil className="w-4 h-4 mr-2" />
-            Edit Employee
-          </Button>
         </div>
 
         {/* Stats Cards */}

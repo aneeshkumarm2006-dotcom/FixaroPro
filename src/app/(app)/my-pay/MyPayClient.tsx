@@ -66,7 +66,7 @@ const STATUS_STYLES: Record<string, string> = {
 type Tab = "current" | "history" | "income";
 
 function formatDate(s: string) {
-  return new Date(s).toLocaleDateString(undefined, {
+  return new Date(s).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

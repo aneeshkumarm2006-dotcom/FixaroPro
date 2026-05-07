@@ -3,19 +3,7 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import type { AvailabilityDay } from "@prisma/client";
-
-export interface AvailabilitySlotDTO {
-  id: string;
-  employeeId: string;
-  day: AvailabilityDay;
-  startTime: string;
-  endTime: string;
-  isAvailable: boolean;
-  isRecurring: boolean;
-  effectiveFrom: Date | null;
-  effectiveTo: Date | null;
-}
+import type { AvailabilitySlotDTO } from "./getAvailability.types";
 
 /**
  * Fetch availability slots for an employee.

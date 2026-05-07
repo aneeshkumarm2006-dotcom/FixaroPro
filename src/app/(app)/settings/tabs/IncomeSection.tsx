@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { DollarSign, Download, FileText } from "lucide-react";
 import Button from "@/components/ui/Button";
-import {
-  getIncomeData,
-  type IncomeData,
-} from "../../actions/getIncomeData";
+import { getIncomeData } from "../../actions/getIncomeData";
+import type { IncomeData } from "../../actions/getIncomeData.types";
 import { generateTaxSummary } from "../../actions/generateTaxSummary";
 import { SectionCard } from "./_shared";
 
@@ -20,7 +18,7 @@ function formatCurrency(n: number) {
 
 function formatDate(s: string | null) {
   if (!s) return "—";
-  return new Date(s).toLocaleDateString(undefined, {
+  return new Date(s).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

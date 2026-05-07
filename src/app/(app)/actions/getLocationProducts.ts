@@ -3,14 +3,7 @@
 import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-
-export type LocationProductEntry = {
-  productId: string;
-  productName: string;
-  productDescription: string | null;
-  unit: string;
-  available: number;
-};
+import type { LocationProductEntry } from "./getLocationProducts.types";
 
 export async function getLocationProducts(
   locationId: string

@@ -5,10 +5,8 @@ import { Calendar } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { getAvailability } from "../../actions/getAvailability";
-import {
-  setAvailability,
-  type AvailabilitySlotInput,
-} from "../../actions/setAvailability";
+import { setAvailability } from "../../actions/setAvailability";
+import type { AvailabilitySlotInput } from "../../actions/setAvailability.types";
 import type { AvailabilityDay } from "@prisma/client";
 import { SectionCard, Field, Feedback, Msg } from "./_shared";
 

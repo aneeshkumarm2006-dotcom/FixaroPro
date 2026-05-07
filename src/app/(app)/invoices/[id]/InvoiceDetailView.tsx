@@ -279,7 +279,7 @@ export default function InvoiceDetailView({
               <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/2">
                 <span className="text-sm text-[#005F6A]/70">Due Date</span>
                 <span className="text-sm text-[#005F6A]">
-                  {new Date(invoice.dueDate).toLocaleDateString()}
+                  {new Date(invoice.dueDate).toLocaleDateString("en-US")}
                 </span>
               </div>
             )}
@@ -287,7 +287,7 @@ export default function InvoiceDetailView({
               <div className="flex justify-between items-center p-3 rounded-xl bg-[#005F6A]/2">
                 <span className="text-sm text-[#005F6A]/70">Sent</span>
                 <span className="text-sm text-[#005F6A]">
-                  {new Date(invoice.sentAt).toLocaleDateString()}
+                  {new Date(invoice.sentAt).toLocaleDateString("en-US")}
                 </span>
               </div>
             )}
@@ -295,7 +295,7 @@ export default function InvoiceDetailView({
               <div className="flex justify-between items-center p-3 rounded-xl bg-green-50">
                 <span className="text-sm text-green-700">Paid</span>
                 <span className="text-sm font-[400] text-green-700">
-                  {new Date(invoice.paidAt).toLocaleDateString()}
+                  {new Date(invoice.paidAt).toLocaleDateString("en-US")}
                 </span>
               </div>
             )}
@@ -304,7 +304,7 @@ export default function InvoiceDetailView({
                 <span className="text-sm text-[#005F6A]/70">Linked Job</span>
                 <Link href={`/jobs/${invoice.job.id}`} className="text-sm text-[#005F6A] hover:underline flex items-center gap-1">
                   <Briefcase className="w-3.5 h-3.5" />
-                  {invoice.job.jobType || "Job"}{invoice.job.jobDate ? ` · ${new Date(invoice.job.jobDate).toLocaleDateString()}` : ""}
+                  {invoice.job.jobType || "Job"}{invoice.job.jobDate ? ` · ${new Date(invoice.job.jobDate).toLocaleDateString("en-US")}` : ""}
                 </Link>
               </div>
             )}

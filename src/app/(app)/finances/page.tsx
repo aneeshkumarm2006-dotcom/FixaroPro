@@ -66,7 +66,7 @@ export default async function FinancesPage() {
 
   const jobOptions = jobs.map((j) => ({
     id: j.id,
-    label: `${j.clientName}${j.jobDate ? ` — ${new Date(j.jobDate).toLocaleDateString()}` : ""}`,
+    label: `${j.clientName}${j.jobDate ? ` — ${new Date(j.jobDate).toLocaleDateString("en-US")}` : ""}`,
   }));
 
   return (

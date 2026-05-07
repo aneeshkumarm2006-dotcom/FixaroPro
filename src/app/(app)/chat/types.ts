@@ -1,50 +1,39 @@
 export type ChatRole = "OWNER" | "ADMIN" | "EMPLOYEE";
 
-export type ChannelKey = "general" | "fieldManagers" | "urgent";
+export type SenderRole = "EMPLOYEE" | "ADMIN";
 
-export interface ChatChannel {
-  key: ChannelKey;
-  label: string;
-  description: string;
-  url: string;
-  visibleTo: ChatRole[];
+export interface ChatMessageDTO {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: SenderRole;
+  body: string;
+  createdAt: string;
+  readByAdminAt: string | null;
+  readByEmployeeAt: string | null;
 }
 
-export interface ChatChannelsConfig {
-  channels: ChatChannel[];
+export interface AdminConversationSummary {
+  conversationId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeImage: string | null;
+  lastMessageBody: string | null;
+  lastMessageAt: string | null;
+  lastSenderRole: SenderRole | null;
+  unreadFromEmployee: number;
 }
 
-export const CHAT_CHANNELS_KEY = "chat.channels";
+export interface EmployeeChatPayload {
+  conversationId: string;
+  messages: ChatMessageDTO[];
+}
 
-export const DEFAULT_CHAT_CHANNELS: ChatChannelsConfig = {
-  channels: [
-    {
-      key: "general",
-      label: "General",
-      description: "Day-to-day team chat for everyone.",
-      url: "",
-      visibleTo: ["OWNER", "ADMIN", "EMPLOYEE"],
-    },
-    {
-      key: "fieldManagers",
-      label: "Field Managers",
-      description: "Coordination channel for admins and managers.",
-      url: "",
-      visibleTo: ["OWNER", "ADMIN"],
-    },
-    {
-      key: "urgent",
-      label: "Urgent",
-      description: "Time-sensitive issues that need immediate attention.",
-      url: "",
-      visibleTo: ["OWNER", "ADMIN", "EMPLOYEE"],
-    },
-  ],
-};
-
-export function filterChannelsForRole(
-  config: ChatChannelsConfig,
-  role: ChatRole
-): ChatChannel[] {
-  return config.channels.filter((c) => c.visibleTo.includes(role));
+export interface AdminChatPayload {
+  conversationId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeImage: string | null;
+  messages: ChatMessageDTO[];
 }

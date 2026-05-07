@@ -6,9 +6,11 @@ import Button from "@/components/ui/Button";
 import {
   getNotificationPrefs,
   updateNotificationPrefs,
+} from "../../actions/updateNotificationPrefs";
+import {
   DEFAULT_NOTIFICATION_PREFS,
   type NotificationPrefs,
-} from "../../actions/updateNotificationPrefs";
+} from "../../actions/notificationPrefsConstants";
 import { SectionCard, Feedback, Msg } from "./_shared";
 
 interface ToggleRow {

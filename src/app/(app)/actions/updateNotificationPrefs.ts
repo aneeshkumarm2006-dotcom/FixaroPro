@@ -4,28 +4,10 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-
-export type NotificationPrefs = {
-  newJob: boolean;
-  jobReminder: boolean;
-  payProcessed: boolean;
-  ratingReceived: boolean;
-  documentToSign: boolean;
-  trainingAssigned: boolean;
-  multiplierChange: boolean;
-  lowInventory: boolean;
-};
-
-export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  newJob: true,
-  jobReminder: true,
-  payProcessed: true,
-  ratingReceived: true,
-  documentToSign: true,
-  trainingAssigned: true,
-  multiplierChange: true,
-  lowInventory: true,
-};
+import {
+  type NotificationPrefs,
+  DEFAULT_NOTIFICATION_PREFS,
+} from "./notificationPrefsConstants";
 
 const KEY_PREFIX = "notifications.prefs.";
 

@@ -422,7 +422,7 @@ export default async function AnalyticsPage() {
     clientName: job.clientName,
     status: job.status,
     price: job.price,
-    date: new Date(job.createdAt).toLocaleDateString(),
+    date: new Date(job.createdAt).toLocaleDateString("en-US"),
     employeeName: job.employee.name,
   }));
 

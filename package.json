@@ -46,7 +46,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-signature-canvas": "^1.0.7",
-    "baseline-browser-mapping": "^2.10.17",
+    "baseline-browser-mapping": "^2.10.27",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "tailwindcss": "^4",

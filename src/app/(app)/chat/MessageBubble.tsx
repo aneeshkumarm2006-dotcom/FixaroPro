@@ -12,6 +12,7 @@ function formatTime(iso: string) {
   return d.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -33,8 +34,8 @@ export default function MessageBubble({ message, isMine }: MessageBubbleProps) {
           {message.body}
         </div>
         <div
-          className={`text-[10px] mt-1 ${
-            isMine ? "text-white/70" : "text-[#005F6A]/50"
+          className={`text-[9px] mt-0.5 ${
+            isMine ? "text-white/50 text-right" : "text-[#005F6A]/40"
           }`}>
           {formatTime(message.createdAt)}
         </div>

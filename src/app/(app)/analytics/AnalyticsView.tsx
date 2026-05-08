@@ -25,13 +25,15 @@ import {
   Activity,
   Pencil,
   Trash2,
+  Star,
+  MessageSquare,
 } from "lucide-react";
 import RevenueTrendChart from "./charts/RevenueTrendChart";
 import InventoryValueChart from "./charts/InventoryValueChart";
 import ProfitLossChart from "./charts/ProfitLossChart";
 import SupplierComparisonChart from "./charts/SupplierComparisonChart";
 import TargetVsActualChart from "./charts/TargetVsActualChart";
-import { CBarChart, CPieChart } from "@/components/ui/Chart";
+import { CBarChart, CPieChart, CLineChart } from "@/components/ui/Chart";
 import { dismissAlert, markAlertRead } from "@/app/(app)/actions/createAlert";
 import { createTarget } from "@/app/(app)/actions/createTarget";
 import { updateTarget } from "@/app/(app)/actions/updateTarget";
@@ -127,6 +129,10 @@ interface EmployeePerformance {
   totalPaid: number;
   avgJobPrice: number;
   completionRate: number;
+  avgTimePerJob: number;
+  currentRating: number;
+  ratingsCount: number;
+  complaints: number;
 }
 
 interface LowStockProduct {
@@ -256,6 +262,8 @@ interface AnalyticsViewProps {
   supplierNames: string[];
   inventoryValueData: Array<{ name: string; warehouse: number; inCirculation: number }>;
   marketingData?: MarketingData;
+  ratingTrendData: Array<Record<string, string | number>>;
+  ratingTrendEmployeeNames: string[];
 }
 
 // ── Reusable Sub-components ──
@@ -433,6 +441,8 @@ export default function AnalyticsView({
   supplierNames,
   inventoryValueData,
   marketingData,
+  ratingTrendData,
+  ratingTrendEmployeeNames,
 }: AnalyticsViewProps) {
   const [activeView, setActiveView] = useState<TabView>("overview");
 
@@ -1441,18 +1451,19 @@ export default function AnalyticsView({
         )}
       </Card>
 
+      {/* 5.1 Job Count per Employee */}
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-6">
           <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+            <Briefcase className="w-4 h-4 text-[#005F6A]" />
           </div>
           <h3 className="text-sm font-[350] text-[#005F6A]/80">
-            Jobs by Employee
+            Job Count per Employee
           </h3>
         </div>
         {employeePerformance.length > 0 ? (
           <CBarChart
-            data={employeePerformance.slice(0, 8).map((e) => ({
+            data={employeePerformance.slice(0, 10).map((e) => ({
               name: e.name,
               Jobs: e.totalJobs,
               Completed: e.completedJobs,
@@ -1464,6 +1475,122 @@ export default function AnalyticsView({
         ) : (
           <p className="text-sm text-[#005F6A]/60 text-center py-8">
             No data yet
+          </p>
+        )}
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 5.1 Average Time per Job */}
+        <Card variant="default" className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
+              <Clock className="w-4 h-4 text-[#005F6A]" />
+            </div>
+            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              Average Time per Job (minutes)
+            </h3>
+          </div>
+          {employeePerformance.some((e) => e.avgTimePerJob > 0) ? (
+            <CBarChart
+              data={employeePerformance
+                .filter((e) => e.avgTimePerJob > 0)
+                .slice(0, 10)
+                .map((e) => ({
+                  name: e.name,
+                  Minutes: parseFloat(e.avgTimePerJob.toFixed(1)),
+                }))}
+              dataKeys={["Minutes"]}
+              xKey="name"
+              height={300}
+            />
+          ) : (
+            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+              No completed jobs with duration yet
+            </p>
+          )}
+        </Card>
+
+        {/* 5.1 Current Star Rating by Employee */}
+        <Card variant="default" className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
+              <Star className="w-4 h-4 text-[#005F6A]" />
+            </div>
+            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              Current Star Rating by Employee
+            </h3>
+          </div>
+          {employeePerformance.some((e) => e.ratingsCount > 0) ? (
+            <CBarChart
+              data={employeePerformance
+                .filter((e) => e.ratingsCount > 0)
+                .slice(0, 10)
+                .map((e) => ({
+                  name: e.name,
+                  Rating: parseFloat(e.currentRating.toFixed(2)),
+                }))}
+              dataKeys={["Rating"]}
+              xKey="name"
+              height={300}
+            />
+          ) : (
+            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+              No ratings yet
+            </p>
+          )}
+        </Card>
+      </div>
+
+      {/* 5.1 Historical Rating Trend */}
+      <Card variant="default" className="p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+          </div>
+          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            Historical Rating Trend (12 months)
+          </h3>
+        </div>
+        {ratingTrendEmployeeNames.length > 0 ? (
+          <CLineChart
+            data={ratingTrendData}
+            dataKeys={ratingTrendEmployeeNames}
+            xKey="month"
+            height={320}
+          />
+        ) : (
+          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            Not enough rating history yet
+          </p>
+        )}
+      </Card>
+
+      {/* 5.1 Total Complaints Logged */}
+      <Card variant="default" className="p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
+            <MessageSquare className="w-4 h-4 text-[#005F6A]" />
+          </div>
+          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            Total Complaints Logged (ratings &lt; 3)
+          </h3>
+        </div>
+        {employeePerformance.some((e) => e.complaints > 0) ? (
+          <CBarChart
+            data={employeePerformance
+              .filter((e) => e.complaints > 0)
+              .slice(0, 10)
+              .map((e) => ({
+                name: e.name,
+                Complaints: e.complaints,
+              }))}
+            dataKeys={["Complaints"]}
+            xKey="name"
+            height={300}
+          />
+        ) : (
+          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            No complaints logged
           </p>
         )}
       </Card>

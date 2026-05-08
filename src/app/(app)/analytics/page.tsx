@@ -43,6 +43,7 @@ export default async function AnalyticsPage() {
     marketingCampaigns,
     landingPages,
     pageVisitCounts,
+    employeeRatings,
   ] = await Promise.all([
     db.job.findMany({
       include: {
@@ -114,6 +115,12 @@ export default async function AnalyticsPage() {
     db.pageVisit.groupBy({
       by: ["landingPageId"],
       _count: true,
+    }),
+    db.employeeRating.findMany({
+      include: {
+        employee: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -298,7 +305,28 @@ export default async function AnalyticsPage() {
     .sort((a, b) => b.totalUsed - a.totalUsed);
 
   // === EMPLOYEE PERFORMANCE ===
+  const ratingsByEmployee = new Map<string, { sum: number; count: number }>();
+  employeeRatings.forEach((r) => {
+    const existing = ratingsByEmployee.get(r.employeeId) || { sum: 0, count: 0 };
+    ratingsByEmployee.set(r.employeeId, {
+      sum: existing.sum + r.rating,
+      count: existing.count + 1,
+    });
+  });
+
+  // Complaints: alerts of severity CRITICAL or low ratings (< 3) per employee
+  const complaintsByEmployee = new Map<string, number>();
+  employeeRatings.forEach((r) => {
+    if (r.rating < 3) {
+      complaintsByEmployee.set(
+        r.employeeId,
+        (complaintsByEmployee.get(r.employeeId) || 0) + 1
+      );
+    }
+  });
+
   const employeePerformance = employees
+    .filter((e) => e.role === "EMPLOYEE")
     .map((e) => {
       const empJobs = e.cleaningJobs;
       const completedEmpJobs = empJobs.filter(
@@ -321,6 +349,25 @@ export default async function AnalyticsPage() {
           ? (completedEmpJobs.length / empJobs.length) * 100
           : 0;
 
+      // Avg time per job (minutes) — only completed jobs with both start and end times
+      const empJobsWithDuration = completedEmpJobs.filter((j) => j.endTime);
+      const avgTimePerJob =
+        empJobsWithDuration.length > 0
+          ? empJobsWithDuration.reduce((sum, j) => {
+              const duration =
+                (new Date(j.endTime!).getTime() -
+                  new Date(j.startTime).getTime()) /
+                (1000 * 60);
+              return sum + duration;
+            }, 0) / empJobsWithDuration.length
+          : 0;
+
+      const ratingAgg = ratingsByEmployee.get(e.id);
+      const currentRating =
+        ratingAgg && ratingAgg.count > 0 ? ratingAgg.sum / ratingAgg.count : 0;
+      const ratingsCount = ratingAgg?.count || 0;
+      const complaints = complaintsByEmployee.get(e.id) || 0;
+
       return {
         id: e.id,
         name: e.name,
@@ -330,9 +377,69 @@ export default async function AnalyticsPage() {
         totalPaid,
         avgJobPrice,
         completionRate,
+        avgTimePerJob,
+        currentRating,
+        ratingsCount,
+        complaints,
       };
     })
     .sort((a, b) => b.totalJobs - a.totalJobs);
+
+  // === HISTORICAL RATING TREND (12 months, per employee) ===
+  const ratingTrendMap = new Map<string, Map<string, { sum: number; count: number }>>();
+  const trendMonthKeys: string[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const monthKey = date.toLocaleString("default", {
+      month: "short",
+      year: "2-digit",
+    });
+    trendMonthKeys.push(monthKey);
+  }
+
+  employeeRatings.forEach((r) => {
+    const date = new Date(r.createdAt);
+    const monthKey = date.toLocaleString("default", {
+      month: "short",
+      year: "2-digit",
+    });
+    if (!trendMonthKeys.includes(monthKey)) return;
+    if (!ratingTrendMap.has(r.employeeId)) {
+      ratingTrendMap.set(r.employeeId, new Map());
+    }
+    const monthMap = ratingTrendMap.get(r.employeeId)!;
+    const existing = monthMap.get(monthKey) || { sum: 0, count: 0 };
+    monthMap.set(monthKey, {
+      sum: existing.sum + r.rating,
+      count: existing.count + 1,
+    });
+  });
+
+  // Build a flat dataset: [{ month, [employeeName]: avgRating, ... }, ...]
+  // Limit to top 5 employees by ratings count to keep the chart readable
+  const topRatedEmployeeIds = Array.from(ratingsByEmployee.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([id]) => id);
+  const topRatedEmployees = employees.filter((e) =>
+    topRatedEmployeeIds.includes(e.id)
+  );
+
+  const ratingTrendData = trendMonthKeys.map((monthKey) => {
+    const row: Record<string, string | number> = { month: monthKey };
+    topRatedEmployees.forEach((emp) => {
+      const monthMap = ratingTrendMap.get(emp.id);
+      const monthData = monthMap?.get(monthKey);
+      row[emp.name] =
+        monthData && monthData.count > 0
+          ? parseFloat((monthData.sum / monthData.count).toFixed(2))
+          : 0;
+    });
+    return row;
+  });
+
+  const ratingTrendEmployeeNames = topRatedEmployees.map((e) => e.name);
 
   // === LOW STOCK PRODUCTS ===
   const lowStockData = lowStockProducts.map((p) => ({
@@ -688,6 +795,8 @@ export default async function AnalyticsPage() {
         supplierNames={supplierNames}
         inventoryValueData={inventoryValueData}
         marketingData={marketingData}
+        ratingTrendData={ratingTrendData}
+        ratingTrendEmployeeNames={ratingTrendEmployeeNames}
       />
     </div>
   );

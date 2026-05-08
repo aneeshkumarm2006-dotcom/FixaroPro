@@ -49,15 +49,22 @@ export default function NavLink({
   children,
   icon,
   expanded = false,
+  exclude = [],
 }: {
   href: string;
   children: React.ReactNode;
   icon: string;
   expanded?: boolean;
+  exclude?: string[];
 }) {
   const pathname = usePathname();
+  const matchesExclude = exclude.some(
+    (p) => pathname === p || pathname?.startsWith(p + "/"),
+  );
   const isActive =
-    pathname === href || (href !== "/dashboard" && pathname?.startsWith(href));
+    !matchesExclude &&
+    (pathname === href ||
+      (href !== "/dashboard" && pathname?.startsWith(href + "/")));
 
   const Icon = iconMap[icon];
 

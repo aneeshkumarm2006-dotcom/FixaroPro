@@ -105,7 +105,7 @@ export default async function InvoiceDetailPage({
   };
 
   return (
-    <div className="h-full overflow-hidden overflow-y-auto p-8">
+    <div className="h-full overflow-hidden overflow-y-auto p-8 print:!h-auto print:!overflow-visible print:!p-0">
       <InvoiceDetailView invoice={invoiceData} taxConfig={taxConfigValue} />
     </div>
   );

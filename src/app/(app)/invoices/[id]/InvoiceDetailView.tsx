@@ -141,9 +141,9 @@ export default function InvoiceDetailView({
   };
 
   return (
-    <div className="max-w-[80rem] mx-auto space-y-6">
+    <div className="max-w-[80rem] mx-auto space-y-6 print:max-w-none print:space-y-0 print:p-0">
       {/* Back Button */}
-      <Link href="/invoices">
+      <Link href="/invoices" className="print:hidden">
         <Button variant="default" size="sm" border={false} className="mb-2 px-6 py-3">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Invoices
@@ -151,7 +151,7 @@ export default function InvoiceDetailView({
       </Link>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+      <div className="flex flex-col md:flex-row items-start justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">

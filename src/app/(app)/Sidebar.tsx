@@ -68,7 +68,7 @@ export default function Sidebar({
         onClick={() => setMobileOpen(true)}
         aria-label="Open menu"
         aria-expanded={mobileOpen}
-        className="md:hidden fixed top-4 left-4 z-30 p-2.5 rounded-xl bg-white/80 backdrop-blur-md shadow-md text-[#005F6A] hover:bg-white transition-colors">
+        className="md:hidden fixed top-4 left-4 z-30 p-2.5 rounded-xl bg-white/80 backdrop-blur-md shadow-md text-[#005F6A] hover:bg-white transition-colors print:hidden">
         <Menu className="w-6 h-6" />
       </button>
 
@@ -76,7 +76,7 @@ export default function Sidebar({
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
-        className={`md:hidden fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 ${
+        className={`md:hidden fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 print:hidden ${
           mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       />
@@ -85,7 +85,7 @@ export default function Sidebar({
       <aside
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={`fixed left-0 top-0 bottom-0 p-3 z-50 transition-all duration-300 ease-in-out w-64 ${
+        className={`fixed left-0 top-0 bottom-0 p-3 z-50 transition-all duration-300 ease-in-out w-64 print:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 ${hovered ? "md:w-64" : "md:w-[5.5rem]"}`}>
         <div className="w-full h-full bg-white/70 backdrop-blur-md shadow-lg rounded-2xl flex flex-col overflow-hidden">
@@ -141,7 +141,11 @@ export default function Sidebar({
                 <NavLink href="/clients" icon="clients" expanded={expanded}>
                   Clients
                 </NavLink>
-                <NavLink href="/inventory" icon="inventory" expanded={expanded}>
+                <NavLink
+                  href="/inventory"
+                  icon="inventory"
+                  expanded={expanded}
+                  exclude={["/inventory/rag-wash"]}>
                   Inventory
                 </NavLink>
                 <NavLink
@@ -208,8 +212,8 @@ export default function Sidebar({
       </aside>
 
       {/* Main Content */}
-      <div className="ml-0 md:ml-[5.5rem] h-screen overflow-hidden overflow-y-auto">
-        <main className="h-full bg-white">{children}</main>
+      <div className="ml-0 md:ml-[5.5rem] h-screen overflow-hidden overflow-y-auto print:!ml-0 print:!h-auto print:!overflow-visible">
+        <main className="h-full bg-white print:!h-auto">{children}</main>
       </div>
     </div>
   );

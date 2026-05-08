@@ -29,6 +29,7 @@ interface ClientData {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  discountPercent: number;
   createdAt: string;
 }
 
@@ -135,6 +136,11 @@ export default function ClientDetailView({
                 <MapPin className="w-4 h-4" />
                 {client.address}
               </span>
+            )}
+            {client.discountPercent > 0 && (
+              <Badge variant="cleano" size="sm">
+                {client.discountPercent}% default discount
+              </Badge>
             )}
           </div>
         </div>

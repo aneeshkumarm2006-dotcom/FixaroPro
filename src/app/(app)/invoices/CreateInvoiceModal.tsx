@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Loader } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -13,6 +13,7 @@ interface ClientOption {
   email: string | null;
   phone: string | null;
   address: string | null;
+  discountPercent?: number | null;
 }
 
 interface CreateInvoiceModalProps {
@@ -41,12 +42,29 @@ export default function CreateInvoiceModal({
   const [clientId, setClientId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [discount, setDiscount] = useState(0);
+  const [discountMode, setDiscountMode] = useState<"percent" | "amount">(
+    "percent"
+  );
+  const [discountInput, setDiscountInput] = useState<string>("");
+  const [discountTouched, setDiscountTouched] = useState(false);
   const [lineItems, setLineItems] = useState<LineItemRow[]>([
     { description: "", quantity: 1, unitPrice: 0 },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedClient = clients.find((c) => c.id === clientId) || null;
+
+  // Auto-prefill discount from client's default unless admin has touched the field
+  useEffect(() => {
+    if (discountTouched) return;
+    if (selectedClient && (selectedClient.discountPercent ?? 0) > 0) {
+      setDiscountMode("percent");
+      setDiscountInput(String(selectedClient.discountPercent));
+    } else {
+      setDiscountInput("");
+    }
+  }, [selectedClient, discountTouched]);
 
   if (!isOpen) return null;
 
@@ -54,6 +72,13 @@ export default function CreateInvoiceModal({
     (sum, li) => sum + li.quantity * li.unitPrice,
     0
   );
+  const discountValue = parseFloat(discountInput);
+  const discount =
+    Number.isFinite(discountValue) && discountValue > 0
+      ? discountMode === "percent"
+        ? +(subtotal * (discountValue / 100)).toFixed(2)
+        : discountValue
+      : 0;
   const taxableAmount = subtotal - discount;
   const gstAmount = (taxableAmount * taxConfig.gstRate) / 100;
   const qstAmount = (taxableAmount * taxConfig.qstRate) / 100;
@@ -142,7 +167,10 @@ export default function CreateInvoiceModal({
             <label className="input-label !text-[#005F6A]/70 block mb-1.5">Client</label>
             <select
               value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setDiscountTouched(false);
+              }}
               className="w-full h-[42px] px-3 py-2 text-sm bg-[#005F6A]/5 text-[#005F6A] rounded-2xl border-0 outline-none">
               <option value="">Select a client...</option>
               {clients.map((c) => (
@@ -230,18 +258,60 @@ export default function CreateInvoiceModal({
 
           {/* Discount */}
           <div>
-            <label className="input-label !text-[#005F6A]/70 block mb-1.5">Discount</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="input-label !text-[#005F6A]/70">
+                Discount
+              </label>
+              <div className="flex bg-[#005F6A]/5 rounded-xl p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountMode("percent");
+                    setDiscountTouched(true);
+                  }}
+                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                    discountMode === "percent"
+                      ? "bg-[#005F6A] text-white"
+                      : "text-[#005F6A]/60"
+                  }`}>
+                  %
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountMode("amount");
+                    setDiscountTouched(true);
+                  }}
+                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                    discountMode === "amount"
+                      ? "bg-[#005F6A] text-white"
+                      : "text-[#005F6A]/60"
+                  }`}>
+                  $
+                </button>
+              </div>
+            </div>
             <Input
               type="number"
-              value={discount || ""}
-              onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+              value={discountInput}
+              onChange={(e) => {
+                setDiscountInput(e.target.value);
+                setDiscountTouched(true);
+              }}
               variant="form"
               border={false}
               className="h-[42px]"
               min={0}
               step="0.01"
-              placeholder="0.00"
+              placeholder={discountMode === "percent" ? "0" : "0.00"}
             />
+            {selectedClient &&
+              (selectedClient.discountPercent ?? 0) > 0 &&
+              !discountTouched && (
+                <p className="text-[11px] text-[#005F6A]/60 mt-1">
+                  Auto-applied from client default ({selectedClient.discountPercent}%)
+                </p>
+              )}
           </div>
 
           {/* Notes */}

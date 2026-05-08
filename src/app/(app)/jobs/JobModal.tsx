@@ -59,6 +59,8 @@ interface Job {
 interface ClientLite {
   id: string;
   name: string;
+  address?: string | null;
+  discountPercent?: number | null;
 }
 
 interface JobModalProps {
@@ -517,6 +519,11 @@ export default function JobModal({
   );
   const [newAddOnName, setNewAddOnName] = useState("");
   const [newAddOnPrice, setNewAddOnPrice] = useState("");
+  const [discountMode, setDiscountMode] = useState<"percent" | "amount">(
+    "amount"
+  );
+  const [discountInput, setDiscountInput] = useState<string>("");
+  const [discountTouched, setDiscountTouched] = useState(false);
 
   const {
     register,
@@ -525,6 +532,7 @@ export default function JobModal({
     reset,
     trigger,
     control,
+    setValue,
   } = useForm<FormValues>({
     resolver: (zodResolver as any)(formSchema) as Resolver<FormValues>,
     mode: "onChange",
@@ -569,6 +577,14 @@ export default function JobModal({
         setAddOns(
           (job.addOns || []).map((a) => ({ name: a.name, price: a.price }))
         );
+        // Existing job: keep its stored amount as the source of truth
+        setDiscountMode("amount");
+        setDiscountInput(
+          job.discountAmount && job.discountAmount > 0
+            ? String(job.discountAmount)
+            : ""
+        );
+        setDiscountTouched(true);
       } else {
         reset({
           clientName: "",
@@ -594,9 +610,24 @@ export default function JobModal({
         setSelectedClientId("");
         setSelectedPaymentType("");
         setAddOns([]);
+        setDiscountMode("percent");
+        setDiscountInput("");
+        setDiscountTouched(false);
       }
     }
   }, [isOpen, job, reset]);
+
+  // Auto-prefill discount from selected client's default percent
+  useEffect(() => {
+    if (!isOpen || discountTouched) return;
+    const linked = clients.find((c) => c.id === selectedClientId);
+    if (linked && (linked.discountPercent ?? 0) > 0) {
+      setDiscountMode("percent");
+      setDiscountInput(String(linked.discountPercent));
+    } else if (!linked) {
+      setDiscountInput("");
+    }
+  }, [isOpen, selectedClientId, clients, discountTouched]);
 
   const disableForm = submitting || isDeleting;
 
@@ -681,7 +712,26 @@ export default function JobModal({
       formData.append("notes", values.notes || "");
       formData.append("bedCount", String(values.bedCount || ""));
       formData.append("bathCount", String(values.bathCount || ""));
-      formData.append("discountAmount", String(values.discountAmount || ""));
+
+      // Resolve discount: convert percent to amount if needed.
+      // If admin has touched the field, send an explicit value (including "0")
+      // so server-side auto-apply doesn't override their choice.
+      const discountValueNum = parseFloat(discountInput);
+      let resolvedDiscount = "";
+      if (Number.isFinite(discountValueNum) && discountValueNum > 0) {
+        if (discountMode === "percent") {
+          const priceNum = Number(values.price) || 0;
+          resolvedDiscount =
+            priceNum > 0
+              ? (priceNum * (discountValueNum / 100)).toFixed(2)
+              : "0";
+        } else {
+          resolvedDiscount = String(discountValueNum);
+        }
+      } else if (discountTouched) {
+        resolvedDiscount = "0";
+      }
+      formData.append("discountAmount", resolvedDiscount);
       formData.append(
         "payRateMultiplier",
         String(values.payRateMultiplier || "")
@@ -929,21 +979,23 @@ export default function JobModal({
                         options={[
                           {
                             label: "— None —",
-                            onClick: () => setSelectedClientId(""),
+                            onClick: () => {
+                              setSelectedClientId("");
+                              setDiscountTouched(false);
+                            },
                           },
                           ...clients.map((c) => ({
                             label: c.name,
                             onClick: () => {
                               setSelectedClientId(c.id);
-                              // Auto-fill the name when linking
-                              const ev = new Event("input", { bubbles: true });
-                              const input = document.querySelector(
-                                'input[name="clientName"]'
-                              ) as HTMLInputElement | null;
-                              if (input) {
-                                input.value = c.name;
-                                input.dispatchEvent(ev);
-                              }
+                              setDiscountTouched(false);
+                              setValue("clientName", c.name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              setValue("location", c.address || "", {
+                                shouldDirty: true,
+                              });
                             },
                           })),
                         ]}
@@ -1278,9 +1330,41 @@ export default function JobModal({
                       </div>
 
                       <div>
-                        <label className="input-label tracking-tight">
-                          Discount Amount
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="input-label tracking-tight">
+                            Discount
+                          </label>
+                          <div className="flex bg-[#005F6A]/5 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDiscountMode("percent");
+                                setDiscountTouched(true);
+                              }}
+                              disabled={disableForm}
+                              className={`px-2 py-0.5 text-[11px] rounded-md transition-colors ${
+                                discountMode === "percent"
+                                  ? "bg-[#005F6A] text-white"
+                                  : "text-[#005F6A]/60"
+                              }`}>
+                              %
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDiscountMode("amount");
+                                setDiscountTouched(true);
+                              }}
+                              disabled={disableForm}
+                              className={`px-2 py-0.5 text-[11px] rounded-md transition-colors ${
+                                discountMode === "amount"
+                                  ? "bg-[#005F6A] text-white"
+                                  : "text-[#005F6A]/60"
+                              }`}>
+                              $
+                            </button>
+                          </div>
+                        </div>
                         <div className="relative">
                           <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
                           <Input
@@ -1289,13 +1373,28 @@ export default function JobModal({
                             size="md"
                             step="0.01"
                             min="0"
-                            {...register("discountAmount")}
+                            value={discountInput}
+                            onChange={(e) => {
+                              setDiscountInput(e.target.value);
+                              setDiscountTouched(true);
+                            }}
                             disabled={disableForm}
                             className="w-full pl-11 px-4 py-3"
-                            placeholder="0.00"
+                            placeholder={discountMode === "percent" ? "0" : "0.00"}
                             border={false}
                           />
                         </div>
+                        {!discountTouched &&
+                          (() => {
+                            const linked = clients.find(
+                              (c) => c.id === selectedClientId
+                            );
+                            return linked && (linked.discountPercent ?? 0) > 0 ? (
+                              <p className="text-[11px] text-[#005F6A]/60 mt-1">
+                                From client default ({linked.discountPercent}%)
+                              </p>
+                            ) : null;
+                          })()}
                       </div>
 
                       <div>

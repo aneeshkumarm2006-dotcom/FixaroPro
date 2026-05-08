@@ -176,16 +176,17 @@ model SupplierPrice {
 }
 
 model Client {
-  id        String    @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  jobs      Job[]
-  invoices  Invoice[]
+  id              String    @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  address         String?
+  notes           String?
+  discountPercent Float     @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  jobs            Job[]
+  invoices        Invoice[]
 }
 
 model Job {

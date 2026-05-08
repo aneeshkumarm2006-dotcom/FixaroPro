@@ -71,6 +71,7 @@ interface ClientOption {
   email: string | null;
   phone: string | null;
   address: string | null;
+  discountPercent?: number | null;
 }
 
 interface InvoicesPageClientProps {

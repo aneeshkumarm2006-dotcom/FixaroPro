@@ -23,7 +23,14 @@ export default async function InvoicesPage() {
       },
     }),
     db.client.findMany({
-      select: { id: true, name: true, email: true, phone: true, address: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        discountPercent: true,
+      },
       orderBy: { name: "asc" },
     }),
     db.appSetting.findUnique({ where: { key: "tax.config" } }),

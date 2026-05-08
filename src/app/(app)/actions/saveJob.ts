@@ -67,10 +67,28 @@ export async function saveJob(formData: FormData) {
 
     const clientId = (formData.get("clientId") as string) || null;
     let clientName = (formData.get("clientName") as string) || "";
+    let clientDiscountPercent = 0;
 
-    if (clientId && !clientName) {
+    if (clientId) {
       const existing = await db.client.findUnique({ where: { id: clientId } });
-      if (existing) clientName = existing.name;
+      if (existing) {
+        if (!clientName) clientName = existing.name;
+        clientDiscountPercent = existing.discountPercent || 0;
+      }
+    }
+
+    const price = parseOptionalFloat(formData.get("price"));
+    let discountAmount = parseOptionalFloat(formData.get("discountAmount"));
+
+    // Auto-apply client default discount when admin hasn't entered one.
+    // Treat null/empty as "not entered"; admin can pass "0" to opt out.
+    if (
+      discountAmount === null &&
+      clientDiscountPercent > 0 &&
+      price !== null &&
+      price > 0
+    ) {
+      discountAmount = +(price * (clientDiscountPercent / 100)).toFixed(2);
     }
 
     const jobData: any = {
@@ -86,7 +104,7 @@ export async function saveJob(formData: FormData) {
           ? new Date(`${startDate}T${startTime}`)
           : new Date(),
       endTime: endDate && endTime ? new Date(`${endDate}T${endTime}`) : null,
-      price: parseOptionalFloat(formData.get("price")),
+      price,
       employeePay: parseOptionalFloat(formData.get("employeePay")),
       totalTip: parseOptionalFloat(formData.get("totalTip")),
       parking: parseOptionalFloat(formData.get("parking")),
@@ -94,7 +112,7 @@ export async function saveJob(formData: FormData) {
       invoiceSent: formData.get("invoiceSent") === "on",
       notes: (formData.get("notes") as string) || null,
       paymentType,
-      discountAmount: parseOptionalFloat(formData.get("discountAmount")),
+      discountAmount,
       bedCount: parseOptionalInt(formData.get("bedCount")),
       bathCount: parseOptionalInt(formData.get("bathCount")),
       payRateMultiplier:

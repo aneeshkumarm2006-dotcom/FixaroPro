@@ -63,6 +63,7 @@ export default async function ClientsPage({
       phone: c.phone,
       address: c.address,
       notes: c.notes,
+      discountPercent: c.discountPercent,
       totalJobs,
       completedJobs,
       totalRevenue,

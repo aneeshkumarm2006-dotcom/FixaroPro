@@ -18,6 +18,8 @@ interface User {
 interface ClientLite {
   id: string;
   name: string;
+  address?: string | null;
+  discountPercent?: number | null;
 }
 
 export interface Job {

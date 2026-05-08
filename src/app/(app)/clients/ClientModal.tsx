@@ -11,6 +11,7 @@ import {
   FileText,
   Loader,
   Check,
+  Percent,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -25,6 +26,7 @@ interface ClientLite {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  discountPercent?: number | null;
 }
 
 interface ClientModalProps {
@@ -50,6 +52,7 @@ export default function ClientModal({
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -60,6 +63,11 @@ export default function ClientModal({
       setPhone(client?.phone || "");
       setAddress(client?.address || "");
       setNotes(client?.notes || "");
+      setDiscountPercent(
+        client?.discountPercent != null && client.discountPercent > 0
+          ? String(client.discountPercent)
+          : ""
+      );
     }
   }, [isOpen, client]);
 
@@ -80,6 +88,7 @@ export default function ClientModal({
     fd.append("phone", phone);
     fd.append("address", address);
     fd.append("notes", notes);
+    fd.append("discountPercent", discountPercent);
 
     let result;
     if (mode === "edit" && client) {
@@ -214,6 +223,33 @@ export default function ClientModal({
                   border={false}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="input-label tracking-tight">
+                Default Discount (%)
+              </label>
+              <div className="relative">
+                <Percent className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
+                <Input
+                  variant="form"
+                  type="number"
+                  size="md"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={discountPercent}
+                  onChange={(e) => setDiscountPercent(e.target.value)}
+                  disabled={submitting}
+                  className="w-full pl-11 px-4 py-3"
+                  placeholder="0"
+                  border={false}
+                />
+              </div>
+              <p className="text-[11px] text-[#005F6A]/50 mt-1">
+                Auto-applied to this client&apos;s jobs and invoices. Leave 0
+                for none.
+              </p>
             </div>
 
             <div>

@@ -47,6 +47,7 @@ interface CreateInvoiceParams {
   jobId?: string | null;
   lineItems: LineItemInput[];
   discountAmount?: number;
+  discountPercent?: number;
   notes?: string | null;
   dueDate?: string | null;
 }
@@ -83,7 +84,32 @@ export async function createInvoice(params: CreateInvoiceParams) {
     }));
 
     const subtotal = lineItemsData.reduce((sum, li) => sum + li.amount, 0);
-    const discount = params.discountAmount ?? 0;
+
+    // Resolve discount: explicit amount > explicit percent > client default percent
+    let discount = 0;
+    if (
+      params.discountAmount !== undefined &&
+      params.discountAmount !== null &&
+      params.discountAmount > 0
+    ) {
+      discount = params.discountAmount;
+    } else if (
+      params.discountPercent !== undefined &&
+      params.discountPercent !== null &&
+      params.discountPercent > 0
+    ) {
+      discount = +(subtotal * (params.discountPercent / 100)).toFixed(2);
+    } else {
+      const client = await db.client.findUnique({
+        where: { id: params.clientId },
+        select: { discountPercent: true },
+      });
+      const pct = client?.discountPercent ?? 0;
+      if (pct > 0) {
+        discount = +(subtotal * (pct / 100)).toFixed(2);
+      }
+    }
+
     const taxableAmount = subtotal - discount;
     const gstAmount = (taxableAmount * gstRate) / 100;
     const qstAmount = (taxableAmount * qstRate) / 100;

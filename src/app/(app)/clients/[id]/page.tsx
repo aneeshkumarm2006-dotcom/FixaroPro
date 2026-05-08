@@ -69,6 +69,7 @@ export default async function ClientDetailPage({
           phone: client.phone,
           address: client.address,
           notes: client.notes,
+          discountPercent: client.discountPercent,
           createdAt: client.createdAt.toISOString(),
         }}
         jobs={jobs}

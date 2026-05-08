@@ -127,7 +127,21 @@ export async function generateInvoiceFromJob(jobId: string) {
     }
 
     const subtotal = lineItems.reduce((sum, li) => sum + li.amount, 0);
-    const discount = job.discountAmount ?? 0;
+
+    // Use job's explicit discount when set (including 0 = admin opted out).
+    // If unset (null), fall back to the client's default discount %.
+    let discount = job.discountAmount ?? 0;
+    if (job.discountAmount === null || job.discountAmount === undefined) {
+      const clientForDiscount = await db.client.findUnique({
+        where: { id: clientId },
+        select: { discountPercent: true },
+      });
+      const pct = clientForDiscount?.discountPercent ?? 0;
+      if (pct > 0 && subtotal > 0) {
+        discount = +(subtotal * (pct / 100)).toFixed(2);
+      }
+    }
+
     const taxableAmount = subtotal - discount;
     const gstAmount = (taxableAmount * gstRate) / 100;
     const qstAmount = (taxableAmount * qstRate) / 100;

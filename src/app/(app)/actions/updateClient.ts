@@ -20,6 +20,16 @@ export async function updateClient(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "Client name is required" };
 
+  const discountRaw = formData.get("discountPercent") as string | null;
+  let discountPercent = 0;
+  if (discountRaw !== null && discountRaw !== "") {
+    const n = parseFloat(discountRaw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      return { error: "Discount percent must be between 0 and 100" };
+    }
+    discountPercent = n;
+  }
+
   try {
     await db.client.update({
       where: { id },
@@ -29,6 +39,7 @@ export async function updateClient(formData: FormData) {
         phone: (formData.get("phone") as string) || null,
         address: (formData.get("address") as string) || null,
         notes: (formData.get("notes") as string) || null,
+        discountPercent,
       },
     });
 

@@ -7,6 +7,7 @@ import CleanerSelector from "./CleanerSelector";
 import JobTypeSelector from "./JobTypeSelector";
 import SubmitButton from "./SubmitButton";
 import DeleteButton from "./DeleteButton";
+import ClientLinkSelector from "./ClientLinkSelector";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -80,7 +81,7 @@ export default async function JobFormPage({
   // Get all clients for the client selector
   const clients = await db.client.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, address: true },
   });
 
   async function saveJob(formData: FormData) {
@@ -113,6 +114,31 @@ export default async function JobFormPage({
     const rawClientId = (formData.get("clientId") as string) || "";
     const clientId = rawClientId || null;
 
+    const price = formData.get("price")
+      ? parseFloat(formData.get("price") as string)
+      : null;
+
+    let discountAmount = formData.get("discountAmount")
+      ? parseFloat(formData.get("discountAmount") as string)
+      : null;
+
+    // Auto-apply client default discount if admin didn't enter one
+    if (
+      (discountAmount === null || discountAmount === 0) &&
+      clientId &&
+      price !== null &&
+      price > 0
+    ) {
+      const c = await db.client.findUnique({
+        where: { id: clientId },
+        select: { discountPercent: true },
+      });
+      const pct = c?.discountPercent ?? 0;
+      if (pct > 0) {
+        discountAmount = +(price * (pct / 100)).toFixed(2);
+      }
+    }
+
     const jobData: any = {
       employeeId: session!.user.id,
       clientName: formData.get("clientName") as string,
@@ -126,9 +152,7 @@ export default async function JobFormPage({
           ? new Date(`${startDate}T${startTime}`)
           : new Date(),
       endTime: endDate && endTime ? new Date(`${endDate}T${endTime}`) : null,
-      price: formData.get("price")
-        ? parseFloat(formData.get("price") as string)
-        : null,
+      price,
       employeePay: formData.get("employeePay")
         ? parseFloat(formData.get("employeePay") as string)
         : null,
@@ -142,9 +166,7 @@ export default async function JobFormPage({
       invoiceSent: formData.get("invoiceSent") === "on",
       notes: (formData.get("notes") as string) || null,
       paymentType,
-      discountAmount: formData.get("discountAmount")
-        ? parseFloat(formData.get("discountAmount") as string)
-        : null,
+      discountAmount,
       bedCount: formData.get("bedCount")
         ? parseInt(formData.get("bedCount") as string, 10)
         : null,
@@ -241,18 +263,10 @@ export default async function JobFormPage({
                 className="block text-sm font-[400] text-neutral-950/80 mb-1">
                 Link Client (optional)
               </label>
-              <select
-                id="clientId"
-                name="clientId"
+              <ClientLinkSelector
+                clients={clients}
                 defaultValue={existingJob?.clientId || ""}
-                className="w-full h-[42px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20">
-                <option value="">— None —</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>

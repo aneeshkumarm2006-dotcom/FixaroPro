@@ -32,3 +32,17 @@ export const auth = betterAuth({
   })],
   secret: process.env.BETTER_AUTH_SECRET!,
 });
+
+type RoleBearer = { role?: string | null } | null | undefined;
+
+export function isOpsManager(user: RoleBearer): boolean {
+  return user?.role === "OPS_MANAGER";
+}
+
+export function isFieldLead(user: RoleBearer): boolean {
+  return user?.role === "FIELD_LEAD";
+}
+
+export function isCleaner(user: RoleBearer): boolean {
+  return user?.role === "EMPLOYEE";
+}

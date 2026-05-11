@@ -9,36 +9,40 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  name              String
-  email             String             @unique
-  image             String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  phone             String?
-  role              Roles              @default(EMPLOYEE)
-  emailVerified     Boolean            @default(false)
-  payMultiplier     Float              @default(1.0)
-  accounts          Account[]
-  assignedProducts  EmployeeProduct[]
-  inventoryRequests InventoryRequest[]
-  jobs              Job[]              @relation("EmployeeJobs")
-  sessions          Session[]
-  cleaningJobs      Job[]              @relation("JobCleaners")
-  jobLogs           JobLog[]           @relation("UserJobLogs")
-  payouts           Payout[]
-  approvedPeriods   PayPeriod[]        @relation("PayPeriodApprover")
-  ragWashes         RagWash[]
-  availabilities    EmployeeAvailability[]
-  photos            JobPhoto[]
-  checklists        JobChecklist[]
-  signatures        DocumentSignature[]
-  trainingProgress  TrainingProgress[]
-  ratings           EmployeeRating[]
-  withdrawals       Withdrawal[]
-  checkouts         InventoryCheckout[]
-  chatConversation  ChatConversation?  @relation("EmployeeChatConversation")
-  sentChatMessages  ChatMessage[]      @relation("ChatMessageSender")
+  id                           String                 @id @default(cuid())
+  name                         String
+  email                        String                 @unique
+  image                        String?
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
+  phone                        String?
+  role                         Roles                  @default(EMPLOYEE)
+  emailVerified                Boolean                @default(false)
+  payMultiplier                Float                  @default(1.0)
+  multiplierLastRecalculatedAt DateTime?
+  accounts                     Account[]
+  assignedProducts             EmployeeProduct[]
+  inventoryRequests            InventoryRequest[]
+  jobs                         Job[]                  @relation("EmployeeJobs")
+  sessions                     Session[]
+  cleaningJobs                 Job[]                  @relation("JobCleaners")
+  jobLogs                      JobLog[]               @relation("UserJobLogs")
+  payouts                      Payout[]
+  approvedPeriods              PayPeriod[]            @relation("PayPeriodApprover")
+  ragWashes                    RagWash[]
+  availabilities               EmployeeAvailability[]
+  photos                       JobPhoto[]
+  checklists                   JobChecklist[]
+  signatures                   DocumentSignature[]
+  trainingProgress             TrainingProgress[]
+  ratings                      EmployeeRating[]
+  withdrawals                  Withdrawal[]
+  checkouts                    InventoryCheckout[]
+  chatConversation             ChatConversation?      @relation("EmployeeChatConversation")
+  sentChatMessages             ChatMessage[]          @relation("ChatMessageSender")
+  employeeComplaints           Complaint[]            @relation("EmployeeComplaints")
+  resolvedComplaints           Complaint[]            @relation("ResolvedComplaints")
+  receivedAlerts               Alert[]                @relation("RecipientAlerts")
 }
 
 model Account {
@@ -78,15 +82,15 @@ model Verification {
 }
 
 model Product {
-  id               String            @id @default(cuid())
-  name             String
-  description      String?
-  unit             String
-  costPerUnit      Float
-  stockLevel       Float             @default(0)
-  minStock         Float             @default(0)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String                   @id @default(cuid())
+  name              String
+  description       String?
+  unit              String
+  costPerUnit       Float
+  stockLevel        Float                    @default(0)
+  minStock          Float                    @default(0)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
   employeeProducts  EmployeeProduct[]
   inventoryRequests InventoryRequest[]
   jobUsage          JobProductUsage[]
@@ -176,21 +180,42 @@ model SupplierPrice {
 }
 
 model Client {
-  id              String    @id @default(cuid())
-  name            String
-  email           String?
-  phone           String?
-  address         String?
-  notes           String?
-  discountPercent Float     @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  jobs            Job[]
-  invoices        Invoice[]
+  id               String            @id @default(cuid())
+  name             String
+  email            String?
+  phone            String?
+  address          String?
+  notes            String?
+  discountPercent  Float             @default(0)
+  clientType       ClientType        @default(RESIDENTIAL)
+  serviceFrequency ServiceFrequency?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  jobs             Job[]
+  invoices         Invoice[]
+  complaints       Complaint[]
+
+  @@index([clientType])
+  @@index([isActive])
+}
+
+enum ClientType {
+  RESIDENTIAL
+  COMMERCIAL
+}
+
+enum ServiceFrequency {
+  ONE_TIME
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
 }
 
 model Job {
   id                String            @id @default(cuid())
+  jobNumber         Int               @unique @default(autoincrement())
   employeeId        String
   clientName        String
   clientId          String?
@@ -228,6 +253,7 @@ model Job {
   photos            JobPhoto[]
   checklists        JobChecklist[]
   ratings           EmployeeRating[]
+  complaints        Complaint[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -390,14 +416,14 @@ model Transaction {
 }
 
 model RagWash {
-  id          String   @id @default(cuid())
-  employeeId  String
-  washDate    DateTime @default(now())
-  ragCount    Int      @default(0)
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  employee    User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  employeeId String
+  washDate   DateTime @default(now())
+  ragCount   Int      @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([washDate])
@@ -419,6 +445,8 @@ model Budget {
 enum Roles {
   OWNER
   ADMIN
+  OPS_MANAGER
+  FIELD_LEAD
   EMPLOYEE
 }
 
@@ -462,7 +490,9 @@ enum PaymentType {
 
 enum PayPeriodStatus {
   DRAFT
+  PENDING_APPROVAL
   APPROVED
+  REJECTED
   PAID
   CANCELLED
 }
@@ -484,25 +514,26 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id            String          @id @default(cuid())
-  invoiceNumber String          @unique
-  status        InvoiceStatus   @default(DRAFT)
-  clientId      String
-  jobId         String?
-  subtotal      Float           @default(0)
-  gstAmount     Float           @default(0)
-  qstAmount     Float           @default(0)
-  discountAmount Float          @default(0)
-  totalAmount   Float           @default(0)
-  notes         String?
-  dueDate       DateTime?
-  sentAt        DateTime?
-  paidAt        DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  job           Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  lineItems     InvoiceLineItem[]
+  id             String            @id @default(cuid())
+  invoiceNumber  String            @unique
+  status         InvoiceStatus     @default(DRAFT)
+  clientId       String
+  jobId          String?
+  subtotal       Float             @default(0)
+  gstAmount      Float             @default(0)
+  qstAmount      Float             @default(0)
+  discountAmount Float             @default(0)
+  totalAmount    Float             @default(0)
+  paidAmount     Float             @default(0)
+  notes          String?
+  dueDate        DateTime?
+  sentAt         DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  job            Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  lineItems      InvoiceLineItem[]
 
   @@index([clientId])
   @@index([jobId])
@@ -526,21 +557,24 @@ model InvoiceLineItem {
 }
 
 model Alert {
-  id          String        @id @default(cuid())
-  type        AlertType
-  severity    AlertSeverity @default(WARNING)
-  title       String
-  message     String
-  isRead      Boolean       @default(false)
-  isDismissed Boolean       @default(false)
-  relatedId   String?
-  relatedType String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  type            AlertType
+  severity        AlertSeverity @default(WARNING)
+  title           String
+  message         String
+  isRead          Boolean       @default(false)
+  isDismissed     Boolean       @default(false)
+  relatedId       String?
+  relatedType     String?
+  recipientUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  recipient       User?         @relation("RecipientAlerts", fields: [recipientUserId], references: [id], onDelete: Cascade)
 
   @@index([type])
   @@index([isRead])
   @@index([createdAt])
+  @@index([recipientUserId])
 }
 
 model Target {
@@ -557,10 +591,77 @@ model Target {
   @@index([periodStart])
 }
 
+model AlertRoutingRule {
+  id            String    @id @default(cuid())
+  alertType     AlertType
+  recipientRole Roles
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([alertType, recipientRole])
+  @@index([alertType])
+  @@index([recipientRole])
+}
+
+model Complaint {
+  id           String            @id @default(cuid())
+  jobId        String?
+  clientId     String?
+  employeeId   String?
+  resolvedById String?
+  category     ComplaintCategory
+  priority     ComplaintPriority @default(MEDIUM)
+  details      String            @db.Text
+  status       ComplaintStatus   @default(OPEN)
+  resolvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  job          Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  client       Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  employee     User?             @relation("EmployeeComplaints", fields: [employeeId], references: [id], onDelete: SetNull)
+  resolvedBy   User?             @relation("ResolvedComplaints", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@index([clientId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ComplaintCategory {
+  SERVICE_QUALITY
+  BEHAVIOR
+  DAMAGE
+  MISSED_APPOINTMENT
+  BILLING
+  OTHER
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
 enum AlertType {
   LOW_INVENTORY
   CANCELLATION
   OVERDUE_PAYMENT
+  PROVIDER_LOW_STOCK
+  CLEANER_PAYMENT
+  IMMEDIATE_PAYOUT
+  CLIENT_COMPLAINT
+  RATING_DECREASE
+  OVERDUE_COMMERCIAL
   GENERAL
 }
 
@@ -626,18 +727,18 @@ enum WithdrawalStatus {
 }
 
 model EmployeeAvailability {
-  id          String          @id @default(cuid())
-  employeeId  String
-  day         AvailabilityDay
-  startTime   String
-  endTime     String
-  isAvailable Boolean         @default(true)
-  isRecurring Boolean         @default(true)
+  id            String          @id @default(cuid())
+  employeeId    String
+  day           AvailabilityDay
+  startTime     String
+  endTime       String
+  isAvailable   Boolean         @default(true)
+  isRecurring   Boolean         @default(true)
   effectiveFrom DateTime?
   effectiveTo   DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  employee    User            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  employee      User            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, day])
   @@index([employeeId])
@@ -659,15 +760,15 @@ model JobPhoto {
 }
 
 model ChecklistTemplate {
-  id          String                  @id @default(cuid())
-  name        String
-  jobType     String?
-  addOnName   String?
-  description String?
-  isActive    Boolean                 @default(true)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
-  items       ChecklistTemplateItem[]
+  id            String                  @id @default(cuid())
+  name          String
+  jobType       String?
+  addOnName     String?
+  description   String?
+  isActive      Boolean                 @default(true)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  items         ChecklistTemplateItem[]
   jobChecklists JobChecklist[]
 }
 
@@ -732,17 +833,17 @@ model Document {
 }
 
 model DocumentSignature {
-  id            String         @id @default(cuid())
-  documentId    String
-  employeeId    String
-  status        DocumentStatus @default(PENDING)
-  signatureUrl  String?
-  signedAt      DateTime?
-  ipAddress     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  employee      User           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id           String         @id @default(cuid())
+  documentId   String
+  employeeId   String
+  status       DocumentStatus @default(PENDING)
+  signatureUrl String?
+  signedAt     DateTime?
+  ipAddress    String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  document     Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  employee     User           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, employeeId])
   @@index([documentId])
@@ -765,14 +866,14 @@ model TrainingModule {
 }
 
 model TrainingQuiz {
-  id         String         @id @default(cuid())
-  moduleId   String
-  question   String
-  options    Json
-  sortOrder  Int            @default(0)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  module     TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  id        String         @id @default(cuid())
+  moduleId  String
+  question  String
+  options   Json
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  module    TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@index([moduleId])
 }
@@ -830,13 +931,13 @@ model Withdrawal {
 }
 
 model InventoryLocation {
-  id        String                  @id @default(cuid())
+  id        String                   @id @default(cuid())
   name      String
   address   String?
   notes     String?
-  isActive  Boolean                 @default(true)
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+  isActive  Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
   stock     InventoryLocationStock[]
   checkouts InventoryCheckout[]
 }
@@ -920,16 +1021,16 @@ model SalesArea {
 }
 
 model LandingPage {
-  id          String      @id @default(cuid())
+  id          String             @id @default(cuid())
   title       String
-  slug        String      @unique
-  content     String      @db.Text
-  ctaText     String      @default("Get a Free Quote")
-  ctaLink     String      @default("/")
-  isPublished Boolean     @default(false)
+  slug        String             @unique
+  content     String             @db.Text
+  ctaText     String             @default("Get a Free Quote")
+  ctaLink     String             @default("/")
+  isPublished Boolean            @default(false)
   campaignId  String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   campaign    MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   visits      PageVisit[]
 
@@ -958,15 +1059,15 @@ enum ChatSenderRole {
 }
 
 model ChatConversation {
-  id                     String        @id @default(cuid())
-  employeeId             String        @unique
-  lastMessageAt          DateTime?
-  lastEmployeeMessageAt  DateTime?
-  lastAdminMessageAt     DateTime?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
-  employee               User          @relation("EmployeeChatConversation", fields: [employeeId], references: [id], onDelete: Cascade)
-  messages               ChatMessage[]
+  id                    String        @id @default(cuid())
+  employeeId            String        @unique
+  lastMessageAt         DateTime?
+  lastEmployeeMessageAt DateTime?
+  lastAdminMessageAt    DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  employee              User          @relation("EmployeeChatConversation", fields: [employeeId], references: [id], onDelete: Cascade)
+  messages              ChatMessage[]
 
   @@index([lastMessageAt])
 }

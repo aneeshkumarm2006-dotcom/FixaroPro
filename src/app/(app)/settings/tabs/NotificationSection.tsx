@@ -60,6 +60,41 @@ const ROWS: ToggleRow[] = [
     label: "Low inventory",
     description: "When your assigned supplies run low.",
   },
+  {
+    key: "providerLowStock",
+    label: "Provider low stock",
+    description: "When a cleaner's product stock crosses the refill threshold.",
+  },
+  {
+    key: "cleanerPayment",
+    label: "Cleaner payment scheduled or completed",
+    description: "When a regular payout is scheduled, approved, or paid out.",
+  },
+  {
+    key: "immediatePayout",
+    label: "Immediate payout",
+    description: "When an immediate payout / withdrawal is requested or sent.",
+  },
+  {
+    key: "latePayment",
+    label: "Late payment",
+    description: "When an invoice becomes overdue and escalates.",
+  },
+  {
+    key: "clientComplaint",
+    label: "Client complaint",
+    description: "When a new client complaint is filed.",
+  },
+  {
+    key: "ratingDecrease",
+    label: "Rating decrease",
+    description: "When your 30-day rating tier drops to a lower multiplier.",
+  },
+  {
+    key: "overdueCommercial",
+    label: "Overdue commercial invoice",
+    description: "When a commercial client invoice passes its due date.",
+  },
 ];
 
 interface NotificationSectionProps {

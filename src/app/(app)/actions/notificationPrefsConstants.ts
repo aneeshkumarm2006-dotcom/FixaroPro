@@ -7,6 +7,13 @@ export type NotificationPrefs = {
   trainingAssigned: boolean;
   multiplierChange: boolean;
   lowInventory: boolean;
+  providerLowStock: boolean;
+  cleanerPayment: boolean;
+  immediatePayout: boolean;
+  latePayment: boolean;
+  clientComplaint: boolean;
+  ratingDecrease: boolean;
+  overdueCommercial: boolean;
 };
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -18,4 +25,11 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   trainingAssigned: true,
   multiplierChange: true,
   lowInventory: true,
+  providerLowStock: true,
+  cleanerPayment: true,
+  immediatePayout: true,
+  latePayment: true,
+  clientComplaint: true,
+  ratingDecrease: true,
+  overdueCommercial: true,
 };

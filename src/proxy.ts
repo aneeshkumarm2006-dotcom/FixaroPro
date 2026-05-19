@@ -2,31 +2,56 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getSessionCookie } from 'better-auth/cookies'
 
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/sign-in', '/sign-up']
+// Exact public paths
+const PUBLIC_EXACT = new Set<string>([
+  '/sign-in',
+  '/sign-up',
+  '/portal/login',
+  '/portal/setup',
+  '/book',
+])
+
+// Public path prefixes (anything under these is public)
+const PUBLIC_PREFIXES = [
+  '/book/', // includes /book and any nested segments
+  '/rate/', // /rate/[token]
+  '/p/', // existing landing pages
+  '/api/auth/', // Better Auth endpoints
+  '/api/post-signin', // role-aware redirect endpoint
+]
+
+function isPublic(pathname: string): boolean {
+  if (PUBLIC_EXACT.has(pathname)) return true
+  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // If trying to access "/" route, always redirect to "/sign-in"
-  if (pathname === "/") {
-    const redirectToSignInUrl = new URL("/sign-in", request.url)
+  if (pathname === '/') {
+    const redirectToSignInUrl = new URL('/sign-in', request.url)
     return NextResponse.redirect(redirectToSignInUrl)
   }
 
-  // Allow public routes
-  if (PUBLIC_ROUTES.includes(pathname)) {
+  // Allow public routes (customer-facing + auth pages)
+  if (isPublic(pathname)) {
     return NextResponse.next()
   }
 
   // Check for session cookie
   const sessionCookie = getSessionCookie(request.headers)
 
-  // If no session cookie exists, redirect to sign-in with return URL
+  // If no session cookie exists, redirect to the appropriate sign-in.
+  // Customer area → /portal/login; everything else → /sign-in.
   if (!sessionCookie) {
-    const signInUrl = new URL('/sign-in', request.url)
+    const isCustomerArea = pathname.startsWith('/portal')
+    const target = isCustomerArea ? '/portal/login' : '/sign-in'
+    const signInUrl = new URL(target, request.url)
     // Preserve the intended destination for redirect after login
-    signInUrl.searchParams.set('callbackUrl', pathname)
+    if (!isCustomerArea) {
+      signInUrl.searchParams.set('callbackUrl', pathname)
+    }
     return NextResponse.redirect(signInUrl)
   }
 

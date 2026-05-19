@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { Suspense, useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import SplitShell, { BRAND_IMAGES } from "@/components/customer/SplitShell";
 import {
@@ -12,8 +13,9 @@ import {
   Banner,
 } from "@/components/customer/Field";
 
-export default function PortalLoginPage() {
+function PortalLoginInner() {
   const session = authClient.useSession();
+  const searchParams = useSearchParams();
 
   const rememberedKey = "cleano_remember_email";
   const initialEmail =
@@ -21,15 +23,22 @@ export default function PortalLoginPage() {
       ? localStorage.getItem(rememberedKey) ?? ""
       : "";
 
+  // If we just bounced a staff account out, show a banner explaining why.
+  const errorParam = searchParams.get("error");
+  const initialError =
+    errorParam === "staff_account"
+      ? "That account is a staff account. Use the staff sign-in page instead."
+      : null;
+
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(Boolean(initialEmail));
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (session.data?.session) {
-      window.location.href = "/api/post-signin";
+      window.location.href = "/api/post-signin?from=portal";
     }
   }, [session.data?.session]);
 
@@ -51,7 +60,7 @@ export default function PortalLoginPage() {
       const res = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
         password,
-        callbackURL: "/api/post-signin",
+        callbackURL: "/api/post-signin?from=portal",
       });
       if (res.error) {
         const code = res.error.status;
@@ -64,7 +73,7 @@ export default function PortalLoginPage() {
       }
       if (remember) localStorage.setItem(rememberedKey, email);
       else localStorage.removeItem(rememberedKey);
-      window.location.href = "/api/post-signin";
+      window.location.href = "/api/post-signin?from=portal";
     } catch {
       setError("Unexpected error. Please try again.");
       setLoading(false);
@@ -175,5 +184,13 @@ export default function PortalLoginPage() {
         </div>
       </form>
     </SplitShell>
+  );
+}
+
+export default function PortalLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <PortalLoginInner />
+    </Suspense>
   );
 }

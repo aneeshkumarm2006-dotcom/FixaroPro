@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Banner, Button } from "@/components/customer/Field";
+import { Banner, Button, Field, Input, Textarea } from "@/components/customer/Field";
+import CustomerModal from "@/components/customer/Modal";
 import { requestCancellation } from "../../../actions/requestCancellation";
 import { requestReschedule } from "../../../actions/requestReschedule";
+
+function tomorrowISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function RequestActions({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState<"cancel" | "reschedule" | null>(null);
@@ -12,16 +19,21 @@ export default function RequestActions({ jobId }: { jobId: string }) {
     text: string;
   } | null>(null);
 
-  async function onCancel() {
-    if (
-      !confirm(
-        "Submit a cancellation request? Our team will reach out to confirm."
-      )
-    )
-      return;
+  // Cancel modal
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  // Reschedule modal
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [preferredDate, setPreferredDate] = useState("");
+  const [rescheduleNotes, setRescheduleNotes] = useState("");
+
+  async function submitCancel() {
     setBusy("cancel");
     const res = await requestCancellation(jobId);
     setBusy(null);
+    setCancelOpen(false);
+    setCancelReason("");
     setMsg(
       res.success
         ? {
@@ -32,14 +44,27 @@ export default function RequestActions({ jobId }: { jobId: string }) {
     );
   }
 
-  async function onReschedule() {
-    const note = prompt(
-      "When would you like to reschedule? Give us your preferred date and any notes."
-    );
-    if (!note) return;
+  async function submitReschedule() {
+    if (!preferredDate && !rescheduleNotes.trim()) {
+      setMsg({
+        kind: "error",
+        text: "Please pick a date or add a note for our team.",
+      });
+      return;
+    }
     setBusy("reschedule");
-    const res = await requestReschedule({ jobId, notes: note });
+    const notesParts: string[] = [];
+    if (preferredDate) notesParts.push(`Preferred: ${preferredDate}`);
+    if (rescheduleNotes.trim()) notesParts.push(rescheduleNotes.trim());
+    const res = await requestReschedule({
+      jobId,
+      preferredDate: preferredDate || undefined,
+      notes: notesParts.join(" — "),
+    });
     setBusy(null);
+    setRescheduleOpen(false);
+    setPreferredDate("");
+    setRescheduleNotes("");
     setMsg(
       res.success
         ? { kind: "success", text: "Reschedule requested — we'll be in touch." }
@@ -48,41 +73,117 @@ export default function RequestActions({ jobId }: { jobId: string }) {
   }
 
   return (
-    <section className="cl-tile cl-tile-pad-lg">
-      <h2 className="cl-title-md" style={{ marginBottom: 14 }}>
-        Need to change this?
-      </h2>
-      {msg ? (
-        <div style={{ marginBottom: 12 }}>
-          <Banner kind={msg.kind}>{msg.text}</Banner>
+    <>
+      <section className="cl-tile cl-tile-pad-lg">
+        <h2 className="cl-title-md" style={{ marginBottom: 14 }}>
+          Need to change this?
+        </h2>
+        {msg ? (
+          <div style={{ marginBottom: 12 }}>
+            <Banner kind={msg.kind}>{msg.text}</Banner>
+          </div>
+        ) : null}
+        <div className="cl-stack-8">
+          <Button
+            variant="secondary"
+            block
+            onClick={() => setRescheduleOpen(true)}
+            disabled={busy !== null}>
+            Request reschedule
+          </Button>
+          <Button
+            variant="dangerGhost"
+            block
+            onClick={() => setCancelOpen(true)}
+            disabled={busy !== null}>
+            Request cancellation
+          </Button>
         </div>
-      ) : null}
-      <div className="cl-stack-8">
-        <Button
-          variant="secondary"
-          block
-          onClick={onReschedule}
-          disabled={busy !== null}>
-          Request reschedule
-        </Button>
-        <Button
-          variant="dangerGhost"
-          block
-          onClick={onCancel}
-          disabled={busy !== null}>
-          Request cancellation
-        </Button>
-      </div>
-      <p
-        style={{
-          fontSize: 11,
-          color: "var(--primary-50)",
-          margin: "12px 0 0",
-          lineHeight: 1.5,
-        }}>
-        Requests are reviewed by our team — your booking won't be changed
-        automatically.
-      </p>
-    </section>
+        <p
+          style={{
+            fontSize: 11,
+            color: "var(--primary-50)",
+            margin: "12px 0 0",
+            lineHeight: 1.5,
+          }}>
+          Requests are reviewed by our team — your booking won't be changed
+          automatically.
+        </p>
+      </section>
+
+      <CustomerModal
+        open={rescheduleOpen}
+        onClose={() => setRescheduleOpen(false)}
+        title="Request a reschedule"
+        description="Tell us when you'd like to move this booking to. Our team will reach out to confirm.">
+        <div className="cl-stack-16">
+          <Field label="Preferred new date (optional)" htmlFor="rs-date">
+            <Input
+              id="rs-date"
+              type="date"
+              min={tomorrowISO()}
+              value={preferredDate}
+              onChange={(e) => setPreferredDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Notes (optional)" htmlFor="rs-notes">
+            <Textarea
+              id="rs-notes"
+              rows={3}
+              value={rescheduleNotes}
+              onChange={(e) => setRescheduleNotes(e.target.value)}
+              placeholder="Any preferred times, reasons, or constraints…"
+            />
+          </Field>
+          <div className="cl-modal-actions">
+            <Button
+              variant="ghost"
+              onClick={() => setRescheduleOpen(false)}
+              disabled={busy !== null}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitReschedule}
+              loading={busy === "reschedule"}
+              disabled={busy !== null}>
+              Submit request
+            </Button>
+          </div>
+        </div>
+      </CustomerModal>
+
+      <CustomerModal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Cancel this booking?"
+        description="Our team reviews every cancellation and will reach out to confirm. Your booking won't be cancelled automatically.">
+        <div className="cl-stack-16">
+          <Field label="Reason (optional)" htmlFor="cn-reason">
+            <Textarea
+              id="cn-reason"
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Help us improve — why are you cancelling?"
+            />
+          </Field>
+          <div className="cl-modal-actions">
+            <Button
+              variant="ghost"
+              onClick={() => setCancelOpen(false)}
+              disabled={busy !== null}>
+              Keep booking
+            </Button>
+            <Button
+              variant="amber"
+              onClick={submitCancel}
+              loading={busy === "cancel"}
+              disabled={busy !== null}>
+              Request cancellation
+            </Button>
+          </div>
+        </div>
+      </CustomerModal>
+    </>
   );
 }

@@ -1065,6 +1065,65 @@
 }
 .cl-dp-link:hover { background: var(--primary-5); }
 
+/* ── Modal ── */
+.cl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 26, 28, 0.42);
+  backdrop-filter: blur(4px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cl-fadein .18s ease both;
+}
+.cl-modal {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: var(--shadow-pop);
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  font-family: var(--font-cl);
+  animation: cl-modalIn .22s cubic-bezier(.2,.8,.3,1) both;
+}
+.cl-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 24px 12px;
+}
+.cl-modal-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.cl-modal-desc {
+  font-size: 14px;
+  color: var(--primary-70);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.cl-modal-body { padding: 0 24px 24px; }
+.cl-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+@keyframes cl-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cl-modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ── Fade-up ── */
 @keyframes cl-cardIn { from { transform: translateY(8px); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
 .cl-fade-up { animation: cl-cardIn .35s cubic-bezier(.2,.7,.3,1) both; }

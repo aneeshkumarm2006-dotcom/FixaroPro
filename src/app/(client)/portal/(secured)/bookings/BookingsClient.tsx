@@ -3,11 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, X, ChevronRight } from "lucide-react";
-import { Banner, Button } from "@/components/customer/Field";
+import { Download, X } from "lucide-react";
+import { Banner, Button, Field, Input, Textarea } from "@/components/customer/Field";
 import { StatusBadge, DateBadge } from "@/components/customer/atoms";
+import CustomerModal from "@/components/customer/Modal";
 import { requestCancellation } from "../../actions/requestCancellation";
 import { requestReschedule } from "../../actions/requestReschedule";
+
+function tomorrowISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 interface Booking {
   id: string;
@@ -47,15 +54,35 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
   } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Cancel modal state
+  const [cancelJobId, setCancelJobId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
+  // Reschedule modal state
+  const [rescheduleJobId, setRescheduleJobId] = useState<string | null>(null);
+  const [preferredDate, setPreferredDate] = useState("");
+  const [rescheduleNotes, setRescheduleNotes] = useState("");
+
   function openBooking(id: string) {
     router.push(`/portal/bookings/${id}`);
   }
 
-  async function handleCancel(jobId: string) {
-    if (!confirm("Submit a cancellation request? Our team will reach out to confirm.")) return;
-    setBusyId(jobId);
-    const res = await requestCancellation(jobId);
+  function handleCancel(jobId: string) {
+    setCancelJobId(jobId);
+    setCancelReason("");
+  }
+  function handleReschedule(jobId: string) {
+    setRescheduleJobId(jobId);
+    setPreferredDate("");
+    setRescheduleNotes("");
+  }
+
+  async function submitCancel() {
+    if (!cancelJobId) return;
+    setBusyId(cancelJobId);
+    const res = await requestCancellation(cancelJobId);
     setBusyId(null);
+    setCancelJobId(null);
     setFlash(
       res.success
         ? { kind: "success", text: "Cancellation requested — awaiting confirmation." }
@@ -63,12 +90,26 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
     );
   }
 
-  async function handleReschedule(jobId: string) {
-    const note = prompt("When would you like to reschedule? Give us your preferred date and any notes.");
-    if (!note) return;
-    setBusyId(jobId);
-    const res = await requestReschedule({ jobId, notes: note });
+  async function submitReschedule() {
+    if (!rescheduleJobId) return;
+    if (!preferredDate && !rescheduleNotes.trim()) {
+      setFlash({
+        kind: "error",
+        text: "Please pick a date or add a note for our team.",
+      });
+      return;
+    }
+    setBusyId(rescheduleJobId);
+    const notesParts: string[] = [];
+    if (preferredDate) notesParts.push(`Preferred: ${preferredDate}`);
+    if (rescheduleNotes.trim()) notesParts.push(rescheduleNotes.trim());
+    const res = await requestReschedule({
+      jobId: rescheduleJobId,
+      preferredDate: preferredDate || undefined,
+      notes: notesParts.join(" — "),
+    });
     setBusyId(null);
+    setRescheduleJobId(null);
     setFlash(
       res.success
         ? { kind: "success", text: "Reschedule requested — we'll be in touch." }
@@ -148,6 +189,80 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
           ))
         )}
       </section>
+
+      <CustomerModal
+        open={rescheduleJobId !== null}
+        onClose={() => setRescheduleJobId(null)}
+        title="Request a reschedule"
+        description="Tell us when you'd like to move this booking to. Our team will reach out to confirm.">
+        <div className="cl-stack-16">
+          <Field label="Preferred new date (optional)" htmlFor="bk-rs-date">
+            <Input
+              id="bk-rs-date"
+              type="date"
+              min={tomorrowISO()}
+              value={preferredDate}
+              onChange={(e) => setPreferredDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Notes (optional)" htmlFor="bk-rs-notes">
+            <Textarea
+              id="bk-rs-notes"
+              rows={3}
+              value={rescheduleNotes}
+              onChange={(e) => setRescheduleNotes(e.target.value)}
+              placeholder="Any preferred times, reasons, or constraints…"
+            />
+          </Field>
+          <div className="cl-modal-actions">
+            <Button
+              variant="ghost"
+              onClick={() => setRescheduleJobId(null)}
+              disabled={busyId !== null}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitReschedule}
+              loading={busyId === rescheduleJobId}
+              disabled={busyId !== null}>
+              Submit request
+            </Button>
+          </div>
+        </div>
+      </CustomerModal>
+
+      <CustomerModal
+        open={cancelJobId !== null}
+        onClose={() => setCancelJobId(null)}
+        title="Cancel this booking?"
+        description="Our team reviews every cancellation and will reach out to confirm. Your booking won't be cancelled automatically.">
+        <div className="cl-stack-16">
+          <Field label="Reason (optional)" htmlFor="bk-cn-reason">
+            <Textarea
+              id="bk-cn-reason"
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Help us improve — why are you cancelling?"
+            />
+          </Field>
+          <div className="cl-modal-actions">
+            <Button
+              variant="ghost"
+              onClick={() => setCancelJobId(null)}
+              disabled={busyId !== null}>
+              Keep booking
+            </Button>
+            <Button
+              variant="amber"
+              onClick={submitCancel}
+              loading={busyId === cancelJobId}
+              disabled={busyId !== null}>
+              Request cancellation
+            </Button>
+          </div>
+        </div>
+      </CustomerModal>
     </>
   );
 }

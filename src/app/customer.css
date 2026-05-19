@@ -1066,26 +1066,29 @@
 .cl-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(14, 26, 28, 0.78);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
   z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  animation: cl-fadein .18s ease both;
+  animation: cl-fadein .2s ease both;
 }
 .cl-modal {
   background: #fff;
   border-radius: 20px;
-  box-shadow: 0 24px 72px -16px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 32px 80px -20px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   width: 100%;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   overflow-x: visible;
   font-family: var(--font-cl);
-  animation: cl-modalIn .22s cubic-bezier(.2,.8,.3,1) both;
+  animation: cl-modalIn .26s cubic-bezier(.2,.8,.3,1) both;
 }
 .cl-modal-head {
   display: flex;

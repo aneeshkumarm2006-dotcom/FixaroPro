@@ -954,10 +954,7 @@
   box-shadow: 0 0 0 4px rgba(0, 95, 106, 0.12);
 }
 .cl-dp-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 50;
+  z-index: 80;
   background: #fff;
   border-radius: 16px;
   box-shadow: var(--shadow-pop);
@@ -1069,8 +1066,9 @@
 .cl-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(14, 26, 28, 0.42);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 60;
   display: flex;
   align-items: center;
@@ -1081,10 +1079,11 @@
 .cl-modal {
   background: #fff;
   border-radius: 20px;
-  box-shadow: var(--shadow-pop);
+  box-shadow: 0 24px 72px -16px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.18);
   width: 100%;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  overflow-x: visible;
   font-family: var(--font-cl);
   animation: cl-modalIn .22s cubic-bezier(.2,.8,.3,1) both;
 }

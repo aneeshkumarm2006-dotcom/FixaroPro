@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, X } from "lucide-react";
-import { Banner, Button, Field, Input, Textarea } from "@/components/customer/Field";
+import { Banner, Button, Field, Textarea } from "@/components/customer/Field";
 import { StatusBadge, DateBadge } from "@/components/customer/atoms";
 import CustomerModal from "@/components/customer/Modal";
+import DatePicker from "@/components/customer/DatePicker";
 import { requestCancellation } from "../../actions/requestCancellation";
 import { requestReschedule } from "../../actions/requestReschedule";
 
@@ -196,13 +197,12 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
         title="Request a reschedule"
         description="Tell us when you'd like to move this booking to. Our team will reach out to confirm.">
         <div className="cl-stack-16">
-          <Field label="Preferred new date (optional)" htmlFor="bk-rs-date">
-            <Input
-              id="bk-rs-date"
-              type="date"
-              min={tomorrowISO()}
+          <Field label="Preferred new date (optional)">
+            <DatePicker
               value={preferredDate}
-              onChange={(e) => setPreferredDate(e.target.value)}
+              onChange={setPreferredDate}
+              min={tomorrowISO()}
+              placeholder="Choose a date"
             />
           </Field>
           <Field label="Notes (optional)" htmlFor="bk-rs-notes">

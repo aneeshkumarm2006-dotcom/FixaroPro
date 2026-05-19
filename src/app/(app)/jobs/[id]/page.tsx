@@ -147,10 +147,9 @@ export default async function JobPage({
       name: a.name,
       price: a.price,
     })),
-    employee: {
-      id: job.employee.id,
-      name: job.employee.name,
-    },
+    employee: job.employee
+      ? { id: job.employee.id, name: job.employee.name }
+      : { id: "", name: "Unassigned" },
     cleaners: job.cleaners.map((c) => ({ id: c.id, name: c.name })),
   };
 

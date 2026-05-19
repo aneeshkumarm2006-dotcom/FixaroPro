@@ -33,12 +33,12 @@ export default function SignInPage() {
       .min(6, { message: "Password must be at least 6 characters" }),
   });
 
-  // Redirect if already logged in
+  // Redirect if already logged in — role-aware via /api/post-signin
   useEffect(() => {
     if (session.data?.session) {
-      router.replace("/dashboard");
+      window.location.href = "/api/post-signin";
     }
-  }, [session.data?.session, router]);
+  }, [session.data?.session]);
 
   // Load saved email if user had chosen remember me previously
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function SignInPage() {
       const res = await authClient.signIn.email({
         email: formData.email,
         password: formData.password,
-        callbackURL: "/dashboard",
+        callbackURL: "/api/post-signin",
       });
 
       if (res.error) {
@@ -152,7 +152,7 @@ export default function SignInPage() {
         return;
       }
 
-      router.push("/dashboard");
+      window.location.href = "/api/post-signin";
     } catch {
       setGlobalError("Unexpected error. Please try again.");
       setLoading(false);

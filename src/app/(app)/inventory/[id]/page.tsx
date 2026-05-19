@@ -86,7 +86,7 @@ export default async function ProductPage({
       id: usage.job.id,
       clientName: usage.job.clientName,
       employee: {
-        name: usage.job.employee.name,
+        name: usage.job.employee?.name ?? "Unassigned",
       },
     },
   }));

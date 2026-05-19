@@ -350,7 +350,7 @@ export default async function JobDetailPage({ params }: PageProps) {
           <dl className="space-y-3">
             <div className="flex justify-between items-center">
               <dt className="text-sm text-neutral-950/60">Lead</dt>
-              <Badge variant="cleano">{job.employee.name}</Badge>
+              <Badge variant="cleano">{job.employee?.name ?? "Unassigned"}</Badge>
             </div>
             {job.cleaners.length > 0 && (
               <div className="flex justify-between items-center">

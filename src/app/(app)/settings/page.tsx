@@ -54,6 +54,7 @@ export default async function SettingsPage() {
     trainingModules,
     documents,
     users,
+    serviceAreas,
   ] = isAdmin
     ? await Promise.all([
         db.appSetting.findMany(),
@@ -107,8 +108,9 @@ export default async function SettingsPage() {
           orderBy: { name: "asc" },
           select: { id: true, name: true, role: true },
         }),
+        db.serviceArea.findMany({ orderBy: { prefix: "asc" } }),
       ])
-    : [[], [], [], [], [], [], [], [], [], []];
+    : [[], [], [], [], [], [], [], [], [], [], []];
 
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">
@@ -125,6 +127,7 @@ export default async function SettingsPage() {
         trainingModules={trainingModules as never}
         documents={documents as never}
         users={users as never}
+        serviceAreas={serviceAreas as never}
       />
     </div>
   );

@@ -1,0 +1,336 @@
+"use server";
+
+import { db } from "@/db";
+import { checkServiceAreaInternal } from "@/lib/service-area";
+import {
+  computeBookingPrice,
+  nextOccurrence,
+  recurrenceCount,
+} from "@/lib/booking-pricing";
+import {
+  ensureClientReferralCode,
+  generateUniqueReferralCode,
+  NEW_CLIENT_DISCOUNT,
+  REFERRER_CREDIT,
+} from "@/lib/referral";
+
+type Frequency =
+  | "ONE_TIME"
+  | "WEEKLY"
+  | "BIWEEKLY"
+  | "MONTHLY"
+  | "QUARTERLY";
+
+interface SubmitBookingInput {
+  // Step 1
+  postalCode: string;
+  // Step 2
+  address: string;
+  bedCount: number;
+  bathCount: number;
+  halfBathCount: number;
+  squareFootage: number;
+  serviceType: string;
+  frequency: Frequency;
+  addOns: { name: string; price: number }[];
+  // Step 3
+  date: string; // YYYY-MM-DD
+  isFlexible: boolean;
+  timeSlot: string; // "HH:mm" or "" if flexible
+  // Step 4
+  name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  referralCode: string;
+  // Optional
+  leadId?: string;
+}
+
+function parseStartTime(date: string, timeSlot: string, isFlexible: boolean): Date {
+  // Defaults to 9am for flexible bookings — admin sets the real time later.
+  const slot = isFlexible || !timeSlot ? "09:00" : timeSlot;
+  return new Date(`${date}T${slot}:00`);
+}
+
+export async function submitBooking(input: SubmitBookingInput) {
+  try {
+    // 1. Validate basics
+    const email = input.email?.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      return { success: false, error: "Valid email is required" };
+    }
+    if (!input.name?.trim() || !input.phone?.trim()) {
+      return { success: false, error: "Name and phone are required" };
+    }
+    if (!input.address?.trim()) {
+      return { success: false, error: "Address is required" };
+    }
+    if (!input.date) {
+      return { success: false, error: "Date is required" };
+    }
+
+    // 2. Re-check service area (server-authoritative — client can be tampered)
+    const areaCheck = await checkServiceAreaInternal(input.postalCode);
+    if (!areaCheck.covered) {
+      return {
+        success: false,
+        error: "Sorry, we don't service that postal code yet",
+      };
+    }
+
+    // 3. Resolve referral code → referring client
+    let referredByClientId: string | null = null;
+    let referrerEligibleForCredit = false;
+    if (input.referralCode?.trim()) {
+      const referrer = await db.client.findUnique({
+        where: { referralCode: input.referralCode.trim().toUpperCase() },
+      });
+      if (referrer) {
+        referredByClientId = referrer.id;
+        referrerEligibleForCredit = true;
+      }
+    }
+
+    // 4. Upsert Client by email — auto-mint a referral code for new clients
+    const existingClient = await db.client.findFirst({
+      where: { email },
+    });
+
+    const isNewClient = !existingClient;
+    const newReferralCode = isNewClient ? await generateUniqueReferralCode() : null;
+
+    const client = existingClient
+      ? await db.client.update({
+          where: { id: existingClient.id },
+          data: {
+            name: input.name.trim(),
+            phone: input.phone.trim(),
+            address: input.address.trim(),
+            serviceFrequency: input.frequency,
+          },
+        })
+      : await db.client.create({
+          data: {
+            name: input.name.trim(),
+            email,
+            phone: input.phone.trim(),
+            address: input.address.trim(),
+            serviceFrequency: input.frequency,
+            referredByClientId,
+            referralCode: newReferralCode,
+          },
+        });
+
+    // Backstop: make sure existing clients also have a code (for future shares).
+    if (existingClient && !existingClient.referralCode) {
+      await ensureClientReferralCode(client.id);
+    }
+
+    // Referral credit gating: only credit the referrer when a NEW client
+    // makes their first booking, and there's no self-referral.
+    if (
+      !isNewClient ||
+      !referrerEligibleForCredit ||
+      referredByClientId === client.id
+    ) {
+      referrerEligibleForCredit = false;
+    }
+
+    // 5. Compute discount eligibility:
+    //   - new client + valid referral code → first-booking discount
+    //   - existing client + available credit → spend their balance (capped)
+    let discountAmount = 0;
+    let creditSpent = 0;
+
+    if (isNewClient && referrerEligibleForCredit) {
+      discountAmount = NEW_CLIENT_DISCOUNT;
+    } else if (!isNewClient && client.referralCredit > 0) {
+      // Spend up to 50% of subtotal in credit (sanity cap), to be tuned later.
+      creditSpent = Math.min(client.referralCredit, 50);
+      discountAmount = creditSpent;
+    }
+
+    // 5b. Server-authoritative pricing
+    const pricing = await computeBookingPrice({
+      bedCount: input.bedCount,
+      bathCount: input.bathCount,
+      addOns: input.addOns,
+      travelFee: areaCheck.travelFee ?? 0,
+      discountAmount,
+    });
+
+    // 5c. Idempotency guard — if the same client just created a job for the
+    // same date + service within the last 60 seconds, treat this as a retry
+    // and return that job instead of creating a duplicate.
+    const startTime = parseStartTime(
+      input.date,
+      input.timeSlot,
+      input.isFlexible
+    );
+    const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
+    const recentDuplicate = await db.job.findFirst({
+      where: {
+        clientId: client.id,
+        startTime,
+        jobType: input.serviceType,
+        createdAt: { gte: sixtySecondsAgo },
+        parentJobId: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recentDuplicate) {
+      return {
+        success: true,
+        jobId: recentDuplicate.id,
+        childJobIds: [],
+        total: recentDuplicate.price ?? pricing.total,
+        deduplicated: true as const,
+      };
+    }
+
+    // 6. Create the primary Job
+
+    const primaryJob = await db.job.create({
+      data: {
+        employeeId: null,
+        clientName: client.name,
+        clientId: client.id,
+        location: input.address.trim(),
+        description: `${input.serviceType} cleaning`,
+        jobType: input.serviceType,
+        jobDate: startTime,
+        startTime,
+        status: input.isFlexible ? "CREATED" : "SCHEDULED",
+        bedCount: input.bedCount,
+        bathCount: input.bathCount,
+        halfBathCount: input.halfBathCount,
+        squareFootage: input.squareFootage > 0 ? input.squareFootage : null,
+        isFlexible: input.isFlexible,
+        requiredCleaners: 1,
+        price: pricing.total,
+        subtotalAmount: pricing.subtotal,
+        gstAmount: pricing.gstAmount,
+        qstAmount: pricing.qstAmount,
+        discountAmount: discountAmount > 0 ? discountAmount : null,
+        bookingSource: "web",
+        notes: input.notes?.trim() || null,
+        addOns: {
+          create: input.addOns.map((a) => ({
+            name: a.name,
+            price: a.price,
+          })),
+        },
+      },
+    });
+
+    // Spend the credit on this client (deduct from balance)
+    if (creditSpent > 0) {
+      await db.client.update({
+        where: { id: client.id },
+        data: {
+          referralCredit: { decrement: creditSpent },
+        },
+      });
+    }
+
+    // Credit the referrer for sending a new paying client our way
+    if (referrerEligibleForCredit && referredByClientId) {
+      await db.client.update({
+        where: { id: referredByClientId },
+        data: {
+          referralCredit: { increment: REFERRER_CREDIT },
+        },
+      });
+    }
+
+    // 7. Recurring jobs — copy the primary across future dates
+    const recurrences = recurrenceCount(input.frequency);
+    const childJobIds: string[] = [];
+    if (recurrences > 0 && input.frequency !== "ONE_TIME") {
+      let cursor = startTime;
+      for (let i = 0; i < recurrences; i++) {
+        cursor = nextOccurrence(cursor, input.frequency);
+        const child = await db.job.create({
+          data: {
+            employeeId: null,
+            clientName: client.name,
+            clientId: client.id,
+            location: input.address.trim(),
+            description: `${input.serviceType} cleaning`,
+            jobType: input.serviceType,
+            jobDate: cursor,
+            startTime: cursor,
+            status: input.isFlexible ? "CREATED" : "SCHEDULED",
+            bedCount: input.bedCount,
+            bathCount: input.bathCount,
+            halfBathCount: input.halfBathCount,
+            squareFootage:
+              input.squareFootage > 0 ? input.squareFootage : null,
+            isFlexible: input.isFlexible,
+            requiredCleaners: 1,
+            price: pricing.total,
+            subtotalAmount: pricing.subtotal,
+            gstAmount: pricing.gstAmount,
+            qstAmount: pricing.qstAmount,
+            parentJobId: primaryJob.id,
+            bookingSource: "web",
+            addOns: {
+              create: input.addOns.map((a) => ({
+                name: a.name,
+                price: a.price,
+              })),
+            },
+          },
+        });
+        childJobIds.push(child.id);
+      }
+    }
+
+    // 8. Mark the lead as converted (if we tracked one)
+    const lead = await db.lead.findFirst({
+      where: { email },
+      orderBy: { createdAt: "desc" },
+    });
+    if (lead) {
+      await db.lead.update({
+        where: { id: lead.id },
+        data: {
+          status: "CONVERTED",
+          convertedJobId: primaryJob.id,
+          convertedAt: new Date(),
+        },
+      });
+    }
+
+    // 9. Queue a booking-confirmation email (actual send wired later)
+    await db.emailLog.create({
+      data: {
+        kind: "BOOKING_CONFIRMATION",
+        recipient: email,
+        subject: `Booking confirmed — ${input.date}`,
+        status: "PENDING",
+        jobId: primaryJob.id,
+      },
+    });
+
+    // 10. Log the booking activity on the primary job
+    await db.jobLog.create({
+      data: {
+        jobId: primaryJob.id,
+        action: "CREATED",
+        description: `Booked via web by ${client.name}`,
+      },
+    });
+
+    return {
+      success: true,
+      jobId: primaryJob.id,
+      childJobIds,
+      total: pricing.total,
+    };
+  } catch (error) {
+    console.error("Error submitting booking:", error);
+    return { success: false, error: "Failed to submit booking" };
+  }
+}

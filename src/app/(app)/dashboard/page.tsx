@@ -19,21 +19,17 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-export default async function DashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+import { requireAdmin } from "@/lib/page-guards";
 
-  if (!session) {
-    redirect("/sign-in");
-  }
+export default async function DashboardPage() {
+  // Admin-only — cleaners go to /my-jobs, clients to /portal.
+  const session = await requireAdmin();
 
   const { user } = session;
   const userWithRole = user as typeof user & {
     role: "OWNER" | "ADMIN" | "EMPLOYEE";
   };
-  const isAdmin =
-    userWithRole.role === "OWNER" || userWithRole.role === "ADMIN";
+  const isAdmin = true;
 
   // Fetch dashboard data
   const now = new Date();

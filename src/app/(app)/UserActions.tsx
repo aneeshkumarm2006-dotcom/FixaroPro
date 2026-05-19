@@ -9,7 +9,7 @@ interface User {
   name: string;
   email: string;
   phone?: string | null;
-  role: "OWNER" | "ADMIN" | "EMPLOYEE";
+  role: string;
 }
 
 interface UserActionsProps {

@@ -29,6 +29,7 @@ import MultipliersTab from "./tabs/MultipliersTab";
 import RolesTab from "./tabs/RolesTab";
 import SuppliersTab from "./tabs/SuppliersTab";
 import InventoryLocationsTab from "./tabs/InventoryLocationsTab";
+import ServiceAreasTab from "./tabs/ServiceAreasTab";
 import ChecklistTemplatesTab from "./tabs/ChecklistTemplatesTab";
 import AvailabilityTab from "./tabs/AvailabilityTab";
 import TrainingTab, {
@@ -47,6 +48,7 @@ import {
   SupplierRecord,
   InventoryLocationRecord,
   ChecklistTemplateRecord,
+  ServiceAreaRecord,
 } from "./types";
 
 interface SettingsClientProps {
@@ -62,6 +64,7 @@ interface SettingsClientProps {
   trainingModules: TrainingModuleRecord[];
   documents: DocumentRecord[];
   users: UserOption[];
+  serviceAreas: ServiceAreaRecord[];
 }
 
 type TabId =
@@ -79,7 +82,8 @@ type TabId =
   | "multipliers"
   | "roles"
   | "suppliers"
-  | "inventoryLocations";
+  | "inventoryLocations"
+  | "serviceAreas";
 
 interface TabDef {
   id: TabId;
@@ -139,6 +143,12 @@ const TABS: TabDef[] = [
     icon: MapPin,
     adminOnly: true,
   },
+  {
+    id: "serviceAreas",
+    label: "Service Areas",
+    icon: MapPin,
+    adminOnly: true,
+  },
 ];
 
 export default function SettingsClient({
@@ -154,6 +164,7 @@ export default function SettingsClient({
   trainingModules,
   documents,
   users,
+  serviceAreas,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -247,6 +258,9 @@ export default function SettingsClient({
               products={products}
               locations={inventoryLocations}
             />
+          )}
+          {activeTab === "serviceAreas" && isAdmin && (
+            <ServiceAreasTab serviceAreas={serviceAreas} />
           )}
         </div>
       </div>

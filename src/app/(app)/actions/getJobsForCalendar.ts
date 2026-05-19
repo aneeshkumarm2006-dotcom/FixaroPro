@@ -147,7 +147,7 @@ export async function getJobsForCalendar(startDate?: Date, endDate?: Date) {
 
     // Create cleaner names string
     const cleanerNames = job.cleaners.map((c) => c.name).join(", ");
-    const label = cleanerNames || job.employee.name;
+    const label = cleanerNames || (job.employee?.name ?? "Unassigned");
 
     return {
       id: job.id,
@@ -170,8 +170,8 @@ export async function getJobsForCalendar(startDate?: Date, endDate?: Date) {
         paymentReceived: job.paymentReceived,
         invoiceSent: job.invoiceSent,
         notes: job.notes,
-        employeeId: job.employee.id,
-        employeeName: job.employee.name,
+        employeeId: job.employee?.id ?? "",
+        employeeName: job.employee?.name ?? "Unassigned",
         cleaners: job.cleaners,
         missingEquipment: missingEquipmentMap[job.id] || [],
       },

@@ -17,9 +17,9 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (session.data?.session) {
-      router.replace("/dashboard");
+      window.location.href = "/api/post-signin";
     }
-  }, [session.data?.session, router]);
+  }, [session.data?.session]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -30,7 +30,7 @@ export default function SignUpPage() {
         name,
         email,
         password,
-        callbackURL: "/dashboard",
+        callbackURL: "/api/post-signin",
       });
 
       if (res.error) {
@@ -38,9 +38,9 @@ export default function SignUpPage() {
         return;
       }
 
-      // autoSignIn may be enabled by default; either way, go home
-      router.push("/dashboard");
-    } catch (err) {
+      // Role-aware redirect — see /api/post-signin
+      window.location.href = "/api/post-signin";
+    } catch {
       setError("Unexpected error. Please try again.");
     } finally {
       setLoading(false);

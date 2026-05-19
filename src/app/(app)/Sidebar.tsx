@@ -12,7 +12,7 @@ interface User {
   name: string;
   email: string;
   phone?: string | null;
-  role: "OWNER" | "ADMIN" | "EMPLOYEE";
+  role: string;
 }
 
 interface SidebarProps {
@@ -122,16 +122,17 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* Navigation */}
+          {/* Navigation — strictly split by role: admin sees admin links only,
+              cleaner sees cleaner links only. No overlap. */}
           <nav
             className={`flex-1 py-2 space-y-1 overflow-y-auto overflow-x-hidden flex flex-col ${
               expanded ? "items-stretch px-3" : "items-center"
             }`}>
-            <NavLink href="/dashboard" icon="dashboard" expanded={expanded}>
-              Dashboard
-            </NavLink>
-            {isAdmin && (
+            {isAdmin ? (
               <>
+                <NavLink href="/dashboard" icon="dashboard" expanded={expanded}>
+                  Dashboard
+                </NavLink>
                 <NavLink href="/analytics" icon="analytics" expanded={expanded}>
                   Analytics
                 </NavLink>
@@ -157,6 +158,15 @@ export default function Sidebar({
                 <NavLink href="/jobs" icon="jobs" expanded={expanded}>
                   Jobs
                 </NavLink>
+                <NavLink
+                  href="/web-bookings"
+                  icon="web-bookings"
+                  expanded={expanded}>
+                  Web Bookings
+                </NavLink>
+                <NavLink href="/calendar" icon="calendar" expanded={expanded}>
+                  Calendar
+                </NavLink>
                 <NavLink href="/payouts" icon="payouts" expanded={expanded}>
                   Payouts
                 </NavLink>
@@ -169,32 +179,53 @@ export default function Sidebar({
                 <NavLink href="/sales" icon="sales" expanded={expanded}>
                   Sales
                 </NavLink>
+                <NavLink href="/leads" icon="leads" expanded={expanded}>
+                  Leads
+                </NavLink>
+                <NavLink href="/waitlist" icon="waitlist" expanded={expanded}>
+                  Waitlist
+                </NavLink>
+                <NavLink href="/requests" icon="requests" expanded={expanded}>
+                  Requests
+                </NavLink>
+                <NavLink href="/training" icon="training" expanded={expanded}>
+                  Training
+                </NavLink>
+                <NavLink href="/documents" icon="documents" expanded={expanded}>
+                  Documents
+                </NavLink>
+                <NavLink href="/chat" icon="chat" expanded={expanded}>
+                  Chat
+                </NavLink>
+              </>
+            ) : (
+              <>
+                <NavLink href="/my-jobs" icon="my-jobs" expanded={expanded}>
+                  My Jobs
+                </NavLink>
+                <NavLink href="/my-pay" icon="my-pay" expanded={expanded}>
+                  My Pay
+                </NavLink>
+                <NavLink
+                  href="/my-inventory"
+                  icon="my-inventory"
+                  expanded={expanded}>
+                  My Inventory
+                </NavLink>
+                <NavLink href="/calendar" icon="calendar" expanded={expanded}>
+                  Calendar
+                </NavLink>
+                <NavLink href="/training" icon="training" expanded={expanded}>
+                  Training
+                </NavLink>
+                <NavLink href="/documents" icon="documents" expanded={expanded}>
+                  Documents
+                </NavLink>
+                <NavLink href="/chat" icon="chat" expanded={expanded}>
+                  Chat
+                </NavLink>
               </>
             )}
-            <NavLink href="/my-jobs" icon="my-jobs" expanded={expanded}>
-              My Jobs
-            </NavLink>
-            <NavLink href="/my-pay" icon="my-pay" expanded={expanded}>
-              My Pay
-            </NavLink>
-            <NavLink
-              href="/my-inventory"
-              icon="my-inventory"
-              expanded={expanded}>
-              My Inventory
-            </NavLink>
-            <NavLink href="/calendar" icon="calendar" expanded={expanded}>
-              Calendar
-            </NavLink>
-            <NavLink href="/training" icon="training" expanded={expanded}>
-              Training
-            </NavLink>
-            <NavLink href="/documents" icon="documents" expanded={expanded}>
-              Documents
-            </NavLink>
-            <NavLink href="/chat" icon="chat" expanded={expanded}>
-              Chat
-            </NavLink>
           </nav>
 
           {/* User Section */}

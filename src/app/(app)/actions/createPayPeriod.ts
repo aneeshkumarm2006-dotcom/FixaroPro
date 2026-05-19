@@ -80,7 +80,11 @@ export async function createPayPeriod(formData: FormData) {
     for (const job of jobs) {
       const cleanerIds = job.cleaners.map((c) => c.id);
       const participantIds = Array.from(
-        new Set([job.employeeId, ...cleanerIds])
+        new Set(
+          [job.employeeId, ...cleanerIds].filter(
+            (id): id is string => !!id
+          )
+        )
       );
       if (participantIds.length === 0) continue;
 

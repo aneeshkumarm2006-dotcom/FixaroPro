@@ -1,7 +1,5 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { requireCleaner } from "@/lib/page-guards";
 import Card from "@/components/ui/Card";
 import { Prisma } from "@prisma/client";
 import { JobsFilters } from "./JobsFilters";
@@ -22,13 +20,7 @@ export default async function MyJobsPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    redirect("/sign-in");
-  }
+  const session = await requireCleaner();
 
   // Parse search params
   const params = await searchParams;

@@ -530,7 +530,7 @@ export default async function AnalyticsPage() {
     status: job.status,
     price: job.price,
     date: new Date(job.createdAt).toLocaleDateString("en-US"),
-    employeeName: job.employee.name,
+    employeeName: job.employee?.name ?? "Unassigned",
   }));
 
   // === PAYMENT DATA ===

@@ -100,6 +100,15 @@ export interface InventoryLocationRecord {
   stock: InventoryLocationStockRecord[];
 }
 
+export interface ServiceAreaRecord {
+  id: string;
+  prefix: string;
+  zoneName: string;
+  isActive: boolean;
+  travelFee: number;
+  notes: string | null;
+}
+
 // Helpers to read AppSetting values by key with a fallback
 export function getSetting<T>(
   settings: AppSettingRecord[],

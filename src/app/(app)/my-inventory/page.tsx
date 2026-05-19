@@ -1,18 +1,9 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { requireCleaner } from "@/lib/page-guards";
 import MyInventoryClient from "./MyInventoryClient";
 
 export default async function MyInventoryPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    redirect("/sign-in");
-  }
-
+  const session = await requireCleaner();
   const userId = session.user.id;
 
   const [employeeProducts, inventoryRequests, inventoryLocations] =

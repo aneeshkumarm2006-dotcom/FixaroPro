@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { customSession } from "better-auth/plugins"
+import { cache } from "react";
+import { headers as nextHeaders } from "next/headers";
 
 import { db } from "@/db";
 
@@ -8,30 +10,53 @@ export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: "postgresql",
   }),
-  emailAndPassword: { 
+  emailAndPassword: {
     enabled: true,
   },
   plugins: [customSession(async (session) => {
       if (session.user) {
-        // Get all user data in a single query with selected fields for performance
+        // Only fetch the role — full user record was an expensive overshoot.
         const userProfile = await db.user.findUnique({
           where: { id: session.user.id },
+          select: { role: true },
         });
-        // Pre-compute access control data to avoid runtime calculations
-        const enhancedUser = {
-          ...session.user,
-          role: userProfile?.role || 'USER',
-        };
-        
         return {
           ...session,
-          user: enhancedUser,
+          user: {
+            ...session.user,
+            role: userProfile?.role ?? 'EMPLOYEE',
+          },
         };
       }
       return session;
   })],
   secret: process.env.BETTER_AUTH_SECRET!,
 });
+
+// React `cache` deduplicates calls within a single server render. With this,
+// a layout + page both calling `getCachedSession()` hit the DB once, not twice.
+export const getCachedSession = cache(async () => {
+  return auth.api.getSession({ headers: await nextHeaders() });
+});
+
+// Transparently dedupe the 95+ existing `auth.api.getSession(...)` callsites
+// across pages and server actions by replacing the original with a cached
+// version keyed on the headers' cookie. Same shape and return type — callers
+// don't need to change.
+const _origGetSession = auth.api.getSession.bind(auth.api);
+type GetSessionArgs = Parameters<typeof _origGetSession>;
+const _cachedByCookie = cache((cookieKey: string, args: GetSessionArgs) => {
+  // cookieKey is only here to participate in cache keying (per-request,
+  // since React cache resets between requests). We ignore it in the call.
+  void cookieKey;
+  return _origGetSession(...args);
+});
+auth.api.getSession = ((...args: GetSessionArgs) => {
+  const hdrs = args[0]?.headers as Headers | undefined;
+  const cookie =
+    (hdrs && typeof hdrs.get === "function" && hdrs.get("cookie")) || "";
+  return _cachedByCookie(cookie, args);
+}) as typeof _origGetSession;
 
 type RoleBearer = { role?: string | null } | null | undefined;
 

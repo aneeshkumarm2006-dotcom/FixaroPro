@@ -180,24 +180,34 @@ model SupplierPrice {
 }
 
 model Client {
-  id               String            @id @default(cuid())
-  name             String
-  email            String?
-  phone            String?
-  address          String?
-  notes            String?
-  discountPercent  Float             @default(0)
-  clientType       ClientType        @default(RESIDENTIAL)
-  serviceFrequency ServiceFrequency?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  jobs             Job[]
-  invoices         Invoice[]
-  complaints       Complaint[]
+  id                     String            @id @default(cuid())
+  name                   String
+  email                  String?
+  phone                  String?
+  address                String?
+  notes                  String?
+  discountPercent        Float             @default(0)
+  clientType             ClientType        @default(RESIDENTIAL)
+  serviceFrequency       ServiceFrequency?
+  isActive               Boolean           @default(true)
+  stripeCustomerId       String?           @unique
+  defaultPaymentMethodId String?
+  referralCode           String?           @unique
+  referralCredit         Float             @default(0)
+  referredByClientId     String?
+  userId                 String?           @unique
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  jobs                   Job[]
+  invoices               Invoice[]
+  complaints             Complaint[]
+  waitlistEntries        Waitlist[]
+  referredBy             Client?           @relation("ClientReferrals", fields: [referredByClientId], references: [id], onDelete: SetNull)
+  referrals              Client[]          @relation("ClientReferrals")
 
   @@index([clientType])
   @@index([isActive])
+  @@index([referredByClientId])
 }
 
 enum ClientType {
@@ -214,51 +224,79 @@ enum ServiceFrequency {
 }
 
 model Job {
-  id                String            @id @default(cuid())
-  jobNumber         Int               @unique @default(autoincrement())
-  employeeId        String
-  clientName        String
-  clientId          String?
-  location          String?
-  description       String?
-  jobType           String?
-  jobDate           DateTime?
-  startTime         DateTime
-  endTime           DateTime?
-  clockInTime       DateTime?
-  clockOutTime      DateTime?
-  status            JobStatus         @default(CREATED)
-  price             Float?
-  employeePay       Float?
-  totalTip          Float?
-  parking           Float?
-  paymentReceived   Boolean           @default(false)
-  invoiceSent       Boolean           @default(false)
-  notes             String?
-  paymentType       PaymentType?
-  discountAmount    Float?
-  bedCount          Int?
-  bathCount         Int?
-  payRateMultiplier Float?            @default(1.0)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  employee          User              @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: Cascade)
-  client            Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  productUsage      JobProductUsage[]
-  cleaners          User[]            @relation("JobCleaners")
-  logs              JobLog[]
-  addOns            JobAddOn[]
-  transactions      Transaction[]
-  invoices          Invoice[]
-  photos            JobPhoto[]
-  checklists        JobChecklist[]
-  ratings           EmployeeRating[]
-  complaints        Complaint[]
+  id                      String            @id @default(cuid())
+  jobNumber               Int               @unique @default(autoincrement())
+  employeeId              String?
+  clientName              String
+  clientId                String?
+  location                String?
+  description             String?
+  jobType                 String?
+  jobDate                 DateTime?
+  startTime               DateTime
+  endTime                 DateTime?
+  clockInTime             DateTime?
+  clockOutTime            DateTime?
+  status                  JobStatus         @default(CREATED)
+  price                   Float?
+  employeePay             Float?
+  totalTip                Float?
+  parking                 Float?
+  paymentReceived         Boolean           @default(false)
+  invoiceSent             Boolean           @default(false)
+  notes                   String?
+  paymentType             PaymentType?
+  discountAmount          Float?
+  bedCount                Int?
+  bathCount               Int?
+  payRateMultiplier       Float?            @default(1.0)
+  isFlexible              Boolean           @default(false)
+  requiredCleaners        Int               @default(1)
+  subtotalAmount          Float             @default(0)
+  gstAmount               Float             @default(0)
+  qstAmount               Float             @default(0)
+  tipAmount               Float             @default(0)
+  totalAmount             Float             @default(0)
+  stripeSetupIntentId     String?
+  stripePaymentIntentId   String?
+  paymentFailedAt         DateTime?
+  paymentFailureReason    String?
+  paidAt                  DateTime?
+  refundedAmount          Float             @default(0)
+  isCashJob               Boolean           @default(false)
+  cancellationRequestedAt DateTime?
+  rescheduleRequestedAt   DateTime?
+  parentJobId             String?
+  bookingSource           String?
+  squareFootage           Int?
+  halfBathCount           Int?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  employee                User?             @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: SetNull)
+  client                  Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  parentJob               Job?              @relation("JobRecurrence", fields: [parentJobId], references: [id], onDelete: SetNull)
+  childJobs               Job[]             @relation("JobRecurrence")
+  productUsage            JobProductUsage[]
+  cleaners                User[]            @relation("JobCleaners")
+  logs                    JobLog[]
+  addOns                  JobAddOn[]
+  transactions            Transaction[]
+  invoices                Invoice[]
+  photos                  JobPhoto[]
+  checklists              JobChecklist[]
+  ratings                 EmployeeRating[]
+  complaints              Complaint[]
+  emailLogs               EmailLog[]
+  ratingTokens            JobRatingToken[]
+  convertedFromLeads      Lead[]
+  convertedFromWaitlist   Waitlist[]
 
   @@index([jobDate])
   @@index([clientName])
   @@index([clientId])
   @@index([status])
+  @@index([parentJobId])
+  @@index([isFlexible])
 }
 
 model JobAddOn {
@@ -448,6 +486,7 @@ enum Roles {
   OPS_MANAGER
   FIELD_LEAD
   EMPLOYEE
+  CLIENT
 }
 
 enum JobStatus {
@@ -592,16 +631,25 @@ model Target {
 }
 
 model AlertRoutingRule {
-  id            String    @id @default(cuid())
-  alertType     AlertType
-  recipientRole Roles
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String         @id @default(cuid())
+  alertType          AlertType
+  recipientRole      Roles
+  isActive           Boolean        @default(true)
+  frequency          AlertFrequency @default(IMMEDIATE)
+  escalateToRole     Roles?
+  escalateAfterHours Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@unique([alertType, recipientRole])
   @@index([alertType])
   @@index([recipientRole])
+}
+
+enum AlertFrequency {
+  IMMEDIATE
+  HOURLY_DIGEST
+  DAILY_DIGEST
 }
 
 model Complaint {
@@ -1106,3 +1154,142 @@ model MarketingCampaign {
   @@index([status])
   @@index([startDate])
 }
+
+// ── BookingKoala replacement (P0 foundation) ──
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  DEAD
+  OUT_OF_AREA
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+enum EmailKind {
+  BOOKING_CONFIRMATION
+  REMINDER_24H
+  RECEIPT
+  REFUND
+  WAITLIST_AVAILABLE
+  RATING_REQUEST
+  PASSWORD_SETUP
+  OTHER
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model ServiceArea {
+  id         String   @id @default(cuid())
+  prefix     String   @unique
+  zoneName   String
+  isActive   Boolean  @default(true)
+  travelFee  Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model Lead {
+  id              String     @id @default(cuid())
+  email           String
+  name            String?
+  phone           String?
+  postalCode      String?
+  dropOffStep     Int?
+  serviceType     String?
+  bedCount        Int?
+  bathCount       Int?
+  halfBathCount   Int?
+  squareFootage   Int?
+  preferredDate   DateTime?
+  isFlexible      Boolean    @default(false)
+  preferredSlot   String?
+  payload         Json?
+  status          LeadStatus @default(NEW)
+  source          String?
+  convertedJobId  String?
+  convertedAt     DateTime?
+  lastActivityAt  DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  convertedJob    Job?       @relation(fields: [convertedJobId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([status])
+  @@index([lastActivityAt])
+}
+
+model Waitlist {
+  id             String         @id @default(cuid())
+  preferredDate  DateTime
+  email          String
+  name           String?
+  phone          String?
+  clientId       String?
+  serviceType    String?
+  bedCount       Int?
+  bathCount      Int?
+  notes          String?
+  status         WaitlistStatus @default(WAITING)
+  notifiedAt     DateTime?
+  convertedJobId String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  client         Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  convertedJob   Job?           @relation(fields: [convertedJobId], references: [id], onDelete: SetNull)
+
+  @@index([preferredDate])
+  @@index([status])
+  @@index([email])
+}
+
+model EmailLog {
+  id          String      @id @default(cuid())
+  kind        EmailKind
+  recipient   String
+  subject     String?
+  status      EmailStatus @default(PENDING)
+  jobId       String?
+  leadId      String?
+  waitlistId  String?
+  providerId  String?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  job         Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([kind])
+  @@index([status])
+  @@index([jobId])
+  @@index([recipient])
+}
+
+model JobRatingToken {
+  id          String    @id @default(cuid())
+  jobId       String
+  token       String    @unique
+  cleanerId   String?
+  usedAt      DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([token])
+}
+

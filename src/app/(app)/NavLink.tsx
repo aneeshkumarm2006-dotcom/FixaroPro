@@ -20,6 +20,10 @@ import {
   GraduationCap,
   FileSignature,
   MessageCircle,
+  Flame,
+  Clock,
+  Inbox,
+  Globe,
   LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +46,10 @@ const iconMap: Record<string, LucideIcon> = {
   training: GraduationCap,
   documents: FileSignature,
   chat: MessageCircle,
+  leads: Flame,
+  waitlist: Clock,
+  requests: Inbox,
+  "web-bookings": Globe,
 };
 
 export default function NavLink({

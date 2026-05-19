@@ -1,13 +1,9 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { requireCleaner } from "@/lib/page-guards";
 import MyPayClient from "./MyPayClient";
 
 export default async function MyPayPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in");
-
+  const session = await requireCleaner();
   const userId = session.user.id;
 
   const [payouts, withdrawals] = await Promise.all([

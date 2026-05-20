@@ -1,8 +1,15 @@
 import { Resend } from "resend";
 import { db } from "@/db";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.EMAIL_FROM ?? "Cleano <no-reply@cleano.ca>";
+
+function getResend() {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY is not set — emails will be skipped");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 function fmt(n: number | null | undefined) {
   return `$${(n ?? 0).toFixed(2)}`;
@@ -68,6 +75,16 @@ async function deliver(opts: {
   html: string;
   logId?: string;
 }) {
+  const resend = getResend();
+  if (!resend) {
+    if (opts.logId) {
+      await db.emailLog.update({
+        where: { id: opts.logId },
+        data: { status: "FAILED", error: "RESEND_API_KEY not configured" },
+      }).catch(() => {});
+    }
+    return { ok: false, error: "RESEND_API_KEY not configured" };
+  }
   try {
     const { data, error } = await resend.emails.send({
       from: FROM,

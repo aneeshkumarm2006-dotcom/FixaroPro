@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
+import DatePicker from "@/components/customer/DatePicker";
 import { createPromoCode, togglePromoCode, deletePromoCode } from "./actions";
 
 interface PromoCode {
@@ -156,11 +157,11 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">Expires (blank = never)</label>
-              <input
-                type="date"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+              <DatePicker
                 value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
+                onChange={setExpiresAt}
+                min={new Date().toISOString().slice(0, 10)}
+                placeholder="No expiry"
               />
             </div>
           </div>

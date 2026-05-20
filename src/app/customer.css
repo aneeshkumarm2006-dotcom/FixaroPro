@@ -989,7 +989,8 @@
   justify-content: center;
   transition: background .12s;
 }
-.cl-dp-nav:hover { background: var(--primary-5); color: var(--primary); }
+.cl-dp-nav { transition: background .15s, color .15s, transform .1s; }
+.cl-dp-nav:hover { background: rgba(0, 95, 106, 0.1); color: var(--primary); transform: scale(1.1); }
 .cl-dp-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1021,26 +1022,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background .12s, color .12s;
+  transition: background .15s, color .15s, transform .1s, box-shadow .15s;
   font-family: inherit;
 }
 .cl-dp-day:hover:not(:disabled):not(.selected) {
-  background: var(--primary-5);
+  background: rgba(0, 95, 106, 0.12);
   color: var(--primary);
+  transform: scale(1.08);
 }
-.cl-dp-day.muted { color: var(--primary-40); }
-.cl-dp-day.today { color: var(--primary); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--primary-20); }
+.cl-dp-day.muted { color: var(--primary-30); }
+.cl-dp-day.muted:hover:not(:disabled):not(.selected) {
+  color: var(--primary-60);
+}
+.cl-dp-day.today {
+  color: var(--primary);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--primary-30);
+}
 .cl-dp-day.selected,
 .cl-dp-day.selected:hover {
-  background: var(--primary);
+  background: #00424a !important;
   color: #fff !important;
-  box-shadow: 0 4px 12px rgba(0, 95, 106, 0.28);
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 66, 74, 0.35);
+  transform: scale(1.08);
 }
 .cl-dp-day:disabled,
 .cl-dp-day.disabled {
   color: var(--primary-20);
   cursor: not-allowed;
   background: transparent;
+  transform: none;
 }
 .cl-dp-foot {
   display: flex;

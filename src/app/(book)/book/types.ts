@@ -36,6 +36,12 @@ export interface BookingDraft {
   email: string;
   notes: string;
   referralCode: string;
+  promoCode?: string;
+  promoDiscount?: number;
+  promoApplied?: boolean;
+  // Step 5 — Stripe
+  stripeCustomerId?: string;
+  stripeCardReady?: boolean;
 }
 
 export const EMPTY_DRAFT: BookingDraft = {

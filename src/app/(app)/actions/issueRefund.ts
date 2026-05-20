@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { queueAndSendRefund } from "@/lib/email";
 
 interface IssueRefundInput {
   jobId: string;
@@ -92,6 +93,9 @@ export async function issueRefund(input: IssueRefundInput) {
           ]
         : []),
     ]);
+
+    // Fire refund email (non-blocking)
+    queueAndSendRefund(input.jobId, input.amount, input.reason).catch(() => {});
 
     revalidatePath(`/jobs/${input.jobId}`);
     revalidatePath("/jobs");

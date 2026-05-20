@@ -10,6 +10,7 @@ import JobModal from "../JobModal";
 import { saveJob } from "../../actions/saveJob";
 import { deleteJob as deleteJobAction } from "../../actions/deleteJob";
 import { togglePaymentReceived } from "../../actions/toggleJobPaymentStatus";
+import { chargeJob } from "../../actions/chargeJob";
 import { generateInvoiceFromJob } from "../../actions/generateInvoiceFromJob";
 import {
   ArrowLeft,
@@ -78,6 +79,7 @@ interface Job {
   totalTip: number | null;
   parking: number | null;
   paymentReceived: boolean;
+  isCashJob?: boolean;
   invoiceSent: boolean;
   notes: string | null;
   paymentType?: string | null;
@@ -983,13 +985,18 @@ export default function JobDetailView({
           </div>
         </div>
 
-        {/* Payment Warning */}
+        {/* Payment Warning + Charge Button */}
         {job.status === "COMPLETED" && !job.paymentReceived && (
-          <div className="rounded-2xl p-4 flex items-center gap-3 bg-yellow-50">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-            <p className="text-sm text-yellow-700 font-[350]">
-              Payment pending for this completed job
-            </p>
+          <div className="rounded-2xl p-4 flex items-center justify-between gap-3 bg-yellow-50">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+              <p className="text-sm text-yellow-700 font-[350]">
+                Payment pending for this completed job
+              </p>
+            </div>
+            {isAdmin && !job.isCashJob && (
+              <ChargeButton jobId={job.id} />
+            )}
           </div>
         )}
 
@@ -1120,6 +1127,36 @@ export default function JobDetailView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ChargeButton({ jobId }: { jobId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function handleCharge() {
+    if (!confirm("Charge the client's saved card for this job?")) return;
+    setBusy(true);
+    setResult(null);
+    const res = await chargeJob(jobId);
+    setBusy(false);
+    setResult({ ok: res.success, msg: res.success ? `Charged $${(res as any).amount?.toFixed(2)}` : (res.error ?? "Failed") });
+  }
+
+  if (result?.ok) {
+    return <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">{result.msg}</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {result && <span className="text-xs text-red-600">{result.msg}</span>}
+      <button
+        onClick={handleCharge}
+        disabled={busy}
+        className="text-sm font-semibold bg-[#005F6A] text-white rounded-xl px-4 py-2 hover:bg-[#00424a] transition-colors disabled:opacity-60 whitespace-nowrap">
+        {busy ? "Charging…" : "Charge card"}
+      </button>
     </div>
   );
 }

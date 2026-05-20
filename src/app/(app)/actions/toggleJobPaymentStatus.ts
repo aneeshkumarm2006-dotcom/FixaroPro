@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import { queueAndSendReceipt } from "@/lib/email";
 
 export async function togglePaymentReceived(jobId: string) {
   const session = await auth.api.getSession({
@@ -97,6 +98,11 @@ export async function togglePaymentReceived(jobId: string) {
     }
 
     await db.$transaction(ops);
+
+    // Send receipt email when payment is marked received
+    if (newStatus) {
+      queueAndSendReceipt(jobId).catch(() => {});
+    }
 
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath("/jobs");

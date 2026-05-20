@@ -13,6 +13,7 @@ import {
   NEW_CLIENT_DISCOUNT,
   REFERRER_CREDIT,
 } from "@/lib/referral";
+import { sendBookingConfirmation } from "@/lib/email";
 
 type Frequency =
   | "ONE_TIME"
@@ -43,6 +44,8 @@ interface SubmitBookingInput {
   email: string;
   notes: string;
   referralCode: string;
+  promoCode?: string;
+  promoDiscount?: number;
   // Optional
   leadId?: string;
 }
@@ -213,6 +216,8 @@ export async function submitBooking(input: SubmitBookingInput) {
         gstAmount: pricing.gstAmount,
         qstAmount: pricing.qstAmount,
         discountAmount: discountAmount > 0 ? discountAmount : null,
+        appliedPromoCode: input.promoCode?.trim() || null,
+        promoDiscountAmount: input.promoDiscount && input.promoDiscount > 0 ? input.promoDiscount : null,
         bookingSource: "web",
         notes: input.notes?.trim() || null,
         addOns: {
@@ -242,6 +247,14 @@ export async function submitBooking(input: SubmitBookingInput) {
           referralCredit: { increment: REFERRER_CREDIT },
         },
       });
+    }
+
+    // 6b. Increment promo code usage if applied
+    if (input.promoCode?.trim() && input.promoDiscount && input.promoDiscount > 0) {
+      await db.promoCode.updateMany({
+        where: { code: input.promoCode.trim().toUpperCase(), isActive: true },
+        data: { usesCount: { increment: 1 } },
+      }).catch(() => {});
     }
 
     // 7. Recurring jobs — copy the primary across future dates
@@ -303,8 +316,8 @@ export async function submitBooking(input: SubmitBookingInput) {
       });
     }
 
-    // 9. Queue a booking-confirmation email (actual send wired later)
-    await db.emailLog.create({
+    // 9. Send booking confirmation email
+    const emailLog = await db.emailLog.create({
       data: {
         kind: "BOOKING_CONFIRMATION",
         recipient: email,
@@ -312,6 +325,21 @@ export async function submitBooking(input: SubmitBookingInput) {
         status: "PENDING",
         jobId: primaryJob.id,
       },
+    });
+    await sendBookingConfirmation({
+      to: email,
+      clientName: client.name,
+      jobId: primaryJob.id,
+      jobNumber: primaryJob.jobNumber,
+      startTime: startTime.toISOString(),
+      isFlexible: input.isFlexible,
+      address: input.address.trim(),
+      serviceType: input.serviceType,
+      subtotal: pricing.subtotal,
+      gst: pricing.gstAmount,
+      qst: pricing.qstAmount,
+      total: pricing.total,
+      logId: emailLog.id,
     });
 
     // 10. Log the booking activity on the primary job

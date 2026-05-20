@@ -264,6 +264,8 @@ model Job {
   paidAt                  DateTime?
   refundedAmount          Float             @default(0)
   isCashJob               Boolean           @default(false)
+  appliedPromoCode        String?
+  promoDiscountAmount     Float?
   cancellationRequestedAt DateTime?
   rescheduleRequestedAt   DateTime?
   parentJobId             String?
@@ -1291,5 +1293,21 @@ model JobRatingToken {
 
   @@index([jobId])
   @@index([token])
+}
+
+model PromoCode {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  description  String?
+  discountType String    @default("FIXED") // FIXED | PERCENT
+  discountValue Float
+  maxUses      Int?
+  usesCount    Int       @default(0)
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([code])
 }
 

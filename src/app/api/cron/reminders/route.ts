@@ -1,0 +1,72 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { sendReminder24h } from "@/lib/email";
+
+// Vercel Cron: runs daily at 9 AM UTC (5 AM EST / 6 AM EDT)
+// vercel.json: { "crons": [{ "path": "/api/cron/reminders", "schedule": "0 9 * * *" }] }
+
+export async function GET(req: NextRequest) {
+  const secret = req.headers.get("authorization");
+  if (
+    process.env.CRON_SECRET &&
+    secret !== `Bearer ${process.env.CRON_SECRET}`
+  ) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Find jobs starting tomorrow (midnight–midnight UTC)
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(0, 0, 0, 0);
+  const dayAfter = new Date(tomorrow);
+  dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
+
+  const jobs = await db.job.findMany({
+    where: {
+      startTime: { gte: tomorrow, lt: dayAfter },
+      status: { notIn: ["CANCELLED"] },
+    },
+    include: {
+      client: { select: { name: true, email: true } },
+      cleaners: { select: { name: true } },
+    },
+  });
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const job of jobs) {
+    if (!job.client?.email) { skipped++; continue; }
+
+    // Skip if already sent for this job
+    const existing = await db.emailLog.findFirst({
+      where: { jobId: job.id, kind: "REMINDER_24H", status: { in: ["SENT", "PENDING"] } },
+    });
+    if (existing) { skipped++; continue; }
+
+    const log = await db.emailLog.create({
+      data: {
+        kind: "REMINDER_24H",
+        recipient: job.client.email,
+        subject: `Reminder: your cleaning is tomorrow`,
+        status: "PENDING",
+        jobId: job.id,
+      },
+    });
+
+    await sendReminder24h({
+      to: job.client.email,
+      clientName: job.client.name,
+      jobId: job.id,
+      startTime: job.startTime.toISOString(),
+      address: job.location ?? "",
+      serviceType: job.jobType,
+      cleanerNames: job.cleaners.map((c) => c.name),
+      logId: log.id,
+    });
+
+    sent++;
+  }
+
+  return NextResponse.json({ ok: true, sent, skipped });
+}

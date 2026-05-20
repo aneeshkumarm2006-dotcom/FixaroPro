@@ -179,6 +179,9 @@ export default function Sidebar({
                 <NavLink href="/sales" icon="sales" expanded={expanded}>
                   Sales
                 </NavLink>
+                <NavLink href="/promo-codes" icon="sales" expanded={expanded}>
+                  Promo Codes
+                </NavLink>
                 <NavLink href="/leads" icon="leads" expanded={expanded}>
                   Leads
                 </NavLink>
@@ -202,6 +205,9 @@ export default function Sidebar({
               <>
                 <NavLink href="/my-jobs" icon="my-jobs" expanded={expanded}>
                   My Jobs
+                </NavLink>
+                <NavLink href="/available-jobs" icon="jobs" expanded={expanded}>
+                  Available Jobs
                 </NavLink>
                 <NavLink href="/my-pay" icon="my-pay" expanded={expanded}>
                   My Pay

@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState, useTransition } from "react";
 import { BookingDraft, TIME_SLOTS } from "../types";
 import { Field } from "@/components/customer/Field";
 import { ChoiceButton } from "@/components/customer/atoms";
 import DatePicker from "@/components/customer/DatePicker";
+import { getUnavailableSlots } from "../../actions/getUnavailableSlots";
 
 interface Props {
   draft: BookingDraft;
@@ -22,7 +24,18 @@ function maxISO() {
 }
 
 export default function Step3Schedule({ draft, onChange }: Props) {
-  const UNAVAILABLE_SLOTS: string[] = []; // wire to real capacity later
+  const [unavailableSlots, setUnavailableSlots] = useState<string[]>([]);
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!draft.date) { setUnavailableSlots([]); return; }
+    startTransition(async () => {
+      const slots = await getUnavailableSlots(draft.date);
+      setUnavailableSlots(slots);
+    });
+  }, [draft.date]);
+
+  const UNAVAILABLE_SLOTS = unavailableSlots;
 
   return (
     <div className="cl-stack-32">

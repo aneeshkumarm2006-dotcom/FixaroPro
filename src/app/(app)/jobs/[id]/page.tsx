@@ -135,6 +135,7 @@ export default async function JobPage({
     totalTip: job.totalTip,
     parking: job.parking,
     paymentReceived: job.paymentReceived,
+    isCashJob: job.isCashJob,
     invoiceSent: job.invoiceSent,
     notes: job.notes,
     paymentType: job.paymentType,

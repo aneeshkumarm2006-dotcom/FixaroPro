@@ -66,18 +66,32 @@ export default function Step4Contact({ draft, onChange }: Props) {
         />
       </Field>
 
-      <Field label="Referral code (optional)" htmlFor="c-ref">
-        <input
-          id="c-ref"
-          className="cl-input mono"
-          value={draft.referralCode}
-          onChange={(e) =>
-            onChange({ referralCode: e.target.value.toUpperCase() })
-          }
-          placeholder="FRIEND15"
-          maxLength={16}
-        />
-      </Field>
+      <div className="cl-grid-2">
+        <Field label="Referral code (optional)" htmlFor="c-ref">
+          <input
+            id="c-ref"
+            className="cl-input mono"
+            value={draft.referralCode}
+            onChange={(e) =>
+              onChange({ referralCode: e.target.value.toUpperCase() })
+            }
+            placeholder="FRIEND15"
+            maxLength={16}
+          />
+        </Field>
+        <Field label="Promo code (optional)" htmlFor="c-promo">
+          <input
+            id="c-promo"
+            className="cl-input mono"
+            value={draft.promoCode ?? ""}
+            onChange={(e) =>
+              onChange({ promoCode: e.target.value.toUpperCase(), promoDiscount: 0, promoApplied: false })
+            }
+            placeholder="SUMMER20"
+            maxLength={24}
+          />
+        </Field>
+      </div>
     </div>
   );
 }

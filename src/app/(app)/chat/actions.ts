@@ -11,7 +11,7 @@ import type {
 } from "./types";
 
 type SessionUser = { id: string; name: string; role?: string };
-type AppRole = "OWNER" | "ADMIN" | "EMPLOYEE";
+type AppRole = "OWNER" | "ADMIN" | "OPS_MANAGER" | "FIELD_LEAD" | "EMPLOYEE";
 
 type RequireUserResult =
   | { error: string }
@@ -27,8 +27,14 @@ async function requireUser(): Promise<RequireUserResult> {
   };
 }
 
+// Must match ADMIN_ROLES in src/lib/role-routing.ts
 function isAdminRole(role: string | undefined) {
-  return role === "OWNER" || role === "ADMIN";
+  return (
+    role === "OWNER" ||
+    role === "ADMIN" ||
+    role === "OPS_MANAGER" ||
+    role === "FIELD_LEAD"
+  );
 }
 
 type RawMessage = {
@@ -196,7 +202,8 @@ export async function getAdminChat(
     where: { id: employeeId },
     select: { id: true, name: true, image: true, role: true },
   });
-  if (!employee || employee.role !== "EMPLOYEE") {
+  // Allow any non-admin, non-client employee to have a conversation
+  if (!employee || isAdminRole(employee.role) || employee.role === "CLIENT") {
     return { success: false, error: "Employee not found" };
   }
 
@@ -282,6 +289,59 @@ export async function sendChatMessage(
   });
 
   return { success: true, data: toMessageDTO(message) };
+}
+
+export async function getUnreadChatCount(): Promise<{
+  count: number;
+  latest?: { senderName: string; body: string; at: string };
+}> {
+  try {
+    const a = await requireUser();
+    if ("error" in a) return { count: 0 };
+
+    if (isAdminRole(a.role)) {
+      const count = await db.chatMessage.count({
+        where: { senderRole: "EMPLOYEE", readByAdminAt: null },
+      });
+      const latest = count > 0
+        ? await db.chatMessage.findFirst({
+            where: { senderRole: "EMPLOYEE", readByAdminAt: null },
+            orderBy: { createdAt: "desc" },
+            include: { sender: { select: { name: true } } },
+          })
+        : null;
+      return {
+        count,
+        latest: latest
+          ? { senderName: latest.sender.name, body: latest.body, at: latest.createdAt.toISOString() }
+          : undefined,
+      };
+    } else {
+      const conversation = await db.chatConversation.findUnique({
+        where: { employeeId: a.user.id },
+      });
+      if (!conversation) return { count: 0 };
+
+      const count = await db.chatMessage.count({
+        where: { conversationId: conversation.id, senderRole: "ADMIN", readByEmployeeAt: null },
+      });
+      const latest = count > 0
+        ? await db.chatMessage.findFirst({
+            where: { conversationId: conversation.id, senderRole: "ADMIN", readByEmployeeAt: null },
+            orderBy: { createdAt: "desc" },
+            include: { sender: { select: { name: true } } },
+          })
+        : null;
+      return {
+        count,
+        latest: latest
+          ? { senderName: latest.sender.name, body: latest.body, at: latest.createdAt.toISOString() }
+          : undefined,
+      };
+    }
+  } catch {
+    return { count: 0 };
+  }
 }
 
 export async function markChatRead(

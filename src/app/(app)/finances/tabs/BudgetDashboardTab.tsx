@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Target, Plus, Pencil, Trash2, X } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { CBarChart } from "@/components/ui/Chart";
 import { createBudget, deleteBudget } from "../../actions/createBudget";
 import { updateBudget } from "../../actions/updateBudget";
@@ -191,16 +192,12 @@ export default function BudgetDashboardTab({ transactions, budgets }: Props) {
           </div>
         </div>
         <div className="flex gap-2">
-          <select
+          <PremiumSelect
             value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-transparent bg-[#005F6A]/5 text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20">
-            {periodOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+            onChange={setPeriod}
+            options={periodOptions.map((p) => ({ value: p, label: p }))}
+            size="sm"
+          />
           <Button
             variant="primary"
             size="sm"
@@ -230,18 +227,14 @@ export default function BudgetDashboardTab({ transactions, budgets }: Props) {
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                 Category
               </label>
-              <select
+              <PremiumSelect
                 value={form.category}
-                onChange={(e) =>
-                  setForm({ ...form, category: e.target.value as TxCategory })
+                onChange={(v) =>
+                  setForm({ ...form, category: v as TxCategory })
                 }
-                className={selectCls}>
-                {ALL_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+                options={ALL_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+                size="sm"
+              />
             </div>
             <div>
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">

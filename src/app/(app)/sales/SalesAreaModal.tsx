@@ -5,6 +5,8 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import { createSalesArea } from "@/app/(app)/actions/createSalesArea";
 import { updateSalesArea, deleteSalesArea } from "@/app/(app)/actions/updateSalesArea";
 
@@ -42,6 +44,12 @@ export default function SalesAreaModal({
 }: SalesAreaModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [areaType, setAreaType] = useState(editingArea?.type || "DOOR_KNOCK");
+  const [areaDate, setAreaDate] = useState(
+    editingArea?.date
+      ? new Date(editingArea.date).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0]
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,16 +111,13 @@ export default function SalesAreaModal({
           <label className="block text-sm font-[350] text-gray-700 mb-1">
             Type
           </label>
-          <select
+          <PremiumSelect
             name="type"
-            defaultValue={editingArea?.type || "DOOR_KNOCK"}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 focus:border-[#005F6A]">
-            {SALES_AREA_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+            value={areaType}
+            onChange={setAreaType}
+            options={SALES_AREA_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+            size="md"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -159,14 +164,11 @@ export default function SalesAreaModal({
           <label className="block text-sm font-[350] text-gray-700 mb-1">
             Date
           </label>
-          <Input
+          <DatePicker
             name="date"
-            type="date"
-            defaultValue={
-              editingArea?.date
-                ? new Date(editingArea.date).toISOString().split("T")[0]
-                : new Date().toISOString().split("T")[0]
-            }
+            value={areaDate}
+            onChange={setAreaDate}
+            size="md"
           />
         </div>
 

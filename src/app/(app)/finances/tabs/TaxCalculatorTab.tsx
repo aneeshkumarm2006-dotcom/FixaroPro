@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Calculator } from "lucide-react";
 import Card from "@/components/ui/Card";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import {
   TaxConfig,
   TransactionRow,
@@ -89,15 +90,17 @@ export default function TaxCalculatorTab({ transactions, taxConfig }: Props) {
             </p>
           </div>
         </div>
-        <select
+        <PremiumSelect
           value={period}
-          onChange={(e) => setPeriod(e.target.value as Period)}
-          className={selectCls}>
-          <option value="month">This Month</option>
-          <option value="quarter">This Quarter</option>
-          <option value="year">Year to Date</option>
-          <option value="all">All Time</option>
-        </select>
+          onChange={(v) => setPeriod(v as Period)}
+          options={[
+            { value: "month", label: "This Month" },
+            { value: "quarter", label: "This Quarter" },
+            { value: "year", label: "Year to Date" },
+            { value: "all", label: "All Time" },
+          ]}
+          size="sm"
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">

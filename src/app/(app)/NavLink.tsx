@@ -58,12 +58,14 @@ export default function NavLink({
   icon,
   expanded = false,
   exclude = [],
+  badge = 0,
 }: {
   href: string;
   children: React.ReactNode;
   icon: string;
   expanded?: boolean;
   exclude?: string[];
+  badge?: number;
 }) {
   const pathname = usePathname();
   const matchesExclude = exclude.some(
@@ -75,6 +77,12 @@ export default function NavLink({
       (href !== "/dashboard" && pathname?.startsWith(href + "/")));
 
   const Icon = iconMap[icon];
+
+  const badgeEl = badge > 0 ? (
+    <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-[600] rounded-full flex items-center justify-center px-1 leading-none flex-shrink-0">
+      {badge > 99 ? "99+" : badge}
+    </span>
+  ) : null;
 
   if (expanded) {
     return (
@@ -93,7 +101,8 @@ export default function NavLink({
             }`}
           />
         )}
-        <span className="truncate">{children}</span>
+        <span className="truncate flex-1">{children}</span>
+        {badgeEl}
       </Link>
     );
   }
@@ -101,7 +110,7 @@ export default function NavLink({
   return (
     <Link
       href={href}
-      className={`flex items-center justify-center w-12 h-12 rounded-xl transition-colors duration-150 ${
+      className={`relative flex items-center justify-center w-12 h-12 rounded-xl transition-colors duration-150 ${
         isActive
           ? "bg-[#005F6A] text-white shadow-sm"
           : "text-[#005F6A] hover:bg-[#005F6A]/10 hover:text-[#005F6A]"
@@ -113,6 +122,11 @@ export default function NavLink({
             isActive ? "text-white" : "text-[#005F6A]"
           }`}
         />
+      )}
+      {badge > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-[700] rounded-full flex items-center justify-center px-1 leading-none">
+          {badge > 99 ? "99+" : badge}
+        </span>
       )}
     </Link>
   );

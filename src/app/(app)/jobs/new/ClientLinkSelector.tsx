@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+
 interface ClientOption {
   id: string;
   name: string;
@@ -15,34 +18,38 @@ export default function ClientLinkSelector({
   clients,
   defaultValue,
 }: ClientLinkSelectorProps) {
-  const setInputValue = (name: string, value: string) => {
+  const [value, setValue] = useState(defaultValue || "");
+
+  const setInputValue = (name: string, val: string) => {
     const el = document.querySelector(
       `input[name="${name}"]`
     ) as HTMLInputElement | null;
     if (el) {
-      el.value = value;
+      el.value = val;
       el.dispatchEvent(new Event("input", { bubbles: true }));
     }
   };
 
+  const options = [
+    { value: "", label: "— None —" },
+    ...clients.map((c) => ({ value: c.id, label: c.name })),
+  ];
+
   return (
-    <select
-      id="clientId"
+    <PremiumSelect
       name="clientId"
-      defaultValue={defaultValue || ""}
-      onChange={(e) => {
-        const c = clients.find((cl) => cl.id === e.target.value);
+      value={value}
+      onChange={(v) => {
+        setValue(v);
+        const c = clients.find((cl) => cl.id === v);
         if (!c) return;
         setInputValue("clientName", c.name);
         setInputValue("location", c.address || "");
       }}
-      className="w-full h-[42px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20">
-      <option value="">— None —</option>
-      {clients.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.name}
-        </option>
-      ))}
-    </select>
+      options={options}
+      placeholder="— None —"
+      searchable
+      size="md"
+    />
   );
 }

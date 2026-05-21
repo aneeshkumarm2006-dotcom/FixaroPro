@@ -7,6 +7,8 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import { createMarketingCampaign } from "@/app/(app)/actions/createMarketingCampaign";
 import {
   updateMarketingCampaign,
@@ -75,6 +77,15 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Controlled state for form selects/dates
+  const [formStatus, setFormStatus] = useState("DRAFT");
+  const [formChannel, setFormChannel] = useState("");
+  const [formStartDate, setFormStartDate] = useState("");
+  const [formEndDate, setFormEndDate] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -95,11 +106,17 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
     setLoading(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this campaign?")) return;
-    const result = await deleteMarketingCampaign(id);
+  const handleDelete = async () => {
+    if (!confirmDeleteId) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteMarketingCampaign(confirmDeleteId);
+    setDeleting(false);
     if (result.error) {
-      alert(result.error);
+      setDeleteError(result.error);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(null);
     }
   };
 
@@ -119,12 +136,22 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
           size="sm"
           onClick={() => {
             setEditingCampaign(null);
+            setFormStatus("DRAFT");
+            setFormChannel("");
+            setFormStartDate("");
+            setFormEndDate("");
             setShowModal(true);
           }}>
           <Plus className="w-4 h-4 mr-1" />
           New Campaign
         </Button>
       </div>
+
+      {deleteError && (
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
+          {deleteError}
+        </div>
+      )}
 
       {campaigns.length === 0 ? (
         <Card variant="default" className="p-8 text-center">
@@ -143,86 +170,116 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                 : 0;
             return (
               <Card key={campaign.id} variant="default" className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-[400] text-[#005F6A] truncate">
-                        {campaign.name}
-                      </h4>
-                      <Badge
-                        variant={statusBadgeVariant(campaign.status)}
-                        size="sm">
-                        {campaign.status}
-                      </Badge>
+                {confirmDeleteId === campaign.id ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-[400] text-[#005F6A]">Delete &ldquo;{campaign.name}&rdquo;?</p>
+                      <p className="text-xs text-[#005F6A]/50 mt-0.5">This cannot be undone.</p>
                     </div>
-                    {campaign.description && (
-                      <p className="text-xs text-[#005F6A]/50 mt-1 line-clamp-1">
-                        {campaign.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 flex-wrap">
-                      {campaign.channel && (
-                        <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
-                          <Megaphone className="w-3 h-3" />
-                          {campaign.channel}
-                        </span>
-                      )}
-                      <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" />$
-                        {campaign.spent.toFixed(0)} / $
-                        {campaign.budget.toFixed(0)}
-                      </span>
-                      {campaign.startDate && (
-                        <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(campaign.startDate).toLocaleDateString("en-US")}
-                          {campaign.endDate &&
-                            ` - ${new Date(campaign.endDate).toLocaleDateString("en-US")}`}
-                        </span>
-                      )}
-                      <span className="text-xs text-[#005F6A]/40">
-                        {campaign.landingPageCount} landing page
-                        {campaign.landingPageCount !== 1 ? "s" : ""}
-                      </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmDeleteId(null)}
+                        disabled={deleting}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+                        {deleting ? "Deleting…" : "Delete"}
+                      </Button>
                     </div>
-                    {campaign.budget > 0 && (
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full transition-all ${
-                              budgetUsed > 100
-                                ? "bg-red-400"
-                                : budgetUsed > 80
-                                  ? "bg-yellow-400"
-                                  : "bg-[#005F6A]"
-                            }`}
-                            style={{
-                              width: `${Math.min(budgetUsed, 100)}%`,
-                            }}
-                          />
-                        </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-[400] text-[#005F6A] truncate">
+                          {campaign.name}
+                        </h4>
+                        <Badge
+                          variant={statusBadgeVariant(campaign.status)}
+                          size="sm">
+                          {campaign.status}
+                        </Badge>
                       </div>
-                    )}
+                      {campaign.description && (
+                        <p className="text-xs text-[#005F6A]/50 mt-1 line-clamp-1">
+                          {campaign.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-2 flex-wrap">
+                        {campaign.channel && (
+                          <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                            <Megaphone className="w-3 h-3" />
+                            {campaign.channel}
+                          </span>
+                        )}
+                        <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" />$
+                          {campaign.spent.toFixed(0)} / $
+                          {campaign.budget.toFixed(0)}
+                        </span>
+                        {campaign.startDate && (
+                          <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(campaign.startDate).toLocaleDateString("en-US")}
+                            {campaign.endDate &&
+                              ` - ${new Date(campaign.endDate).toLocaleDateString("en-US")}`}
+                          </span>
+                        )}
+                        <span className="text-xs text-[#005F6A]/40">
+                          {campaign.landingPageCount} landing page
+                          {campaign.landingPageCount !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      {campaign.budget > 0 && (
+                        <div className="mt-2">
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                budgetUsed > 100
+                                  ? "bg-red-400"
+                                  : budgetUsed > 80
+                                    ? "bg-yellow-400"
+                                    : "bg-[#005F6A]"
+                              }`}
+                              style={{
+                                width: `${Math.min(budgetUsed, 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingCampaign(campaign);
+                          setFormStatus(campaign.status || "DRAFT");
+                          setFormChannel(campaign.channel || "");
+                          setFormStartDate(campaign.startDate ? new Date(campaign.startDate).toISOString().split("T")[0] : "");
+                          setFormEndDate(campaign.endDate ? new Date(campaign.endDate).toISOString().split("T")[0] : "");
+                          setShowModal(true);
+                        }}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmDeleteId(campaign.id)}
+                        className="text-red-400 hover:text-red-600">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingCampaign(campaign);
-                        setShowModal(true);
-                      }}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(campaign.id)}
-                      className="text-red-400 hover:text-red-600">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                )}
               </Card>
             );
           })}
@@ -235,6 +292,10 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
           setShowModal(false);
           setEditingCampaign(null);
           setError(null);
+          setFormStatus("DRAFT");
+          setFormChannel("");
+          setFormStartDate("");
+          setFormEndDate("");
         }}
         title={editingCampaign ? "Edit Campaign" : "New Campaign"}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -270,35 +331,25 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-[350] text-gray-700 mb-1">
-                Status
-              </label>
-              <select
+              <label className="block text-sm font-[350] text-gray-700 mb-1">Status</label>
+              <PremiumSelect
                 name="status"
-                defaultValue={editingCampaign?.status || "DRAFT"}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 focus:border-[#005F6A]">
-                {CAMPAIGN_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+                value={formStatus}
+                onChange={setFormStatus}
+                options={CAMPAIGN_STATUSES}
+                size="md"
+              />
             </div>
             <div>
-              <label className="block text-sm font-[350] text-gray-700 mb-1">
-                Channel
-              </label>
-              <select
+              <label className="block text-sm font-[350] text-gray-700 mb-1">Channel</label>
+              <PremiumSelect
                 name="channel"
-                defaultValue={editingCampaign?.channel || ""}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 focus:border-[#005F6A]">
-                <option value="">Select channel</option>
-                {CHANNELS.map((ch) => (
-                  <option key={ch} value={ch}>
-                    {ch}
-                  </option>
-                ))}
-              </select>
+                value={formChannel}
+                onChange={setFormChannel}
+                placeholder="Select channel"
+                options={[{ value: "", label: "No channel" }, ...CHANNELS.map(ch => ({ value: ch, label: ch }))]}
+                size="md"
+              />
             </div>
           </div>
 
@@ -331,36 +382,12 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-[350] text-gray-700 mb-1">
-                Start Date
-              </label>
-              <Input
-                name="startDate"
-                type="date"
-                defaultValue={
-                  editingCampaign?.startDate
-                    ? new Date(editingCampaign.startDate)
-                        .toISOString()
-                        .split("T")[0]
-                    : ""
-                }
-              />
+              <label className="block text-sm font-[350] text-gray-700 mb-1">Start Date</label>
+              <DatePicker name="startDate" value={formStartDate} onChange={setFormStartDate} size="md" />
             </div>
             <div>
-              <label className="block text-sm font-[350] text-gray-700 mb-1">
-                End Date
-              </label>
-              <Input
-                name="endDate"
-                type="date"
-                defaultValue={
-                  editingCampaign?.endDate
-                    ? new Date(editingCampaign.endDate)
-                        .toISOString()
-                        .split("T")[0]
-                    : ""
-                }
-              />
+              <label className="block text-sm font-[350] text-gray-700 mb-1">End Date</label>
+              <DatePicker name="endDate" value={formEndDate} onChange={setFormEndDate} size="md" />
             </div>
           </div>
 

@@ -28,7 +28,18 @@ export default async function ClientDetailPage({
     },
   });
 
+  const jobIds = client?.jobs.map((j) => j.id) ?? [];
+
   if (!client) redirect("/clients");
+
+  const rawRatings = await db.employeeRating.findMany({
+    where: { jobId: { in: jobIds } },
+    include: {
+      employee: { select: { id: true, name: true } },
+      job: { select: { id: true, jobNumber: true, jobDate: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
   const jobs = client.jobs.map((j) => ({
     id: j.id,
@@ -59,6 +70,22 @@ export default async function ClientDetailPage({
     .filter((j) => j.status === "COMPLETED" && !j.paymentReceived)
     .reduce((sum, j) => sum + (j.price || 0), 0);
 
+  const ratings = rawRatings.map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    notes: r.notes,
+    ratedBy: r.ratedBy,
+    createdAt: r.createdAt.toISOString(),
+    employee: r.employee,
+    job: r.job
+      ? {
+          id: r.job.id,
+          jobNumber: r.job.jobNumber,
+          jobDate: r.job.jobDate?.toISOString() ?? null,
+        }
+      : null,
+  }));
+
   return (
     <div className="h-full overflow-y-auto p-8">
       <ClientDetailView
@@ -74,6 +101,7 @@ export default async function ClientDetailPage({
         }}
         jobs={jobs}
         totals={{ totalRevenue, totalPaid, unpaidAmount, jobCount: jobs.length }}
+        ratings={ratings}
       />
     </div>
   );

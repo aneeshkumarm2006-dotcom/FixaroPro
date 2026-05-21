@@ -1,23 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-  Briefcase,
-  DollarSign,
-  CreditCard,
-  Star,
-  Calendar,
-  Pencil,
+  ArrowLeft, DollarSign, Briefcase, Star, CreditCard,
+  AlertTriangle, Pencil, Mail, Phone, MapPin,
 } from "lucide-react";
-import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import ClientModal from "../ClientModal";
 
 type TabKey = "history" | "payments" | "ratings";
@@ -61,275 +48,384 @@ interface Totals {
   jobCount: number;
 }
 
+interface RatingEntry {
+  id: string;
+  rating: number;
+  notes: string | null;
+  ratedBy: string | null;
+  createdAt: string;
+  employee: { id: string; name: string };
+  job: { id: string; jobNumber: number; jobDate: string | null } | null;
+}
+
+const AVATAR_COLORS = ["#005F6A", "#0284c7", "#7c3aed", "#dc2626", "#d97706", "#059669", "#0891b2", "#be185d"];
+
+function avatarColor(name: string) {
+  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+}
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map(p => p[0] ?? "").join("").toUpperCase();
+}
+
+const STATUS_PILLS: Record<string, { bg: string; fg: string; dot: string; label: string }> = {
+  CREATED:     { bg: "rgba(148,163,184,0.18)", fg: "#475569", dot: "#94a3b8", label: "Created" },
+  SCHEDULED:   { bg: "rgba(217,119,6,0.12)",   fg: "#92400e", dot: "#d97706", label: "Scheduled" },
+  IN_PROGRESS: { bg: "rgba(2,132,199,0.10)",   fg: "#075985", dot: "#0284c7", label: "In Progress" },
+  COMPLETED:   { bg: "rgba(5,150,105,0.10)",   fg: "#065f46", dot: "#10b981", label: "Completed" },
+  PAID:        { bg: "rgba(5,150,105,0.18)",   fg: "#065f46", dot: "#059669", label: "Paid" },
+  CANCELLED:   { bg: "rgba(220,38,38,0.10)",   fg: "#991b1b", dot: "#dc2626", label: "Cancelled" },
+};
+
+function StatusPill({ status }: { status: string }) {
+  const c = STATUS_PILLS[status] ?? { bg: "var(--primary-10)", fg: "var(--primary)", dot: "var(--primary)", label: status };
+  return (
+    <span className="pill" style={{ background: c.bg, color: c.fg }}>
+      <span className="pill-dot" style={{ background: c.dot }} />
+      {c.label}
+    </span>
+  );
+}
+
+function StarRow({ rating }: { rating: number }) {
+  return (
+    <span style={{ display: "inline-flex", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <Star
+          key={s}
+          size={13}
+          style={{ color: s <= Math.round(rating) ? "#f59e0b" : "#e5e7eb", fill: s <= Math.round(rating) ? "#f59e0b" : "#e5e7eb" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function AStatCard({ icon: Icon, label, value, hint, warn }: {
+  icon: React.ElementType; label: string; value: string; hint?: string; warn?: boolean;
+}) {
+  return (
+    <div className="astat" style={warn ? { borderLeft: "3px solid #d97706" } : {}}>
+      <div className="astat-head" style={warn ? { color: "#92400e" } : {}}>
+        <span>{label}</span>
+        <span className="astat-icon" style={warn ? { background: "#fffbeb", color: "#d97706" } : {}}>
+          <Icon size={15} />
+        </span>
+      </div>
+      <div className="astat-value" style={warn ? { color: "#92400e" } : {}}>{value}</div>
+      {hint && <div className="astat-delta">{hint}</div>}
+    </div>
+  );
+}
+
+function dateStr(iso: string) {
+  return new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function ClientDetailView({
   client,
   jobs,
   totals,
+  ratings = [],
 }: {
   client: ClientData;
   jobs: JobLite[];
   totals: Totals;
+  ratings?: RatingEntry[];
 }) {
   const [tab, setTab] = useState<TabKey>("history");
   const [editOpen, setEditOpen] = useState(false);
 
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, { variant: any; label: string }> = {
-      CREATED: { variant: "default", label: "Created" },
-      SCHEDULED: { variant: "warning", label: "Scheduled" },
-      IN_PROGRESS: { variant: "secondary", label: "In Progress" },
-      COMPLETED: { variant: "success", label: "Completed" },
-      PAID: { variant: "cleano", label: "Paid" },
-      CANCELLED: { variant: "error", label: "Cancelled" },
-    };
-    const c = map[status] || { variant: "default", label: status };
-    return (
-      <Badge variant={c.variant} size="sm">
-        {c.label}
-      </Badge>
-    );
-  };
+  const avgRating = ratings.length
+    ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length)
+    : null;
 
-  const MetricCard = ({ label, value }: { label: string; value: string }) => (
-    <Card variant="cleano_light" className="p-6 h-[7rem]">
-      <div className="h-full flex flex-col justify-between">
-        <span className="app-title-small !text-[#005F6A]/70">{label}</span>
-        <p className="h2-title text-[#005F6A]">{value}</p>
-      </div>
-    </Card>
-  );
+  const collectedPct = totals.totalRevenue > 0
+    ? Math.round((totals.totalPaid / totals.totalRevenue) * 100)
+    : 0;
 
   return (
-    <div className="max-w-[80rem] mx-auto space-y-6">
-      <Link href="/clients">
-        <Button
-          variant="default"
-          size="sm"
-          border={false}
-          className="mb-2 px-6 py-3">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Clients
-        </Button>
-      </Link>
+    <div className="admin-font stack-24">
+      <a href="/clients" className="link-muted" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+        <ArrowLeft size={14} /> Back to Clients
+      </a>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-        <div className="flex-1">
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-            {client.name}
-          </h1>
-          <div className="flex flex-wrap gap-4 text-sm text-[#005F6A]/70 mt-2">
-            {client.email && (
-              <span className="flex items-center gap-1">
-                <Mail className="w-4 h-4" />
-                {client.email}
-              </span>
-            )}
-            {client.phone && (
-              <span className="flex items-center gap-1">
-                <Phone className="w-4 h-4" />
-                {client.phone}
-              </span>
-            )}
-            {client.address && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {client.address}
-              </span>
-            )}
-            {client.discountPercent > 0 && (
-              <Badge variant="cleano" size="sm">
-                {client.discountPercent}% default discount
-              </Badge>
-            )}
+      <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <span
+            className="avatar-lg avatar"
+            style={{ background: avatarColor(client.name), fontSize: 18, flexShrink: 0 }}>
+            {initials(client.name)}
+          </span>
+          <div className="stack-8">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h1 className="display" style={{ fontSize: "clamp(24px,3vw,36px)" }}>{client.name}</h1>
+              {client.discountPercent > 0 && (
+                <span className="pill" style={{ background: "#fffbeb", color: "#92400e" }}>
+                  <span className="pill-dot" style={{ background: "#d97706" }} />
+                  {client.discountPercent}% discount
+                </span>
+              )}
+            </div>
+            <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
+              {client.email && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
+                  <Mail size={13} /> {client.email}
+                </span>
+              )}
+              {client.phone && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
+                  <Phone size={13} /> {client.phone}
+                </span>
+              )}
+              {client.address && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
+                  <MapPin size={13} /> {client.address}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          border={false}
-          onClick={() => setEditOpen(true)}
-          className="px-6 py-3">
-          <Pencil className="w-4 h-4 mr-2" />
-          Edit Client
-        </Button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditOpen(true)}>
+          <Pencil size={14} /> Edit Client
+        </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Total Jobs" value={String(totals.jobCount)} />
-        <MetricCard
-          label="Total Revenue"
-          value={`$${totals.totalRevenue.toFixed(2)}`}
+      <div className="astat-grid">
+        <AStatCard icon={Briefcase}  label="Total jobs"  value={String(totals.jobCount)} />
+        <AStatCard icon={DollarSign} label="Revenue"     value={`$${totals.totalRevenue.toFixed(0)}`} />
+        <AStatCard
+          icon={CreditCard} label="Collected"
+          value={`$${totals.totalPaid.toFixed(0)}`}
+          hint={`${collectedPct}% collected`}
         />
-        <MetricCard
-          label="Collected"
-          value={`$${totals.totalPaid.toFixed(2)}`}
-        />
-        <MetricCard
-          label="Unpaid"
-          value={`$${totals.unpaidAmount.toFixed(2)}`}
+        <AStatCard
+          icon={AlertTriangle} label="Unpaid"
+          value={`$${totals.unpaidAmount.toFixed(0)}`}
+          warn={totals.unpaidAmount > 0}
+          hint={totals.unpaidAmount > 0 ? "outstanding" : "all clear"}
         />
       </div>
 
       {/* Notes */}
       {client.notes && (
-        <Card variant="cleano_light" className="p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="w-4 h-4 text-[#005F6A]" />
-            <h3 className="text-sm font-[400] text-[#005F6A]">Notes</h3>
+        <div className="dcard">
+          <div className="dcard-head">
+            <h3>Notes</h3>
           </div>
-          <p className="text-sm text-[#005F6A]/80 whitespace-pre-wrap">
+          <p style={{ fontSize: 14, color: "var(--primary-70)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>
             {client.notes}
           </p>
-        </Card>
+        </div>
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 bg-[#005F6A]/5 rounded-2xl p-1 w-fit overflow-x-auto">
-        {[
-          {
-            id: "history" as TabKey,
-            label: "Job History",
-            icon: <Briefcase className="w-4 h-4" />,
-          },
-          {
-            id: "payments" as TabKey,
-            label: "Payments",
-            icon: <CreditCard className="w-4 h-4" />,
-          },
-          {
-            id: "ratings" as TabKey,
-            label: "Ratings",
-            icon: <Star className="w-4 h-4" />,
-          },
-        ].map((t) => (
-          <Button
-            key={t.id}
-            border={false}
-            onClick={() => setTab(t.id)}
-            variant={tab === t.id ? "action" : "ghost"}
-            size="md"
-            className="rounded-xl px-4 md:px-6 py-3 whitespace-nowrap">
-            <span className="mr-2 hidden sm:inline">{t.icon}</span>
-            {t.label}
-          </Button>
-        ))}
+      <div className="dtabs">
+        <button
+          type="button"
+          className={`dtab ${tab === "history" ? "active" : ""}`}
+          onClick={() => setTab("history")}>
+          <Briefcase size={14} />
+          Job history
+          {jobs.length > 0 && <span className="atab-count">{jobs.length}</span>}
+        </button>
+        <button
+          type="button"
+          className={`dtab ${tab === "payments" ? "active" : ""}`}
+          onClick={() => setTab("payments")}>
+          <CreditCard size={14} />
+          Payments
+        </button>
+        <button
+          type="button"
+          className={`dtab ${tab === "ratings" ? "active" : ""}`}
+          onClick={() => setTab("ratings")}>
+          <Star size={14} />
+          Ratings
+          {ratings.length > 0 && <span className="atab-count">{ratings.length}</span>}
+        </button>
       </div>
 
-      {/* History */}
+      {/* Job History */}
       {tab === "history" && (
-        <Card variant="default" className="p-6">
-          {jobs.length === 0 ? (
-            <div className="text-center py-12">
-              <Briefcase className="w-8 h-8 text-[#005F6A]/40 mx-auto mb-3" />
-              <p className="text-sm text-[#005F6A]/60">No jobs yet</p>
+        jobs.length === 0 ? (
+          <div className="atable-wrap" style={{ padding: "60px 40px", textAlign: "center", color: "var(--primary-60)" }}>
+            No jobs recorded for this client.
+          </div>
+        ) : (
+          <div className="atable-wrap">
+            <div className="atable-scroll">
+              <table className="atable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th className="num">Price</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.map(j => {
+                    const d = j.jobDate || j.startTime;
+                    return (
+                      <tr key={j.id} onClick={() => { window.location.href = `/jobs/${j.id}`; }}>
+                        <td className="col-date" style={{ minWidth: 130 }}>
+                          <div className="date-line">{dateStr(d)}</div>
+                        </td>
+                        <td>
+                          {j.jobType ? (
+                            <span className="pill" style={{ background: "var(--primary-10)", color: "var(--primary)" }}>
+                              {j.jobType}
+                            </span>
+                          ) : <span style={{ color: "var(--primary-40)" }}>—</span>}
+                        </td>
+                        <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", fontSize: 12, color: "var(--primary-70)" }}>
+                          {j.location || "—"}
+                        </td>
+                        <td><StatusPill status={j.status} /></td>
+                        <td className="num" style={{ fontWeight: 600, color: "var(--ink)" }}>
+                          {j.price ? `$${j.price.toFixed(0)}` : "—"}
+                        </td>
+                        <td>
+                          <span className="pay-icons">
+                            <span className={`pay-icon ${j.paymentReceived ? "paid" : "unpaid"}`} title={j.paymentReceived ? "Paid" : "Unpaid"}>$</span>
+                            <span className={`pay-icon ${j.invoiceSent ? "sent" : "unsent"}`} title={j.invoiceSent ? "Invoice sent" : "No invoice"}>✉</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {jobs.map((j) => (
-                <Link
-                  key={j.id}
-                  href={`/jobs/${j.id}`}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[#005F6A]/5 hover:bg-[#005F6A]/10 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-[400] text-[#005F6A]">
-                        {j.jobDate
-                          ? new Date(j.jobDate).toLocaleDateString("en-US")
-                          : new Date(j.startTime).toLocaleDateString("en-US")}
-                      </span>
-                      {getStatusBadge(j.status)}
-                      {j.jobType && (
-                        <Badge variant="cleano" size="sm">
-                          {j.jobType}
-                        </Badge>
-                      )}
-                    </div>
-                    {j.location && (
-                      <p className="text-xs text-[#005F6A]/60 mt-1">
-                        {j.location}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-[400] text-[#005F6A]">
-                      {j.price ? `$${j.price.toFixed(2)}` : "—"}
-                    </p>
-                    {j.discountAmount && j.discountAmount > 0 && (
-                      <p className="text-xs text-yellow-600">
-                        −${j.discountAmount.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+          </div>
+        )
       )}
 
       {/* Payments */}
-      {tab === "payments" && (
-        <Card variant="default" className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CreditCard className="w-4 h-4 text-[#005F6A]" />
-            <h3 className="text-sm font-[400] text-[#005F6A]">
-              Payment History
-            </h3>
+      {tab === "payments" && (() => {
+        const paid = jobs.filter(j => j.paymentReceived);
+        return paid.length === 0 ? (
+          <div className="atable-wrap" style={{ padding: "60px 40px", textAlign: "center", color: "var(--primary-60)" }}>
+            No payments recorded.
           </div>
-          {jobs.filter((j) => j.paymentReceived).length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-[#005F6A]/60">
-                No payments recorded yet
-              </p>
+        ) : (
+          <div className="atable-wrap">
+            <div className="atable-scroll">
+              <table className="atable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Job</th>
+                    <th className="num">Amount</th>
+                    <th>Payment type</th>
+                    <th>Received</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paid.map(j => {
+                    const d = j.jobDate || j.startTime;
+                    return (
+                      <tr key={j.id} onClick={() => { window.location.href = `/jobs/${j.id}`; }}>
+                        <td className="col-date" style={{ minWidth: 130 }}>
+                          <div className="date-line">{dateStr(d)}</div>
+                        </td>
+                        <td>
+                          <a href={`/jobs/${j.id}`} className="link" onClick={e => e.stopPropagation()} style={{ fontSize: 13 }}>
+                            View job
+                          </a>
+                        </td>
+                        <td className="num" style={{ fontWeight: 600, color: "#059669" }}>
+                          +${(j.price || 0).toFixed(0)}
+                        </td>
+                        <td>
+                          {j.paymentType ? (
+                            <span className="pill" style={{ background: "var(--primary-10)", color: "var(--primary)" }}>
+                              {j.paymentType}
+                            </span>
+                          ) : <span style={{ color: "var(--primary-40)" }}>—</span>}
+                        </td>
+                        <td>
+                          <span className="pay-icon paid">✓</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {jobs
-                .filter((j) => j.paymentReceived)
-                .map((j) => (
-                  <div
-                    key={j.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-green-50">
-                    <div className="flex-1">
-                      <p className="text-sm text-[#005F6A]">
-                        {j.jobDate
-                          ? new Date(j.jobDate).toLocaleDateString("en-US")
-                          : new Date(j.startTime).toLocaleDateString("en-US")}
-                      </p>
-                      {j.paymentType && (
-                        <p className="text-xs text-[#005F6A]/60">
-                          {j.paymentType}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-sm font-[400] text-green-700">
-                      +${(j.price || 0).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          )}
-        </Card>
-      )}
+          </div>
+        );
+      })()}
 
       {/* Ratings */}
       {tab === "ratings" && (
-        <Card variant="default" className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Star className="w-4 h-4 text-[#005F6A]" />
-            <h3 className="text-sm font-[400] text-[#005F6A]">
-              Ratings & Reviews
-            </h3>
+        ratings.length === 0 ? (
+          <div className="atable-wrap" style={{ padding: "60px 40px", textAlign: "center", color: "var(--primary-60)" }}>
+            <Star size={32} style={{ color: "var(--primary-30)", margin: "0 auto 12px" }} />
+            <p style={{ margin: 0 }}>No ratings yet for this client.</p>
+            <p style={{ margin: "6px 0 0", fontSize: 12 }}>Ratings are submitted by clients via the post-job review link.</p>
           </div>
-          <div className="text-center py-8">
-            <Star className="w-8 h-8 text-[#005F6A]/40 mx-auto mb-3" />
-            <p className="text-sm text-[#005F6A]/60">
-              Rating system coming soon
-            </p>
+        ) : (
+          <div className="stack-16">
+            {/* Rating hero */}
+            <div style={{
+              background: "linear-gradient(135deg, #004952 0%, #005F6A 60%, #007a88 100%)",
+              borderRadius: 16, padding: "28px 32px",
+              display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
+            }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 52, fontWeight: 400, color: "#fff", lineHeight: 1 }}>
+                  {avgRating!.toFixed(1)}
+                </div>
+                <StarRow rating={avgRating!} />
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
+                {ratings.length} review{ratings.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+
+            {ratings.map(r => (
+              <div key={r.id} className="dcard">
+                <div className="dcard-head">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span className="avatar" style={{ background: avatarColor(r.employee.name), fontSize: 11, width: 32, height: 32 }}>
+                      {initials(r.employee.name)}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>{r.employee.name}</div>
+                      {r.job && (
+                        <a href={`/jobs/${r.job.id}`} className="link-muted" style={{ fontSize: 11 }}>
+                          Job #{r.job.jobNumber}{r.job.jobDate ? ` · ${dateStr(r.job.jobDate)}` : ""}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <StarRow rating={r.rating} />
+                    <div style={{ fontSize: 11, color: "var(--primary-50)", marginTop: 4 }}>
+                      {dateStr(r.createdAt)}
+                    </div>
+                  </div>
+                </div>
+                {r.notes && (
+                  <blockquote style={{
+                    margin: 0, padding: "12px 16px",
+                    borderLeft: "3px solid var(--primary-20)",
+                    background: "var(--primary-5)",
+                    borderRadius: "0 8px 8px 0",
+                    fontSize: 13, color: "var(--primary-70)", fontStyle: "italic", lineHeight: 1.6,
+                  }}>
+                    {r.notes}
+                  </blockquote>
+                )}
+              </div>
+            ))}
           </div>
-        </Card>
+        )
       )}
 
       <ClientModal

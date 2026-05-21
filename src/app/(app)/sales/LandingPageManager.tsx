@@ -7,6 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { createLandingPage, updateLandingPage, deleteLandingPage } from "@/app/(app)/actions/createLandingPage";
 import {
   Globe,
@@ -51,6 +52,7 @@ export default function LandingPageManager({
   const [editingPage, setEditingPage] = useState<LandingPage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,6 +95,7 @@ export default function LandingPageManager({
           size="sm"
           onClick={() => {
             setEditingPage(null);
+            setCampaignId("");
             setShowModal(true);
           }}>
           <Plus className="w-4 h-4 mr-1" />
@@ -165,6 +168,7 @@ export default function LandingPageManager({
                     size="sm"
                     onClick={() => {
                       setEditingPage(page);
+                      setCampaignId(page.campaignId || "");
                       setShowModal(true);
                     }}>
                     <Pencil className="w-4 h-4" />
@@ -188,6 +192,7 @@ export default function LandingPageManager({
         onClose={() => {
           setShowModal(false);
           setEditingPage(null);
+          setCampaignId("");
           setError(null);
         }}
         title={editingPage ? "Edit Landing Page" : "New Landing Page"}>
@@ -267,17 +272,17 @@ export default function LandingPageManager({
             <label className="block text-sm font-[350] text-gray-700 mb-1">
               Campaign
             </label>
-            <select
+            <PremiumSelect
               name="campaignId"
-              defaultValue={editingPage?.campaignId || ""}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 focus:border-[#005F6A]">
-              <option value="">No campaign</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              value={campaignId}
+              onChange={setCampaignId}
+              options={[
+                { value: "", label: "No campaign" },
+                ...campaigns.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder="No campaign"
+              size="md"
+            />
           </div>
 
           <div className="flex items-center gap-2">

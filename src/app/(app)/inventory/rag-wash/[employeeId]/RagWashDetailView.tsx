@@ -7,6 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import DatePicker from "@/components/ui/DatePicker";
 import { createRagWash } from "../../../actions/createRagWash";
 import { updateRagWash, deleteRagWash } from "../../../actions/updateRagWash";
 import {
@@ -133,12 +134,9 @@ export default function RagWashDetailView({
         <label className="input-label !text-[#005F6A]/70 mb-1 block">
           Wash Date
         </label>
-        <Input
-          type="date"
+        <DatePicker
           value={washDate}
-          onChange={(e) => setWashDate(e.target.value)}
-          variant="form"
-          border={false}
+          onChange={setWashDate}
           size="md"
         />
       </div>

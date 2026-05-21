@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, MessageCircle } from "lucide-react";
 import NavLink from "./NavLink";
 import UserActions from "./UserActions";
+import { getUnreadChatCount } from "./chat/actions";
 
 interface User {
   id: string;
@@ -31,6 +32,11 @@ export default function Sidebar({
   const [hovered, setHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const [chatUnread, setChatUnread] = useState(0);
+  const [chatToast, setChatToast] = useState<{ senderName: string; body: string } | null>(null);
+  const prevLatestAtRef = useRef<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathnameRef = useRef(pathname);
 
   // Close mobile drawer on navigation
   useEffect(() => {
@@ -56,6 +62,54 @@ export default function Sidebar({
       document.body.style.overflow = original;
     };
   }, [mobileOpen]);
+
+  // Keep pathname ref current; dismiss toast when user opens chat
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    if (pathname.startsWith("/chat")) {
+      setChatToast(null);
+    }
+  }, [pathname]);
+
+  // Poll for unread chat count and show toast on new messages
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const { count, latest } = await getUnreadChatCount();
+        if (cancelled) return;
+
+        setChatUnread(count);
+
+        const latestAt = latest?.at ?? "";
+        const isInitialized = prevLatestAtRef.current !== null;
+        const hasNew =
+          isInitialized &&
+          latestAt !== "" &&
+          latestAt !== prevLatestAtRef.current;
+
+        if (hasNew && !pathnameRef.current.startsWith("/chat")) {
+          setChatToast({ senderName: latest!.senderName, body: latest!.body });
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setChatToast(null), 5000);
+        }
+
+        prevLatestAtRef.current = latestAt;
+      } catch {
+        // ignore transient errors
+      }
+    }
+
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   // Whether labels are visible. Drives NavLink/UserActions content.
   const expanded = hovered || mobileOpen;
@@ -197,7 +251,7 @@ export default function Sidebar({
                 <NavLink href="/documents" icon="documents" expanded={expanded}>
                   Documents
                 </NavLink>
-                <NavLink href="/chat" icon="chat" expanded={expanded}>
+                <NavLink href="/chat" icon="chat" expanded={expanded} badge={chatUnread}>
                   Chat
                 </NavLink>
               </>
@@ -227,7 +281,7 @@ export default function Sidebar({
                 <NavLink href="/documents" icon="documents" expanded={expanded}>
                   Documents
                 </NavLink>
-                <NavLink href="/chat" icon="chat" expanded={expanded}>
+                <NavLink href="/chat" icon="chat" expanded={expanded} badge={chatUnread}>
                   Chat
                 </NavLink>
               </>
@@ -252,6 +306,76 @@ export default function Sidebar({
       <div className="ml-0 md:ml-[5.5rem] h-screen overflow-hidden overflow-y-auto print:!ml-0 print:!h-auto print:!overflow-visible">
         <main className="h-full bg-white print:!h-auto">{children}</main>
       </div>
+
+      {/* Chat notification toast */}
+      {chatToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 300,
+            maxWidth: 340,
+            width: "calc(100vw - 48px)",
+            animation: "chat-toast-in 0.25s ease-out",
+          }}>
+          <style>{`
+            @keyframes chat-toast-in {
+              from { opacity: 0; transform: translateY(12px) scale(0.97); }
+              to   { opacity: 1; transform: translateY(0)    scale(1); }
+            }
+          `}</style>
+          <div style={{
+            background: "#005F6A",
+            borderRadius: 16,
+            boxShadow: "0 8px 32px rgba(0,95,106,0.35), 0 2px 8px rgba(0,0,0,0.12)",
+            padding: "14px 16px",
+            display: "flex",
+            gap: 12,
+            alignItems: "flex-start",
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              <MessageCircle size={18} color="#fff" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {chatToast.senderName}
+              </p>
+              <p style={{
+                fontSize: 12, color: "rgba(255,255,255,0.75)", margin: "3px 0 8px",
+                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>
+                {chatToast.body}
+              </p>
+              <a
+                href="/chat"
+                style={{
+                  fontSize: 12, fontWeight: 600, color: "#fff",
+                  textDecoration: "none", opacity: 0.9,
+                }}
+                onClick={() => setChatToast(null)}>
+                Open Chat →
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setChatToast(null)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                padding: 4, color: "rgba(255,255,255,0.6)", flexShrink: 0,
+                display: "flex", alignItems: "center",
+              }}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

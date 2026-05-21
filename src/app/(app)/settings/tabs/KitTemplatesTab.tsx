@@ -6,6 +6,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { createKitTemplate } from "../../actions/createKitTemplate";
 import { updateKitTemplate } from "../../actions/updateKitTemplate";
 import { deleteKitTemplate } from "../../actions/deleteKitTemplate";
@@ -15,7 +16,6 @@ import {
   Field,
   Feedback,
   Msg,
-  themedSelectClass,
 } from "./_shared";
 
 interface KitTemplatesTabProps {
@@ -268,19 +268,15 @@ export default function KitTemplatesTab({
                 <div
                   key={idx}
                   className="grid grid-cols-[2fr_1fr_auto] gap-2 items-center">
-                  <select
+                  <PremiumSelect
                     value={item.productId}
-                    onChange={(e) =>
-                      updateItem(idx, { productId: e.target.value })
-                    }
-                    className={themedSelectClass}>
-                    <option value="">Select product...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => updateItem(idx, { productId: v })}
+                    options={[
+                      { value: "", label: "Select product..." },
+                      ...products.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
+                    size="sm"
+                  />
                   <Input
                     variant="form"
                     type="number"

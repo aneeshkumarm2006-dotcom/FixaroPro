@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { X, Plus, Trash2, Loader } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import { createInvoice } from "../actions/createInvoice";
 
 interface ClientOption {
@@ -165,30 +167,29 @@ export default function CreateInvoiceModal({
           {/* Client */}
           <div>
             <label className="input-label !text-[#005F6A]/70 block mb-1.5">Client</label>
-            <select
+            <PremiumSelect
               value={clientId}
-              onChange={(e) => {
-                setClientId(e.target.value);
+              onChange={(v) => {
+                setClientId(v);
                 setDiscountTouched(false);
               }}
-              className="w-full h-[42px] px-3 py-2 text-sm bg-[#005F6A]/5 text-[#005F6A] rounded-2xl border-0 outline-none">
-              <option value="">Select a client...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "Select a client..." },
+                ...clients.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder="Select a client..."
+              searchable
+              size="md"
+            />
           </div>
 
           {/* Due Date */}
           <div>
             <label className="input-label !text-[#005F6A]/70 block mb-1.5">Due Date</label>
-            <Input
-              type="date"
+            <DatePicker
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              variant="form"
-              border={false}
-              className="h-[42px]"
+              onChange={setDueDate}
+              size="md"
             />
           </div>
 

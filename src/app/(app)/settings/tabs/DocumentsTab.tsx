@@ -14,6 +14,8 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import { createDocument } from "../../actions/createDocument";
 import { assignDocument } from "../../actions/assignDocument";
 import { deleteDocument } from "../../actions/deleteDocument";
@@ -420,13 +422,12 @@ export default function DocumentsTab({ documents, users }: DocumentsTabProps) {
               />
             </Field>
             <Field label="Due Date" hint="Optional.">
-              <input
-                type="date"
+              <DatePicker
                 value={draft.dueDate}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, dueDate: e.target.value }))
+                onChange={(v) =>
+                  setDraft((prev) => ({ ...prev, dueDate: v }))
                 }
-                className={themedInputClass}
+                size="sm"
               />
             </Field>
           </div>
@@ -489,19 +490,21 @@ export default function DocumentsTab({ documents, users }: DocumentsTabProps) {
           )}
 
           <Field label="Assign to">
-            <select
+            <PremiumSelect
               value={draft.assignMode}
-              onChange={(e) =>
+              onChange={(v) =>
                 setDraft((prev) => ({
                   ...prev,
-                  assignMode: e.target.value as AssignMode,
+                  assignMode: v as AssignMode,
                 }))
               }
-              className={themedSelectClass}>
-              <option value="ALL">All employees</option>
-              <option value="ROLES">Specific roles</option>
-              <option value="USERS">Specific users</option>
-            </select>
+              options={[
+                { value: "ALL", label: "All employees" },
+                { value: "ROLES", label: "Specific roles" },
+                { value: "USERS", label: "Specific users" },
+              ]}
+              size="sm"
+            />
           </Field>
 
           {draft.assignMode === "ROLES" && (
@@ -577,16 +580,16 @@ export default function DocumentsTab({ documents, users }: DocumentsTabProps) {
         {assignDoc && (
           <div className="space-y-4">
             <Field label="Assign to">
-              <select
+              <PremiumSelect
                 value={assignMode}
-                onChange={(e) =>
-                  setAssignMode(e.target.value as AssignMode)
-                }
-                className={themedSelectClass}>
-                <option value="ALL">All employees</option>
-                <option value="ROLES">Specific roles</option>
-                <option value="USERS">Specific users</option>
-              </select>
+                onChange={(v) => setAssignMode(v as AssignMode)}
+                options={[
+                  { value: "ALL", label: "All employees" },
+                  { value: "ROLES", label: "Specific roles" },
+                  { value: "USERS", label: "Specific users" },
+                ]}
+                size="sm"
+              />
             </Field>
 
             {assignMode === "ROLES" && (

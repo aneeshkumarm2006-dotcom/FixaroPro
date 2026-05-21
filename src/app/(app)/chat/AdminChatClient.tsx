@@ -1,43 +1,71 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, MessageCircle, User as UserIcon, Search } from "lucide-react";
+import { Send, Search, Phone, MoreHorizontal, Paperclip, Smile, User as UserIcon, MessageCircle } from "lucide-react";
 import useSWR from "swr";
-import {
-  getAdminChat,
-  getAdminChatList,
-  sendChatMessage,
-} from "./actions";
-import type {
-  AdminChatPayload,
-  AdminConversationSummary,
-} from "./types";
+import { getAdminChat, getAdminChatList, sendChatMessage } from "./actions";
+import type { AdminChatPayload, AdminConversationSummary } from "./types";
 import MessageBubble from "./MessageBubble";
 
 interface AdminChatClientProps {
   initialList: AdminConversationSummary[];
 }
 
+// Deterministic color per employee name
+const AVATAR_COLORS = ["#005F6A","#0284c7","#7c3aed","#d97706","#dc2626","#059669","#be185d","#0891b2"];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
+}
+
 function formatRelative(iso: string | null) {
   if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.round(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function timeOnly(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function dayLabel(d: Date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const t = new Date(d); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - t.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function groupByDay(messages: AdminChatPayload["messages"]) {
+  const groups: { label: string; messages: AdminChatPayload["messages"] }[] = [];
+  let currentKey = "";
+  for (const m of messages) {
+    const d = new Date(m.createdAt);
+    const key = d.toDateString();
+    if (key !== currentKey) {
+      currentKey = key;
+      groups.push({ label: dayLabel(d), messages: [m] });
+    } else {
+      groups[groups.length - 1].messages.push(m);
+    }
   }
-  const diff = now.getTime() - d.getTime();
-  const day = 24 * 60 * 60 * 1000;
-  if (diff < 7 * day) {
-    return d.toLocaleDateString(undefined, { weekday: "short" });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return groups;
 }
 
 export default function AdminChatClient({ initialList }: AdminChatClientProps) {
@@ -47,7 +75,9 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: list, mutate: mutateList } = useSWR<AdminConversationSummary[]>(
     "admin-chat-list",
@@ -56,11 +86,7 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
       if (!res.success) throw new Error(res.error);
       return res.data;
     },
-    {
-      fallbackData: initialList,
-      refreshInterval: 5000,
-      revalidateOnFocus: true,
-    }
+    { fallbackData: initialList, refreshInterval: 5000, revalidateOnFocus: true }
   );
 
   const { data: chat, mutate: mutateChat } = useSWR<AdminChatPayload | null>(
@@ -71,23 +97,17 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
       if (!res.success) throw new Error(res.error);
       return res.data;
     },
-    {
-      refreshInterval: 3000,
-      revalidateOnFocus: true,
-    }
+    { refreshInterval: 3000, revalidateOnFocus: true }
   );
 
   const filteredList = useMemo(() => {
     const q = search.trim().toLowerCase();
     const items = list ?? [];
     if (!q) return items;
-    return items.filter((s) => s.employeeName.toLowerCase().includes(q));
+    return items.filter(s => s.employeeName.toLowerCase().includes(q));
   }, [list, search]);
 
-  const totalUnread = useMemo(
-    () => (list ?? []).reduce((acc, s) => acc + s.unreadFromEmployee, 0),
-    [list]
-  );
+  const grouped = useMemo(() => groupByDay(chat?.messages ?? []), [chat?.messages]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -98,201 +118,251 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
   async function handleSend() {
     const body = draft.trim();
     if (!body || !chat?.conversationId || sending) return;
+    setSendError(null);
     setSending(true);
     setDraft("");
+
+    // Optimistic update
+    const optimisticMsg = {
+      id: `optimistic-${Date.now()}`,
+      conversationId: chat.conversationId,
+      senderId: "me",
+      senderName: "You",
+      senderRole: "ADMIN" as const,
+      body,
+      createdAt: new Date().toISOString(),
+      readByAdminAt: new Date().toISOString(),
+      readByEmployeeAt: null,
+    };
+    await mutateChat(
+      (current) => current
+        ? { ...current, messages: [...current.messages, optimisticMsg] }
+        : current,
+      { revalidate: false }
+    );
+
     const res = await sendChatMessage(chat.conversationId, body);
     setSending(false);
     if (!res.success) {
       setDraft(body);
+      setSendError(res.error);
+      await mutateChat();
       return;
     }
     await Promise.all([mutateChat(), mutateList()]);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setDraft(e.target.value);
+    const t = e.target;
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight, 120) + "px";
+  }
+
+  const selectedConv = (list ?? []).find(s => s.employeeId === selectedEmployeeId);
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-6 sm:px-8 pt-6 pb-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-              Chat
+    <div className="h-full flex flex-col admin-font">
+      {/* Page header */}
+      <div style={{ padding: "32px 32px 24px", flexShrink: 0 }}>
+        <div className="row-between" style={{ alignItems: "flex-end", gap: 16 }}>
+          <div className="stack-8">
+            <p className="eyebrow">Communication</p>
+            <h1 className="display" style={{ fontSize: "clamp(34px,4vw,48px)" }}>
+              Team <em style={{ fontStyle: "italic", color: "var(--primary)" }}>chat.</em>
             </h1>
-            <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
-              Direct messages with your employees
+            <p style={{ fontSize: 14, color: "var(--primary-60)", margin: 0 }}>
+              Direct messages with cleaners. Coordinate jobs, share notes, and stay in touch.
             </p>
           </div>
-          {totalUnread > 0 && (
-            <div className="px-3 py-1.5 rounded-full bg-[#005F6A] text-white text-xs font-[400]">
-              {totalUnread} unread
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 px-6 sm:px-8 pb-6">
-        <div className="h-full flex gap-4 rounded-2xl border border-[#005F6A]/10 bg-white overflow-hidden">
-          {/* Sidebar */}
-          <aside className="w-72 flex-shrink-0 flex flex-col border-r border-[#005F6A]/10">
-            <div className="p-3 border-b border-[#005F6A]/10">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#005F6A]/40" />
+      {/* Chat shell */}
+      <div style={{ flex: 1, minHeight: 0, padding: "0 32px 32px" }}>
+        <div className="chat-shell">
+          {/* Conversation list */}
+          <aside className="chat-list">
+            <div className="chat-list-head">
+              <div className="chat-list-title">
+                <span>Conversations · {(list ?? []).length}</span>
+              </div>
+              <div className="chat-list-search">
+                <span className="chat-list-search-icon"><Search size={14} /></span>
                 <input
+                  className="input"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={e => setSearch(e.target.value)}
                   placeholder="Search employees…"
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-xl bg-[#005F6A]/5 text-[#005F6A] placeholder:text-[#005F6A]/40 outline-none focus:bg-[#005F6A]/8"
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="chat-list-body">
               {filteredList.length === 0 ? (
-                <p className="p-4 text-xs text-[#005F6A]/50 text-center">
-                  No employees yet.
-                </p>
-              ) : (
-                <ul>
-                  {filteredList.map((s) => {
-                    const active = s.employeeId === selectedEmployeeId;
-                    const previewPrefix =
-                      s.lastSenderRole === "ADMIN" ? "You: " : "";
-                    return (
-                      <li key={s.conversationId}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedEmployeeId(s.employeeId)}
-                          className={`w-full text-left px-3 py-3 flex items-start gap-3 border-b border-[#005F6A]/5 transition-colors ${
-                            active
-                              ? "bg-[#005F6A]/8"
-                              : "hover:bg-[#005F6A]/5"
-                          }`}>
-                          <div className="w-9 h-9 rounded-full bg-[#005F6A]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {s.employeeImage ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={s.employeeImage}
-                                alt={s.employeeName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <UserIcon className="w-4 h-4 text-[#005F6A]/60" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span
-                                className={`text-sm truncate ${
-                                  s.unreadFromEmployee > 0
-                                    ? "font-[500] text-[#005F6A]"
-                                    : "font-[400] text-[#005F6A]"
-                                }`}>
-                                {s.employeeName}
-                              </span>
-                              <span className="text-[10px] text-[#005F6A]/50 flex-shrink-0">
-                                {formatRelative(s.lastMessageAt)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 mt-0.5">
-                              <span className="text-xs text-[#005F6A]/60 truncate">
-                                {s.lastMessageBody
-                                  ? `${previewPrefix}${s.lastMessageBody}`
-                                  : "No messages yet"}
-                              </span>
-                              {s.unreadFromEmployee > 0 && (
-                                <span className="text-[10px] font-[500] bg-[#005F6A] text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0">
-                                  {s.unreadFromEmployee}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                <div className="chat-list-empty">No conversations found.</div>
+              ) : filteredList.map(s => {
+                const active = s.employeeId === selectedEmployeeId;
+                const preview = s.lastMessageBody
+                  ? `${s.lastSenderRole === "ADMIN" ? "You: " : ""}${s.lastMessageBody}`
+                  : "No messages yet";
+                const isUnread = s.unreadFromEmployee > 0;
+                const color = avatarColor(s.employeeName);
+                const inits = initials(s.employeeName);
+
+                return (
+                  <div
+                    key={s.conversationId}
+                    className={`chat-row${active ? " active" : ""}`}
+                    onClick={() => setSelectedEmployeeId(s.employeeId)}>
+                    <div className="chat-avatar-wrap">
+                      <span style={{
+                        width: 40, height: 40, borderRadius: "50%",
+                        background: color, color: "#fff",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, fontWeight: 600, flexShrink: 0,
+                      }}>
+                        {inits}
+                      </span>
+                      <span className="chat-status-dot offline" />
+                    </div>
+                    <div className="chat-row-meta">
+                      <div className="chat-row-name">{s.employeeName}</div>
+                      <div className={`chat-row-preview${isUnread ? " unread" : ""}`}>
+                        {preview}
+                      </div>
+                    </div>
+                    <div className="chat-row-right">
+                      {s.lastMessageAt && (
+                        <span className="chat-row-time">{formatRelative(s.lastMessageAt)}</span>
+                      )}
+                      {isUnread && (
+                        <span className="chat-row-badge">{s.unreadFromEmployee}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </aside>
 
           {/* Thread */}
-          <section className="flex-1 min-w-0 flex flex-col">
-            {!chat ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-                <div className="p-3 bg-[#005F6A]/10 rounded-2xl mb-3">
-                  <MessageCircle className="w-6 h-6 text-[#005F6A]" />
+          <section className="chat-thread">
+            {!chat || !selectedConv ? (
+              <div className="chat-thread-empty" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: "rgba(0,95,106,0.06)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  marginBottom: 14,
+                }}>
+                  <MessageCircle size={24} color="var(--primary-40)" />
                 </div>
-                <p className="text-sm text-[#005F6A]/60">
+                <p style={{ fontSize: 14, color: "var(--primary-60)", margin: 0, fontWeight: 500 }}>
                   Select an employee to start chatting.
                 </p>
               </div>
             ) : (
               <>
-                <header className="px-5 py-3 border-b border-[#005F6A]/10 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#005F6A]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {chat.employeeImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={chat.employeeImage}
-                        alt={chat.employeeName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon className="w-4 h-4 text-[#005F6A]/60" />
-                    )}
+                {/* Thread header */}
+                <div className="chat-thread-head">
+                  <div className="chat-avatar-wrap">
+                    <span style={{
+                      width: 44, height: 44, borderRadius: "50%",
+                      background: avatarColor(selectedConv.employeeName), color: "#fff",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 15, fontWeight: 600, flexShrink: 0,
+                    }}>
+                      {selectedConv.employeeImage
+                        ? <img src={selectedConv.employeeImage} alt={selectedConv.employeeName} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                        : initials(selectedConv.employeeName)
+                      }
+                    </span>
+                    <span className="chat-status-dot offline" style={{ width: 12, height: 12 }} />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="text-base font-[400] text-[#005F6A] truncate">
-                      {chat.employeeName}
-                    </h2>
-                    <p className="text-[11px] text-[#005F6A]/50">Employee</p>
+                  <div className="thread-meta">
+                    <div className="thread-name">{selectedConv.employeeName}</div>
+                    <div className="thread-role">Employee</div>
                   </div>
-                </header>
+                  <div className="thread-actions">
+                    <button className="chat-icon-btn" aria-label="More options">
+                      <MoreHorizontal size={16} />
+                    </button>
+                  </div>
+                </div>
 
-                <div
-                  ref={scrollRef}
-                  className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
-                  {chat.messages.length === 0 ? (
-                    <div className="h-full flex items-center justify-center">
-                      <p className="text-sm text-[#005F6A]/50">
-                        No messages yet. Send the first one.
-                      </p>
+                {/* Messages */}
+                <div ref={scrollRef} className="chat-thread-body">
+                  {grouped.length === 0 ? (
+                    <div style={{ margin: "auto", textAlign: "center", color: "var(--primary-50)" }}>
+                      <p style={{ fontSize: 13 }}>No messages yet. Send the first one.</p>
                     </div>
                   ) : (
-                    chat.messages.map((m) => (
-                      <MessageBubble
-                        key={m.id}
-                        message={m}
-                        isMine={m.senderRole === "ADMIN"}
-                      />
+                    grouped.map((group, gi) => (
+                      <div key={gi}>
+                        <div className="chat-day-divider">{group.label}</div>
+                        {group.messages.map((m) => {
+                          const mine = m.senderRole === "ADMIN";
+                          return (
+                            <div key={m.id} className={`chat-msg ${mine ? "mine" : "theirs"}`} style={{ marginTop: 4 }}>
+                              <div className="chat-msg-bubble">
+                                <div>{m.body}</div>
+                                <div className="chat-msg-time">
+                                  {timeOnly(m.createdAt)}
+                                  {mine && (
+                                    <svg width="11" height="8" viewBox="0 0 11 8" fill="none" style={{ opacity: 0.8 }}>
+                                      <path d="M1 4l2.5 2.5L6 4m2-3L5.5 6.5 10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ))
                   )}
                 </div>
 
-                <div className="px-5 py-3 border-t border-[#005F6A]/10">
-                  <div className="flex items-end gap-2">
+                {/* Composer */}
+                <div className="chat-composer">
+                  {sendError && (
+                    <div style={{
+                      fontSize: 12, color: "#dc2626",
+                      background: "#fef2f2", border: "1px solid #fecaca",
+                      borderRadius: 8, padding: "6px 12px", marginBottom: 10,
+                    }}>
+                      Failed to send: {sendError}
+                    </div>
+                  )}
+                  <div className="chat-composer-row">
+                    <button className="chat-icon-btn" aria-label="Attach file" style={{ padding: "6px" }}>
+                      <Paperclip size={17} />
+                    </button>
                     <textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={handleKeyDown}
+                      ref={textareaRef}
                       rows={1}
-                      placeholder="Type a message…"
-                      className="flex-1 resize-none rounded-2xl bg-[#005F6A]/5 hover:bg-[#005F6A]/7 focus:bg-white focus:outline focus:outline-1 focus:outline-[#005F6A]/30 px-4 py-3 text-sm text-[#005F6A] placeholder:text-[#005F6A]/40 max-h-32"
+                      value={draft}
+                      onChange={handleChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder={`Message ${selectedConv.employeeName}…`}
                     />
+                    <button className="chat-icon-btn" aria-label="Emoji" style={{ padding: "6px" }}>
+                      <Smile size={17} />
+                    </button>
                     <button
-                      type="button"
+                      className="chat-send"
                       onClick={handleSend}
                       disabled={sending || draft.trim().length === 0}
-                      className="p-3 rounded-2xl bg-[#005F6A] text-white disabled:opacity-40 hover:bg-[#005F6A]/90 transition-colors">
-                      <Send className="w-4 h-4" />
+                      aria-label="Send">
+                      <Send size={14} />
                     </button>
                   </div>
+                  <div className="chat-composer-hint">⏎ to send · ⇧⏎ for new line</div>
                 </div>
               </>
             )}

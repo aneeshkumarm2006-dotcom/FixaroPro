@@ -1,23 +1,52 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Send, Shield } from "lucide-react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Send, Paperclip, Smile, Phone, MoreHorizontal, Shield, Briefcase } from "lucide-react";
 import useSWR from "swr";
-import {
-  getEmployeeChat,
-  sendChatMessage,
-} from "./actions";
+import { getEmployeeChat, sendChatMessage } from "./actions";
 import type { EmployeeChatPayload } from "./types";
-import MessageBubble from "./MessageBubble";
 
 interface EmployeeChatClientProps {
   initial: EmployeeChatPayload;
+  userName?: string;
 }
 
-export default function EmployeeChatClient({ initial }: EmployeeChatClientProps) {
+function timeOnly(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function dayLabel(d: Date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const t = new Date(d); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - t.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function groupByDay(messages: EmployeeChatPayload["messages"]) {
+  const groups: { label: string; messages: EmployeeChatPayload["messages"] }[] = [];
+  let currentKey = "";
+  for (const m of messages) {
+    const d = new Date(m.createdAt);
+    const key = d.toDateString();
+    if (key !== currentKey) {
+      currentKey = key;
+      groups.push({ label: dayLabel(d), messages: [m] });
+    } else {
+      groups[groups.length - 1].messages.push(m);
+    }
+  }
+  return groups;
+}
+
+export default function EmployeeChatClient({ initial, userName }: EmployeeChatClientProps) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data, mutate } = useSWR<EmployeeChatPayload>(
     "employee-chat",
@@ -26,15 +55,12 @@ export default function EmployeeChatClient({ initial }: EmployeeChatClientProps)
       if (!res.success) throw new Error(res.error);
       return res.data;
     },
-    {
-      fallbackData: initial,
-      refreshInterval: 3000,
-      revalidateOnFocus: true,
-    }
+    { fallbackData: initial, refreshInterval: 3000, revalidateOnFocus: true }
   );
 
   const messages = data?.messages ?? [];
   const conversationId = data?.conversationId ?? initial.conversationId;
+  const grouped = useMemo(() => groupByDay(messages), [messages]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -45,75 +71,201 @@ export default function EmployeeChatClient({ initial }: EmployeeChatClientProps)
   async function handleSend() {
     const body = draft.trim();
     if (!body || !conversationId || sending) return;
+    setSendError(null);
     setSending(true);
     setDraft("");
+
+    // Optimistic update — append message immediately so the UI doesn't feel slow
+    const optimisticMsg = {
+      id: `optimistic-${Date.now()}`,
+      conversationId,
+      senderId: "me",
+      senderName: userName ?? "You",
+      senderRole: "EMPLOYEE" as const,
+      body,
+      createdAt: new Date().toISOString(),
+      readByAdminAt: null,
+      readByEmployeeAt: new Date().toISOString(),
+    };
+    await mutate(
+      (current) => current
+        ? { ...current, messages: [...current.messages, optimisticMsg] }
+        : current,
+      { revalidate: false }
+    );
+
     const res = await sendChatMessage(conversationId, body);
     setSending(false);
     if (!res.success) {
       setDraft(body);
+      setSendError(res.error);
+      // Roll back optimistic update
+      await mutate();
       return;
     }
+    // Confirm with real data from server
     await mutate();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }
 
-  return (
-    <div className="h-full flex flex-col max-w-[60rem] mx-auto px-4 sm:px-6 py-6">
-      <header className="flex items-center gap-3 pb-4 border-b border-[#005F6A]/10">
-        <div className="p-2.5 bg-[#005F6A]/10 rounded-xl">
-          <Shield className="w-5 h-5 text-[#005F6A]" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-lg font-[400] text-[#005F6A]">Admin</h1>
-          <p className="text-xs text-[#005F6A]/60">
-            Direct line to your manager
-          </p>
-        </div>
-      </header>
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setDraft(e.target.value);
+    const t = e.target;
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight, 120) + "px";
+  }
 
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto py-4 space-y-2">
-        {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-sm text-[#005F6A]/50">
-              No messages yet. Say hi to your admin.
-            </p>
-          </div>
-        ) : (
-          messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              isMine={m.senderRole === "EMPLOYEE"}
-            />
-          ))
-        )}
+  const firstName = userName ? userName.split(" ")[0] : "there";
+
+  return (
+    <div className="h-full flex flex-col admin-font">
+      {/* Page header */}
+      <div style={{ padding: "32px 32px 24px", flexShrink: 0 }}>
+        <p className="eyebrow" style={{ textTransform: "uppercase" }}>
+          Hi, {firstName.toUpperCase()}
+        </p>
+        <h1 className="display" style={{ fontSize: "clamp(34px,4vw,48px)", marginTop: 6 }}>
+          Messages.
+        </h1>
+        <p style={{ fontSize: 14, color: "var(--primary-60)", margin: "6px 0 0" }}>
+          Stay in touch with dispatch and your crew.
+        </p>
       </div>
 
-      <div className="pt-3 border-t border-[#005F6A]/10">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder="Type a message…"
-            className="flex-1 resize-none rounded-2xl bg-[#005F6A]/5 hover:bg-[#005F6A]/7 focus:bg-white focus:outline focus:outline-1 focus:outline-[#005F6A]/30 px-4 py-3 text-sm text-[#005F6A] placeholder:text-[#005F6A]/40 max-h-32"
-          />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={sending || draft.trim().length === 0}
-            className="p-3 rounded-2xl bg-[#005F6A] text-white disabled:opacity-40 hover:bg-[#005F6A]/90 transition-colors">
-            <Send className="w-4 h-4" />
-          </button>
+      {/* Chat shell — single conversation, no list panel */}
+      <div style={{ flex: 1, minHeight: 0, padding: "0 32px 32px" }}>
+        <div style={{
+          height: "100%",
+          background: "#fff",
+          borderRadius: 18,
+          boxShadow: "0 2px 24px rgba(0,95,106,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+          border: "1px solid rgba(0,95,106,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}>
+          {/* Thread header */}
+          <div className="chat-thread-head">
+            <div className="chat-avatar-wrap">
+              <div style={{
+                width: 44, height: 44, borderRadius: "50%",
+                background: "var(--primary)", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 15, fontWeight: 600, flexShrink: 0,
+              }}>
+                <Shield size={20} />
+              </div>
+              <span className="chat-status-dot online" style={{ width: 12, height: 12 }} />
+            </div>
+            <div className="thread-meta">
+              <div className="thread-name">
+                Admin
+                <span className="chat-role-pill">Dispatch</span>
+              </div>
+              <div className="thread-role">
+                Operations · Dispatch
+                <span style={{ color: "#059669", marginLeft: 8 }}>· Active now</span>
+              </div>
+            </div>
+            <div className="thread-actions">
+              <button className="chat-icon-btn" aria-label="More options">
+                <MoreHorizontal size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div
+            ref={scrollRef}
+            style={{
+              flex: 1, overflowY: "auto",
+              padding: "20px 24px",
+              display: "flex", flexDirection: "column", gap: 3,
+              background: "var(--cream)",
+            }}>
+            {grouped.length === 0 ? (
+              <div style={{ margin: "auto", textAlign: "center", color: "var(--primary-50)" }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: "rgba(0,95,106,0.06)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 14px",
+                }}>
+                  <Briefcase size={22} color="var(--primary-40)" />
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--primary-70)", margin: "0 0 4px" }}>
+                  No messages yet
+                </p>
+                <p style={{ fontSize: 12, color: "var(--primary-50)", margin: 0 }}>
+                  Say hi to your admin.
+                </p>
+              </div>
+            ) : (
+              grouped.map((group, gi) => (
+                <div key={gi}>
+                  <div className="chat-day-divider">{group.label}</div>
+                  {group.messages.map(m => {
+                    const mine = m.senderRole === "EMPLOYEE";
+                    return (
+                      <div key={m.id} className={`chat-msg ${mine ? "mine" : "theirs"}`} style={{ marginTop: 4 }}>
+                        <div className="chat-msg-bubble">
+                          <div>{m.body}</div>
+                          <div className="chat-msg-time">
+                            {timeOnly(m.createdAt)}
+                            {mine && (
+                              <svg width="11" height="8" viewBox="0 0 11 8" fill="none" style={{ opacity: 0.8 }}>
+                                <path d="M1 4l2.5 2.5L6 4m2-3L5.5 6.5 10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Composer */}
+          <div className="chat-composer">
+            {sendError && (
+              <div style={{
+                fontSize: 12, color: "#dc2626",
+                background: "#fef2f2", border: "1px solid #fecaca",
+                borderRadius: 8, padding: "6px 12px", marginBottom: 10,
+              }}>
+                Failed to send: {sendError}
+              </div>
+            )}
+            <div className="chat-composer-row">
+              <button className="chat-icon-btn" aria-label="Attach file" style={{ padding: "6px" }}>
+                <Paperclip size={17} />
+              </button>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={draft}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Message Admin…"
+              />
+              <button className="chat-icon-btn" aria-label="Emoji" style={{ padding: "6px" }}>
+                <Smile size={17} />
+              </button>
+              <button
+                className="chat-send"
+                onClick={handleSend}
+                disabled={sending || draft.trim().length === 0}
+                aria-label="Send">
+                <Send size={14} />
+              </button>
+            </div>
+            <div className="chat-composer-hint">⏎ to send · ⇧⏎ for new line</div>
+          </div>
         </div>
       </div>
     </div>

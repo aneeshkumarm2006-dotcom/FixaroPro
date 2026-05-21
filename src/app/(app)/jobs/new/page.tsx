@@ -8,6 +8,8 @@ import JobTypeSelector from "./JobTypeSelector";
 import SubmitButton from "./SubmitButton";
 import DeleteButton from "./DeleteButton";
 import ClientLinkSelector from "./ClientLinkSelector";
+import { ControlledDatePicker, ControlledTimePicker } from "./DateTimePicker";
+import PaymentTypeSelect from "./PaymentTypeSelect";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -346,9 +348,7 @@ export default async function JobFormPage({
                     className="block text-sm font-[400] text-neutral-950/80 mb-1">
                     Start Date
                   </label>
-                  <Input
-                    type="date"
-                    id="startDate"
+                  <ControlledDatePicker
                     name="startDate"
                     defaultValue={
                       existingJob?.startTime
@@ -357,6 +357,7 @@ export default async function JobFormPage({
                             .split("T")[0]
                         : ""
                     }
+                    size="md"
                   />
                 </div>
 
@@ -366,9 +367,7 @@ export default async function JobFormPage({
                     className="block text-sm font-[400] text-neutral-950/80 mb-1">
                     Start Time
                   </label>
-                  <Input
-                    type="time"
-                    id="startTime"
+                  <ControlledTimePicker
                     name="startTime"
                     defaultValue={
                       existingJob?.startTime
@@ -378,6 +377,7 @@ export default async function JobFormPage({
                             .slice(0, 5)
                         : ""
                     }
+                    size="md"
                   />
                 </div>
               </div>
@@ -395,9 +395,7 @@ export default async function JobFormPage({
                     className="block text-sm font-[400] text-neutral-950/80 mb-1">
                     End Date
                   </label>
-                  <Input
-                    type="date"
-                    id="endDate"
+                  <ControlledDatePicker
                     name="endDate"
                     defaultValue={
                       existingJob?.endTime
@@ -406,6 +404,7 @@ export default async function JobFormPage({
                             .split("T")[0]
                         : ""
                     }
+                    size="md"
                   />
                 </div>
 
@@ -415,9 +414,7 @@ export default async function JobFormPage({
                     className="block text-sm font-[400] text-neutral-950/80 mb-1">
                     End Time
                   </label>
-                  <Input
-                    type="time"
-                    id="endTime"
+                  <ControlledTimePicker
                     name="endTime"
                     defaultValue={
                       existingJob?.endTime
@@ -427,6 +424,7 @@ export default async function JobFormPage({
                             .slice(0, 5)
                         : ""
                     }
+                    size="md"
                   />
                 </div>
               </div>
@@ -579,18 +577,7 @@ export default async function JobFormPage({
                 className="block text-sm font-[400] text-neutral-950/80 mb-1">
                 Payment Type
               </label>
-              <select
-                id="paymentType"
-                name="paymentType"
-                defaultValue={existingJob?.paymentType || ""}
-                className="w-full h-[42px] px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20">
-                <option value="">— Select —</option>
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="E_TRANSFER">E-Transfer</option>
-                <option value="CREDIT_CARD">Credit Card</option>
-                <option value="OTHER">Other</option>
-              </select>
+              <PaymentTypeSelect defaultValue={existingJob?.paymentType || ""} />
             </div>
 
             <div>

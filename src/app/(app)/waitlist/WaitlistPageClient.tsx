@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock, Bell, Check } from "lucide-react";
-import Card from "@/components/ui/Card";
+import { Calendar, AlertCircle, MapPin, CheckCircle2 } from "lucide-react";
 import { markWaitlistNotified } from "../actions/markWaitlistNotified";
 import { updateWaitlistStatus } from "../actions/updateWaitlistStatus";
 
@@ -23,195 +22,269 @@ interface Entry {
   createdAt: string;
 }
 
-const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
-  WAITING: { label: "Waiting", className: "bg-amber-100 text-amber-800" },
-  NOTIFIED: { label: "Notified", className: "bg-blue-100 text-blue-800" },
-  CONVERTED: { label: "Converted", className: "bg-emerald-100 text-emerald-800" },
-  EXPIRED: { label: "Expired", className: "bg-gray-100 text-gray-600" },
-  CANCELLED: { label: "Cancelled", className: "bg-gray-100 text-gray-500" },
+const SERVICE_LABELS: Record<string, string> = {
+  standard: "Standard", deep: "Deep", "move-in": "Move-in",
+  "move-out": "Move-out", office: "Office",
 };
 
+const STATUS_COLORS: Record<Status, { bg: string; fg: string; dot: string; label: string }> = {
+  WAITING:   { bg: "rgba(217,119,6,0.12)",   fg: "#92400e", dot: "#d97706", label: "Waiting" },
+  NOTIFIED:  { bg: "rgba(2,132,199,0.10)",   fg: "#075985", dot: "#0284c7", label: "Notified" },
+  CONVERTED: { bg: "rgba(5,150,105,0.10)",   fg: "#065f46", dot: "#10b981", label: "Converted" },
+  EXPIRED:   { bg: "rgba(148,163,184,0.18)", fg: "#475569", dot: "#94a3b8", label: "Expired" },
+  CANCELLED: { bg: "rgba(148,163,184,0.18)", fg: "#475569", dot: "#94a3b8", label: "Cancelled" },
+};
+
+function StatusPill({ status }: { status: Status }) {
+  const c = STATUS_COLORS[status];
+  return (
+    <span className="pill" style={{ background: c.bg, color: c.fg }}>
+      <span className="pill-dot" style={{ background: c.dot }} />
+      {c.label}
+    </span>
+  );
+}
+
+function AStatCard({ icon: Icon, label, value, hint, delta, deltaDir }: {
+  icon: React.ElementType; label: string; value: number | string;
+  hint?: string; delta?: string; deltaDir?: "up" | "down";
+}) {
+  return (
+    <div className="astat">
+      <div className="astat-head">
+        <span>{label}</span>
+        <span className="astat-icon"><Icon size={15} /></span>
+      </div>
+      <div className="astat-value">{value}</div>
+      {(hint || delta) && (
+        <div className={`astat-delta ${deltaDir ?? ""}`}>
+          {delta && <strong>{delta}</strong>}
+          {hint && <> {hint}</>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function daysAgo(iso: string) {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+}
+
+function dateStr(iso: string) {
+  return new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+}
+
+const TABS = [
+  { id: "all",       label: "All" },
+  { id: "waiting",   label: "Waiting" },
+  { id: "notified",  label: "Notified" },
+  { id: "converted", label: "Converted" },
+  { id: "expired",   label: "Expired" },
+  { id: "cancelled", label: "Cancelled" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
 export default function WaitlistPageClient({ entries }: { entries: Entry[] }) {
-  const [filter, setFilter] = useState<Status | "ALL">("ALL");
+  const [tab, setTab] = useState<TabId>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    if (filter === "ALL") return entries;
-    return entries.filter((e) => e.status === filter);
-  }, [entries, filter]);
+  const stats = useMemo(() => ({
+    total:     entries.length,
+    waiting:   entries.filter(e => e.status === "WAITING").length,
+    notified:  entries.filter(e => e.status === "NOTIFIED").length,
+    converted: entries.filter(e => e.status === "CONVERTED").length,
+    expired:   entries.filter(e => e.status === "EXPIRED").length,
+    cancelled: entries.filter(e => e.status === "CANCELLED").length,
+  }), [entries]);
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { ALL: entries.length };
-    for (const e of entries) c[e.status] = (c[e.status] || 0) + 1;
-    return c;
-  }, [entries]);
+  const countFor = (id: TabId) =>
+    id === "all" ? stats.total : stats[id as keyof typeof stats] ?? 0;
+
+  const filtered = useMemo(() => {
+    const list = tab === "all" ? entries
+      : entries.filter(e => e.status === tab.toUpperCase());
+    return [...list].sort((a, b) =>
+      new Date(a.preferredDate).getTime() - new Date(b.preferredDate).getTime());
+  }, [tab, entries]);
 
   async function handleNotify(id: string) {
-    setBusyId(id);
-    setError(null);
+    setBusyId(id); setError(null);
     const res = await markWaitlistNotified(id);
     setBusyId(null);
     if (!res.success) setError(res.error || "Failed to notify");
   }
 
   async function handleStatus(id: string, status: Status) {
-    setBusyId(id);
-    setError(null);
+    setBusyId(id); setError(null);
     await updateWaitlistStatus({ id, status });
     setBusyId(null);
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A] flex items-center gap-3">
-          <Clock className="w-7 h-7" /> Waitlist
-        </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
-          Customers waiting for a slot to open on their preferred date.
-        </p>
+    <div className="admin-font stack-24">
+      <header className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
+        <div className="stack-8">
+          <p className="eyebrow">Sales</p>
+          <h1 className="display">
+            Waitlist{" "}
+            <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>· {stats.total}</span>
+          </h1>
+        </div>
+      </header>
+
+      <div className="astat-grid">
+        <AStatCard icon={Calendar}     label="Total entries" value={stats.total}     hint="all time" />
+        <AStatCard icon={AlertCircle}  label="Waiting"       value={stats.waiting}   hint="not yet contacted" />
+        <AStatCard icon={MapPin}       label="Notified"      value={stats.notified}  hint="awaiting response" />
+        <AStatCard
+          icon={CheckCircle2} label="Converted" value={stats.converted}
+          delta={stats.total ? `${Math.round((stats.converted / stats.total) * 100)}%` : "0%"}
+          deltaDir="up" hint="conversion rate"
+        />
       </div>
 
       {error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#b91c1c" }}>
           {error}
         </div>
       )}
 
-      <Card variant="default" className="p-5">
-        <div className="flex flex-wrap gap-1 mb-5">
-          {(["ALL", "WAITING", "NOTIFIED", "CONVERTED", "EXPIRED", "CANCELLED"] as const).map(
-            (f) => {
-              const active = filter === f;
-              const count = counts[f] ?? 0;
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                    active
-                      ? "bg-[#005F6A] text-white"
-                      : "bg-[#005F6A]/5 text-[#005F6A] hover:bg-[#005F6A]/10"
-                  }`}>
-                  {f === "ALL" ? "All" : STATUS_CONFIG[f as Status].label}
-                  {count > 0 && (
-                    <span
-                      className={`ml-1.5 ${
-                        active ? "text-white/70" : "text-[#005F6A]/50"
-                      }`}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            }
-          )}
-        </div>
+      <div className="atabs">
+        {TABS.map(t => (
+          <button key={t.id} type="button"
+            className={`atab ${tab === t.id ? "active" : ""}`}
+            onClick={() => setTab(t.id)}>
+            {t.label}
+            {countFor(t.id) > 0 && <span className="atab-count">{countFor(t.id)}</span>}
+          </button>
+        ))}
+      </div>
 
-        {filtered.length === 0 ? (
-          <div className="text-center text-sm text-[#005F6A]/60 py-12">
-            No waitlist entries to show.
+      {filtered.length === 0 ? (
+        <div className="atable-wrap" style={{ padding: "80px 40px", textAlign: "center", color: "var(--primary-60)" }}>
+          No entries in this view.
+        </div>
+      ) : (
+        <>
+          <div className="atable-wrap" id="wl-desktop">
+            <div className="atable-scroll">
+              <table className="atable">
+                <thead>
+                  <tr>
+                    <th>Preferred date</th>
+                    <th>Contact</th>
+                    <th>Service</th>
+                    <th>Status</th>
+                    <th className="col-actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(w => {
+                    const age = daysAgo(w.createdAt);
+                    return (
+                      <tr key={w.id}>
+                        <td className="col-date" style={{ minWidth: 160 }}>
+                          <div className="date-line">{dateStr(w.preferredDate)}</div>
+                          <div className="time-line">Added {age === 0 ? "today" : `${age}d ago`}</div>
+                        </td>
+                        <td style={{ minWidth: 220 }}>
+                          <div className="col-client">
+                            {w.name || <em style={{ color: "var(--primary-50)" }}>No name</em>}
+                          </div>
+                          <div className="col-client-sub">{w.email}</div>
+                          {w.phone && <div className="col-client-sub">{w.phone}</div>}
+                        </td>
+                        <td style={{ minWidth: 200, whiteSpace: "normal" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {w.serviceType && (
+                              <span className="pill" style={{ background: "var(--primary-10)", color: "var(--primary)" }}>
+                                {SERVICE_LABELS[w.serviceType] ?? w.serviceType}
+                              </span>
+                            )}
+                            {(w.bedCount !== null || w.bathCount !== null) && (
+                              <span style={{ fontSize: 12, color: "var(--primary-70)" }}>
+                                {w.bedCount ?? "?"}bd · {w.bathCount ?? "?"}ba
+                              </span>
+                            )}
+                          </div>
+                          {w.notes && (
+                            <div style={{ fontSize: 12, color: "var(--primary-60)", marginTop: 4, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {w.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td><StatusPill status={w.status} /></td>
+                        <td className="col-actions">
+                          <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+                            {w.status === "WAITING" && (
+                              <button className="btn btn-primary btn-sm" disabled={busyId === w.id} onClick={() => handleNotify(w.id)}>Notify</button>
+                            )}
+                            {w.status === "NOTIFIED" && (
+                              <button className="btn btn-primary btn-sm" disabled={busyId === w.id} onClick={() => handleStatus(w.id, "CONVERTED")}>Mark Converted</button>
+                            )}
+                            {(w.status === "WAITING" || w.status === "NOTIFIED") && (
+                              <button className="btn btn-danger-ghost btn-sm" disabled={busyId === w.id} onClick={() => handleStatus(w.id, "CANCELLED")}>Cancel</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        ) : (
-          <div className="rounded-xl overflow-hidden bg-[#005F6A]/5">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-wide text-[#005F6A]/60">
-                  <th className="px-4 py-3">Preferred date</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#005F6A]/10">
-                {filtered.map((w) => {
-                  const cfg = STATUS_CONFIG[w.status];
-                  return (
-                    <tr key={w.id} className="text-[#005F6A]">
-                      <td className="px-4 py-3">
-                        <div className="font-medium">
-                          {new Date(w.preferredDate).toLocaleDateString()}
-                        </div>
-                        <div className="text-[10px] text-[#005F6A]/50">
-                          Added {new Date(w.createdAt).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{w.name || "—"}</div>
-                        <div className="text-xs text-[#005F6A]/60">{w.email}</div>
-                        {w.phone && (
-                          <div className="text-xs text-[#005F6A]/60">{w.phone}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {w.serviceType && (
-                          <div className="text-[#005F6A]/70">{w.serviceType}</div>
-                        )}
-                        {(w.bedCount !== null || w.bathCount !== null) && (
-                          <div className="text-[#005F6A]/60">
-                            {w.bedCount ?? "?"} bed · {w.bathCount ?? "?"} bath
-                          </div>
-                        )}
-                        {w.notes && (
-                          <div className="text-[10px] text-[#005F6A]/50 mt-1 max-w-[180px] truncate">
-                            {w.notes}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div
-                          className={`inline-block px-2 py-1 rounded-full text-[10px] font-medium ${cfg.className}`}>
-                          {cfg.label}
-                        </div>
-                        {w.notifiedAt && (
-                          <div className="text-[10px] text-[#005F6A]/50 mt-1">
-                            Notified{" "}
-                            {new Date(w.notifiedAt).toLocaleDateString()}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex flex-col gap-1 items-end">
-                          {w.status === "WAITING" && (
-                            <button
-                              type="button"
-                              onClick={() => handleNotify(w.id)}
-                              disabled={busyId === w.id}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#005F6A] text-white text-xs hover:bg-[#005F6A]/90 disabled:opacity-50">
-                              <Bell className="w-3.5 h-3.5" /> Notify
-                            </button>
-                          )}
-                          {w.status === "NOTIFIED" && (
-                            <button
-                              type="button"
-                              onClick={() => handleStatus(w.id, "CONVERTED")}
-                              disabled={busyId === w.id}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs hover:bg-emerald-700 disabled:opacity-50">
-                              <Check className="w-3.5 h-3.5" /> Mark converted
-                            </button>
-                          )}
-                          {(w.status === "WAITING" || w.status === "NOTIFIED") && (
-                            <button
-                              type="button"
-                              onClick={() => handleStatus(w.id, "CANCELLED")}
-                              disabled={busyId === w.id}
-                              className="text-[10px] text-[#005F6A]/50 hover:text-red-600">
-                              Cancel
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+
+          <div id="wl-mobile" style={{ display: "none", flexDirection: "column", gap: 10 }}>
+            {filtered.map(w => {
+              const age = daysAgo(w.createdAt);
+              return (
+                <article key={w.id} className="jcard">
+                  <div className="jcard-top">
+                    <div>
+                      <div className="jcard-client">{w.name || w.email}</div>
+                      <div className="jcard-meta">{w.email}</div>
+                      {w.phone && <div className="jcard-meta">{w.phone}</div>}
+                    </div>
+                    <StatusPill status={w.status} />
+                  </div>
+                  <div className="jcard-row">
+                    <div>
+                      <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>{dateStr(w.preferredDate)}</div>
+                      <div style={{ fontSize: 11, color: "var(--primary-60)" }}>Added {age === 0 ? "today" : `${age}d ago`}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {w.serviceType && <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>{SERVICE_LABELS[w.serviceType] ?? w.serviceType}</div>}
+                      {(w.bedCount !== null || w.bathCount !== null) && (
+                        <div style={{ fontSize: 11, color: "var(--primary-60)" }}>{w.bedCount ?? "?"}bd · {w.bathCount ?? "?"}ba</div>
+                      )}
+                    </div>
+                  </div>
+                  {(w.status === "WAITING" || w.status === "NOTIFIED") && (
+                    <div style={{ paddingTop: 10, borderTop: "1px solid var(--primary-10)", display: "flex", gap: 8 }}>
+                      {w.status === "WAITING" && (
+                        <button className="btn btn-primary btn-sm" disabled={busyId === w.id} onClick={() => handleNotify(w.id)}>Notify</button>
+                      )}
+                      {w.status === "NOTIFIED" && (
+                        <button className="btn btn-primary btn-sm" disabled={busyId === w.id} onClick={() => handleStatus(w.id, "CONVERTED")}>Mark Converted</button>
+                      )}
+                      <button className="btn btn-danger-ghost btn-sm" disabled={busyId === w.id} onClick={() => handleStatus(w.id, "CANCELLED")}>Cancel</button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
-        )}
-      </Card>
+
+          <style>{`
+            @media (max-width: 1000px) {
+              #wl-desktop { display: none !important; }
+              #wl-mobile  { display: flex !important; }
+            }
+          `}</style>
+        </>
+      )}
     </div>
   );
 }

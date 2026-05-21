@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
+import DatePicker from "@/components/ui/DatePicker";
 import type { CheckoutHistoryEntry } from "../../actions/getCheckoutHistory.types";
 
 interface HistoryClientProps {
@@ -122,22 +122,22 @@ export default function HistoryClient({
             <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
               From
             </label>
-            <Input
-              variant="form"
-              type="date"
+            <DatePicker
               value={start}
-              onChange={(e) => setStart(e.target.value)}
+              onChange={setStart}
+              size="sm"
+              placeholder="From date"
             />
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
               To
             </label>
-            <Input
-              variant="form"
-              type="date"
+            <DatePicker
               value={end}
-              onChange={(e) => setEnd(e.target.value)}
+              onChange={setEnd}
+              size="sm"
+              placeholder="To date"
             />
           </div>
           <Button

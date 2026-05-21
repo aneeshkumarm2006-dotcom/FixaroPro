@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import { createTransaction } from "../../actions/createTransaction";
 import { updateTransaction } from "../../actions/updateTransaction";
 import { deleteTransaction } from "../../actions/deleteTransaction";
@@ -263,37 +265,35 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
             className={`${inputCls} pl-9`}
           />
         </div>
-        <select
+        <PremiumSelect
           value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value as TxCategory | "ALL");
+          onChange={(v) => {
+            setCategoryFilter(v as TxCategory | "ALL");
             setPage(1);
           }}
-          className={selectCls}>
-          <option value="ALL">All Categories</option>
-          {ALL_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => {
-            setFromDate(e.target.value);
-            setPage(1);
-          }}
-          className={inputCls}
+          options={[
+            { value: "ALL", label: "All Categories" },
+            ...ALL_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] })),
+          ]}
+          size="sm"
         />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => {
-            setToDate(e.target.value);
+        <DatePicker
+          value={fromDate}
+          onChange={(v) => {
+            setFromDate(v);
             setPage(1);
           }}
-          className={inputCls}
+          size="sm"
+          placeholder="From date"
+        />
+        <DatePicker
+          value={toDate}
+          onChange={(v) => {
+            setToDate(v);
+            setPage(1);
+          }}
+          size="sm"
+          placeholder="To date"
         />
       </div>
 
@@ -314,30 +314,24 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                 Date
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                required
-                className={inputCls}
+                onChange={(v) => setForm({ ...form, date: v })}
+                size="sm"
               />
             </div>
             <div>
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                 Category
               </label>
-              <select
+              <PremiumSelect
                 value={form.category}
-                onChange={(e) =>
-                  setForm({ ...form, category: e.target.value as TxCategory })
+                onChange={(v) =>
+                  setForm({ ...form, category: v as TxCategory })
                 }
-                className={selectCls}>
-                {ALL_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+                options={ALL_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
+                size="sm"
+              />
             </div>
             <div>
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
@@ -385,17 +379,16 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                 Linked Job
               </label>
-              <select
+              <PremiumSelect
                 value={form.jobId}
-                onChange={(e) => setForm({ ...form, jobId: e.target.value })}
-                className={selectCls}>
-                <option value="">— none —</option>
-                {jobOptions.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setForm({ ...form, jobId: v })}
+                options={[
+                  { value: "", label: "— none —" },
+                  ...jobOptions.map((j) => ({ value: j.id, label: j.label })),
+                ]}
+                size="sm"
+                searchable
+              />
             </div>
             <div>
               <label className="text-xs text-[#005F6A]/70 uppercase tracking-wide mb-1 block">

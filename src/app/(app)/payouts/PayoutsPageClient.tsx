@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import DatePicker from "@/components/ui/DatePicker";
 import { createPayPeriod } from "../actions/createPayPeriod";
 import PayPeriodDetail from "./PayPeriodDetail";
 
@@ -226,22 +227,20 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="input-label tracking-tight">Start Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 disabled={creating}
-                className="w-full px-4 py-3 rounded-2xl bg-white text-sm text-[#005F6A] focus:outline-none"
+                size="md"
               />
             </div>
             <div>
               <label className="input-label tracking-tight">End Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 disabled={creating}
-                className="w-full px-4 py-3 rounded-2xl bg-white text-sm text-[#005F6A] focus:outline-none"
+                size="md"
               />
             </div>
             <div>

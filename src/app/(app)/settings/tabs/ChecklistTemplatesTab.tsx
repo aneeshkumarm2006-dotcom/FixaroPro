@@ -14,6 +14,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { createChecklistTemplate } from "../../actions/createChecklistTemplate";
 import { updateChecklistTemplate } from "../../actions/updateChecklistTemplate";
 import { deleteChecklistTemplate } from "../../actions/deleteChecklistTemplate";
@@ -314,19 +315,17 @@ export default function ChecklistTemplatesTab({
             <Field
               label="Job Type"
               hint="Restrict template to a specific job type, or leave blank for all.">
-              <select
+              <PremiumSelect
                 value={draft.jobType}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, jobType: e.target.value }))
+                onChange={(v) =>
+                  setDraft((prev) => ({ ...prev, jobType: v }))
                 }
-                className={themedSelectClass}>
-                <option value="">— Any (Standard) —</option>
-                {jobTypes.map((jt) => (
-                  <option key={jt.id} value={jt.name}>
-                    {jt.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— Any (Standard) —" },
+                  ...jobTypes.map((jt) => ({ value: jt.name, label: jt.name })),
+                ]}
+                size="sm"
+              />
             </Field>
 
             <Field

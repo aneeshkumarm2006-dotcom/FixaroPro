@@ -30,7 +30,7 @@ export default async function ChatPage() {
   const initial = chat.success ? chat.data : { conversationId: "", messages: [] };
   return (
     <div className="h-full overflow-hidden">
-      <EmployeeChatClient initial={initial} />
+      <EmployeeChatClient initial={initial} userName={session.user.name ?? undefined} />
     </div>
   );
 }

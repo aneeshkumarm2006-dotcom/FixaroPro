@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import TimePicker from "@/components/ui/TimePicker";
+import DatePicker from "@/components/ui/DatePicker";
 import { getAvailability } from "../../actions/getAvailability";
 import { setAvailability } from "../../actions/setAvailability";
 import type { AvailabilitySlotInput } from "../../actions/setAvailability.types";
@@ -162,24 +164,22 @@ export default function AvailabilityTab({ employeeId }: AvailabilityTabProps) {
                     />
                     Available
                   </label>
-                  <Input
-                    variant="form"
-                    type="time"
+                  <TimePicker
                     value={row.startTime}
                     disabled={!row.isAvailable}
-                    onChange={(e) =>
-                      updateRow(row.day, { startTime: e.target.value })
+                    onChange={(v) =>
+                      updateRow(row.day, { startTime: v })
                     }
+                    size="sm"
                   />
                   <span className="text-xs text-[#005F6A]/60">to</span>
-                  <Input
-                    variant="form"
-                    type="time"
+                  <TimePicker
                     value={row.endTime}
                     disabled={!row.isAvailable}
-                    onChange={(e) =>
-                      updateRow(row.day, { endTime: e.target.value })
+                    onChange={(v) =>
+                      updateRow(row.day, { endTime: v })
                     }
+                    size="sm"
                   />
                 </div>
               );
@@ -197,19 +197,17 @@ export default function AvailabilityTab({ employeeId }: AvailabilityTabProps) {
               Recurring weekly
             </label>
             <Field label="Effective From">
-              <Input
-                variant="form"
-                type="date"
+              <DatePicker
                 value={effectiveFrom}
-                onChange={(e) => setEffectiveFrom(e.target.value)}
+                onChange={setEffectiveFrom}
+                size="sm"
               />
             </Field>
             <Field label="Effective To">
-              <Input
-                variant="form"
-                type="date"
+              <DatePicker
                 value={effectiveTo}
-                onChange={(e) => setEffectiveTo(e.target.value)}
+                onChange={setEffectiveTo}
+                size="sm"
               />
             </Field>
           </div>

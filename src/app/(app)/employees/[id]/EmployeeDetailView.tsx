@@ -7,6 +7,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { EmployeeModal } from "../EmployeeModal";
 import { assignKit } from "../../actions/assignKit";
 import {
@@ -960,20 +961,21 @@ export default function EmployeeDetailView({
             Warehouse stock will be deducted accordingly.
           </p>
 
-          <select
-            className="w-full p-3 rounded-xl border border-[#005F6A]/20 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+          <PremiumSelect
             value={selectedKitId}
-            onChange={(e) => {
-              setSelectedKitId(e.target.value);
+            onChange={(v) => {
+              setSelectedKitId(v);
               setKitMessage(null);
-            }}>
-            <option value="">Select a kit template...</option>
-            {kitTemplates.map((kit) => (
-              <option key={kit.id} value={kit.id}>
-                {kit.name} ({kit.items.length} items)
-              </option>
-            ))}
-          </select>
+            }}
+            options={[
+              { value: "", label: "Select a kit template..." },
+              ...kitTemplates.map((kit) => ({
+                value: kit.id,
+                label: `${kit.name} (${kit.items.length} items)`,
+              })),
+            ]}
+            size="md"
+          />
 
           {selectedKit && (
             <div className="bg-[#005F6A]/5 rounded-xl p-4 space-y-2">

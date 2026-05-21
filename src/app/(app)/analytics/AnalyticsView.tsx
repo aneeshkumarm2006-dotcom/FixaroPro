@@ -5,6 +5,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
+import PremiumSelect from "@/components/ui/PremiumSelect";
+import DatePicker from "@/components/ui/DatePicker";
 import {
   DollarSign,
   TrendingUp,
@@ -870,6 +872,9 @@ export default function AnalyticsView({
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [targetMetric, setTargetMetric] = useState("REVENUE");
+    const [targetPeriod, setTargetPeriod] = useState("MONTHLY");
+    const [targetPeriodStart, setTargetPeriodStart] = useState("");
 
     const metricLabels: Record<string, string> = {
       REVENUE: "Revenue",
@@ -909,51 +914,47 @@ export default function AnalyticsView({
                   <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                     Metric
                   </label>
-                  <select
+                  <PremiumSelect
                     name="metric"
-                    required
-                    className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] font-[400] cursor-pointer appearance-none bg-no-repeat focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 hover:border-[#005F6A]/30 transition-colors"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23005F6A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: "right 0.75rem center",
-                      backgroundSize: "1.25em 1.25em",
-                    }}>
-                    <option value="REVENUE">Revenue</option>
-                    <option value="JOBS_COMPLETED">Jobs Completed</option>
-                    <option value="NEW_CLIENTS">New Clients</option>
-                    <option value="PROFIT_MARGIN">Profit Margin (%)</option>
-                    <option value="AVG_JOB_PRICE">Avg Job Price</option>
-                    <option value="EMPLOYEE_RETENTION">Employee Count</option>
-                  </select>
+                    value={targetMetric}
+                    onChange={setTargetMetric}
+                    options={[
+                      { value: "REVENUE", label: "Revenue" },
+                      { value: "JOBS_COMPLETED", label: "Jobs Completed" },
+                      { value: "NEW_CLIENTS", label: "New Clients" },
+                      { value: "PROFIT_MARGIN", label: "Profit Margin (%)" },
+                      { value: "AVG_JOB_PRICE", label: "Avg Job Price" },
+                      { value: "EMPLOYEE_RETENTION", label: "Employee Count" },
+                    ]}
+                    size="sm"
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                     Period
                   </label>
-                  <select
+                  <PremiumSelect
                     name="period"
-                    required
-                    className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] font-[400] cursor-pointer appearance-none bg-no-repeat focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20 hover:border-[#005F6A]/30 transition-colors"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23005F6A' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: "right 0.75rem center",
-                      backgroundSize: "1.25em 1.25em",
-                    }}>
-                    <option value="WEEKLY">Weekly</option>
-                    <option value="MONTHLY">Monthly</option>
-                    <option value="QUARTERLY">Quarterly</option>
-                    <option value="YEARLY">Yearly</option>
-                  </select>
+                    value={targetPeriod}
+                    onChange={setTargetPeriod}
+                    options={[
+                      { value: "WEEKLY", label: "Weekly" },
+                      { value: "MONTHLY", label: "Monthly" },
+                      { value: "QUARTERLY", label: "Quarterly" },
+                      { value: "YEARLY", label: "Yearly" },
+                    ]}
+                    size="sm"
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
                     Period Start
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     name="periodStart"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                    value={targetPeriodStart}
+                    onChange={setTargetPeriodStart}
+                    size="sm"
                   />
                 </div>
                 <div>
@@ -1721,22 +1722,20 @@ export default function AnalyticsView({
                 <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
                   Start Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                  onChange={setStartDate}
+                  size="sm"
                 />
               </div>
               <div className="flex-1">
                 <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
                   End Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                  onChange={setEndDate}
+                  size="sm"
                 />
               </div>
             </div>

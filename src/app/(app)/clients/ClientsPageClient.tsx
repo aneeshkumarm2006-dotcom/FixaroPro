@@ -1,31 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  Search,
-  Plus,
-  Users,
-  DollarSign,
-  AlertTriangle,
-  Briefcase,
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
-  Pencil,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  Loader,
-  ChevronDown,
-  Filter,
+  Search, Plus, Users, DollarSign, AlertTriangle,
+  Briefcase, Pencil, SlidersHorizontal,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
-import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
-import CustomDropdown from "@/components/ui/custom-dropdown";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import ClientModal from "./ClientModal";
 import { deleteClient } from "../actions/deleteClient";
 
@@ -57,6 +39,33 @@ interface ClientsPageClientProps {
   initialRowsPerPage: number;
 }
 
+const AVATAR_COLORS = ["#005F6A", "#0284c7", "#7c3aed", "#dc2626", "#d97706", "#059669", "#0891b2", "#be185d"];
+
+function avatarColor(name: string) {
+  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+}
+
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map(p => p[0] ?? "").join("").toUpperCase();
+}
+
+function AStatCard({ icon: Icon, label, value, hint, warn }: {
+  icon: React.ElementType; label: string; value: string; hint?: string; warn?: boolean;
+}) {
+  return (
+    <div className="astat" style={warn ? { borderLeft: "3px solid #d97706" } : {}}>
+      <div className="astat-head" style={warn ? { color: "#92400e" } : {}}>
+        <span>{label}</span>
+        <span className="astat-icon" style={warn ? { background: "#fffbeb", color: "#d97706" } : {}}>
+          <Icon size={15} />
+        </span>
+      </div>
+      <div className="astat-value" style={warn ? { color: "#92400e" } : {}}>{value}</div>
+      {hint && <div className="astat-delta">{hint}</div>}
+    </div>
+  );
+}
+
 export default function ClientsPageClient({
   initialClients,
   initialStats,
@@ -73,107 +82,57 @@ export default function ClientsPageClient({
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Filters
   const [showFilters, setShowFilters] = useState(false);
-  const [activityFilter, setActivityFilter] = useState<
-    "all" | "active" | "inactive"
-  >("all");
-  const [unpaidFilter, setUnpaidFilter] = useState<"all" | "has" | "none">(
-    "all"
-  );
-  const [discountFilter, setDiscountFilter] = useState<"all" | "has" | "none">(
-    "all"
-  );
-  const [sortBy, setSortBy] = useState<
-    "name" | "revenue" | "jobs" | "recent"
-  >("name");
+  const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
+  const [unpaidFilter, setUnpaidFilter] = useState<"all" | "has" | "none">("all");
+  const [discountFilter, setDiscountFilter] = useState<"all" | "has" | "none">("all");
+  const [sortBy, setSortBy] = useState<"name" | "revenue" | "jobs" | "recent">("name");
 
-  const hasActiveFilters =
-    activityFilter !== "all" ||
-    unpaidFilter !== "all" ||
-    discountFilter !== "all" ||
-    sortBy !== "name";
+  const activeFilterCount = [
+    activityFilter !== "all",
+    unpaidFilter !== "all",
+    discountFilter !== "all",
+    sortBy !== "name",
+  ].filter(Boolean).length;
 
-  const clearAllFilters = () => {
-    setActivityFilter("all");
-    setUnpaidFilter("all");
-    setDiscountFilter("all");
-    setSortBy("name");
-    setPage(1);
+  const clearFilters = () => {
+    setActivityFilter("all"); setUnpaidFilter("all");
+    setDiscountFilter("all"); setSortBy("name"); setPage(1);
   };
 
-  const filtered = initialClients
-    .filter((c) => {
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        const matchesSearch =
-          c.name.toLowerCase().includes(q) ||
-          (c.email?.toLowerCase().includes(q) ?? false) ||
-          (c.phone?.toLowerCase().includes(q) ?? false) ||
-          (c.address?.toLowerCase().includes(q) ?? false);
-        if (!matchesSearch) return false;
-      }
-
-      if (activityFilter === "active" && c.totalJobs === 0) return false;
-      if (activityFilter === "inactive" && c.totalJobs > 0) return false;
-
-      if (unpaidFilter === "has" && c.unpaidJobs === 0) return false;
-      if (unpaidFilter === "none" && c.unpaidJobs > 0) return false;
-
-      if (discountFilter === "has" && c.discountPercent <= 0) return false;
-      if (discountFilter === "none" && c.discountPercent > 0) return false;
-
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "revenue":
-          return b.totalRevenue - a.totalRevenue;
-        case "jobs":
-          return b.totalJobs - a.totalJobs;
-        case "recent": {
-          const aTime = a.lastJobDate ? new Date(a.lastJobDate).getTime() : 0;
-          const bTime = b.lastJobDate ? new Date(b.lastJobDate).getTime() : 0;
-          return bTime - aTime;
+  const filtered = useMemo(() => {
+    return initialClients
+      .filter(c => {
+        if (searchTerm) {
+          const q = searchTerm.toLowerCase();
+          if (
+            !c.name.toLowerCase().includes(q) &&
+            !(c.email?.toLowerCase().includes(q)) &&
+            !(c.phone?.toLowerCase().includes(q)) &&
+            !(c.address?.toLowerCase().includes(q))
+          ) return false;
         }
-        case "name":
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
-
-  const activityLabel = {
-    all: "All Clients",
-    active: "Has Jobs",
-    inactive: "No Jobs",
-  }[activityFilter];
-
-  const unpaidLabel = {
-    all: "All",
-    has: "Has Unpaid",
-    none: "No Unpaid",
-  }[unpaidFilter];
-
-  const discountLabel = {
-    all: "All",
-    has: "Has Discount",
-    none: "No Discount",
-  }[discountFilter];
-
-  const sortLabel = {
-    name: "Name (A–Z)",
-    revenue: "Revenue (High–Low)",
-    jobs: "Most Jobs",
-    recent: "Recent Activity",
-  }[sortBy];
-
-  const filterFieldLabelClass =
-    "text-[11px] uppercase tracking-wider !text-[#005F6A]/50 font-[400] mb-1.5";
-  const filterTriggerClass =
-    "w-full h-[42px] px-4 py-3 flex items-center justify-between";
-  const filterTriggerTextClass =
-    "text-left w-full text-sm font-[350] truncate";
+        if (activityFilter === "active" && c.totalJobs === 0) return false;
+        if (activityFilter === "inactive" && c.totalJobs > 0) return false;
+        if (unpaidFilter === "has" && c.unpaidJobs === 0) return false;
+        if (unpaidFilter === "none" && c.unpaidJobs > 0) return false;
+        if (discountFilter === "has" && c.discountPercent <= 0) return false;
+        if (discountFilter === "none" && c.discountPercent > 0) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "revenue": return b.totalRevenue - a.totalRevenue;
+          case "jobs":    return b.totalJobs - a.totalJobs;
+          case "recent": {
+            const at = a.lastJobDate ? new Date(a.lastJobDate).getTime() : 0;
+            const bt = b.lastJobDate ? new Date(b.lastJobDate).getTime() : 0;
+            return bt - at;
+          }
+          default: return a.name.localeCompare(b.name);
+        }
+      });
+  }, [initialClients, searchTerm, activityFilter, unpaidFilter, discountFilter, sortBy]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
@@ -182,621 +141,269 @@ export default function ClientsPageClient({
 
   const goToPage = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
 
-  const handleCreate = () => {
-    setSelectedClient(null);
-    setModalMode("create");
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (c: Client) => {
-    setSelectedClient(c);
-    setModalMode("edit");
-    setIsModalOpen(true);
-  };
+  const handleCreate = () => { setSelectedClient(null); setModalMode("create"); setIsModalOpen(true); };
+  const handleEdit = (c: Client) => { setSelectedClient(c); setModalMode("edit"); setIsModalOpen(true); };
 
   const handleDelete = async (c: Client) => {
     if (c.totalJobs > 0) {
-      setErrorMsg(
-        `Cannot delete "${c.name}" — ${c.totalJobs} job${
-          c.totalJobs === 1 ? "" : "s"
-        } linked.`
-      );
+      setErrorMsg(`Cannot delete "${c.name}" — ${c.totalJobs} job${c.totalJobs === 1 ? "" : "s"} linked.`);
       return;
     }
     if (!confirm(`Delete "${c.name}"?`)) return;
     setDeletingId(c.id);
     const result = await deleteClient(c.id);
     setDeletingId(null);
-    if (result.error) {
-      setErrorMsg(result.error);
-    } else {
-      router.refresh();
-    }
+    if (result.error) setErrorMsg(result.error);
+    else router.refresh();
   };
 
-  const MetricCard = ({
-    label,
-    value,
-    variant = "default",
-  }: {
-    label: string;
-    value: string;
-    variant?: "default" | "warning";
-  }) => (
-    <Card
-      variant={variant === "warning" ? "warning" : "cleano_light"}
-      className="p-6 h-[7rem]">
-      <div className="h-full flex flex-col justify-between">
-        <span
-          className={`app-title-small ${
-            variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
-          }`}>
-          {label}
-        </span>
-        <p
-          className={`h2-title ${
-            variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
-          }`}>
-          {value}
-        </p>
-      </div>
-    </Card>
-  );
-
   return (
-    <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-            Clients
+    <div className="admin-font stack-24">
+      <header className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
+        <div className="stack-8">
+          <p className="eyebrow">Records</p>
+          <h1 className="display">
+            Clients{" "}
+            <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>· {initialStats.totalClients}</span>
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
-            Manage your clients and view their job history
-          </p>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          border={false}
-          onClick={handleCreate}
-          className="rounded-2xl px-6 py-3">
-          <Plus className="w-4 h-4 mr-2" />
-          New Client
-        </Button>
+        <button type="button" className="btn btn-primary" onClick={handleCreate}>
+          <Plus size={16} /> New Client
+        </button>
+      </header>
+
+      <div className="astat-grid">
+        <AStatCard icon={Users}       label="Total clients" value={String(initialStats.totalClients)} hint="all time" />
+        <AStatCard icon={Briefcase}   label="Active clients" value={String(initialStats.activeClients)} hint="with jobs" />
+        <AStatCard icon={DollarSign}  label="Total revenue"  value={`$${initialStats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} />
+        <AStatCard
+          icon={AlertTriangle} label="Unpaid jobs"
+          value={String(initialStats.unpaidJobs)}
+          warn={initialStats.unpaidJobs > 0}
+          hint={initialStats.unpaidJobs > 0 ? "needs attention" : "all clear"}
+        />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          label="Total Clients"
-          value={String(initialStats.totalClients)}
-        />
-        <MetricCard
-          label="Active Clients"
-          value={String(initialStats.activeClients)}
-        />
-        <MetricCard
-          label="Total Revenue"
-          value={`$${initialStats.totalRevenue.toFixed(2)}`}
-        />
-        {initialStats.unpaidJobs > 0 ? (
-          <MetricCard
-            label="Unpaid Jobs"
-            value={String(initialStats.unpaidJobs)}
-            variant="warning"
-          />
-        ) : (
-          <MetricCard label="Unpaid Jobs" value="0" />
-        )}
-      </div>
-
-      {/* Error */}
       {errorMsg && (
-        <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 p-3 flex items-start gap-3">
-          <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
-          <div className="flex-1 text-sm text-red-700">{errorMsg}</div>
-          <button
-            className="text-xs text-red-600 underline"
-            onClick={() => setErrorMsg(null)}>
-            dismiss
-          </button>
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#b91c1c", display: "flex", gap: 10, alignItems: "center" }}>
+          <AlertTriangle size={14} />
+          <span style={{ flex: 1 }}>{errorMsg}</span>
+          <button type="button" onClick={() => setErrorMsg(null)} style={{ fontSize: 12, color: "#b91c1c", cursor: "pointer", textDecoration: "underline", background: "none", border: 0 }}>dismiss</button>
         </div>
       )}
 
-      {/* Search and Filters Toggle */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4 items-stretch sm:items-center">
-        {/* Search */}
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-10 w-4 h-4 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search clients by name, email, phone, or address..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              className="w-full h-[42px] pl-10 pr-4 py-3 rounded-2xl bg-[#005F6A]/5 hover:bg-[#005F6A]/8 focus:bg-white text-sm text-[#005F6A] border border-[#005F6A]/10 focus:border-[#005F6A]/40 outline-none transition-all placeholder:text-[#005F6A]/40 placeholder:font-[350]"
+      <div className="atoolbar">
+        <div className="atoolbar-search">
+          <span className="atoolbar-search-icon"><Search size={14} /></span>
+          <input
+            className="input"
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
+            placeholder="Search clients by name, email, phone, or address…"
+          />
+        </div>
+        <button
+          type="button"
+          className={`afilter-toggle${showFilters ? " open" : ""}`}
+          onClick={() => setShowFilters(v => !v)}>
+          <SlidersHorizontal size={14} />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="afilter-badge">{activeFilterCount}</span>
+          )}
+        </button>
+        <PremiumSelect
+          value={String(rowsPerPage)}
+          onChange={v => { setRowsPerPage(Number(v)); setPage(1); }}
+          options={[5, 10, 25, 50, 100].map(n => ({ value: String(n), label: `${n} / page` }))}
+          size="sm"
+          style={{ width: 110 }}
+        />
+        <span style={{ fontSize: 13, color: "var(--primary-60)" }}>
+          {total} client{total !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {showFilters && (
+        <div className="afilter-panel">
+          <div className="field">
+            <label className="label">Activity</label>
+            <PremiumSelect
+              value={activityFilter}
+              onChange={v => { setActivityFilter(v as typeof activityFilter); setPage(1); }}
+              options={[{ value: "all", label: "All clients" }, { value: "active", label: "Has jobs" }, { value: "inactive", label: "No jobs" }]}
+              size="sm"
             />
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Filters Toggle */}
-          <Button
-            variant={showFilters ? "cleano" : "default"}
-            size="md"
-            border={false}
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className="h-[42px] px-4 py-3 flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            <span className="text-sm font-[350]">Filters</span>
-            {hasActiveFilters && (
-              <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#005F6A] text-white text-[10px] font-[400]">
-                •
-              </span>
-            )}
-          </Button>
-
-          {/* Rows Per Page */}
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="default"
-                size="md"
-                border={false}
-                className="min-w-20 h-[42px] px-4 py-3 flex items-center justify-between w-fit">
-                <span className="text-sm font-[350]">{rowsPerPage} / page</span>
-                <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-              </Button>
-            }
-            options={[5, 10, 25, 50, 100].map((n) => ({
-              label: String(n),
-              onClick: () => {
-                setRowsPerPage(n);
-                setPage(1);
-              },
-            }))}
-            maxHeight="12rem"
-          />
-        </div>
-      </div>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <div className="bg-white rounded-2xl p-4 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Activity */}
-            <div className="flex flex-col">
-              <label className={filterFieldLabelClass}>Activity</label>
-              <CustomDropdown
-                trigger={
-                  <Button
-                    variant="default"
-                    size="md"
-                    border={false}
-                    type="button"
-                    className={filterTriggerClass}>
-                    <span className={filterTriggerTextClass}>
-                      {activityLabel}
-                    </span>
-                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
-                }
-                options={[
-                  {
-                    label: "All Clients",
-                    onClick: () => {
-                      setActivityFilter("all");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "Has Jobs",
-                    onClick: () => {
-                      setActivityFilter("active");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "No Jobs",
-                    onClick: () => {
-                      setActivityFilter("inactive");
-                      setPage(1);
-                    },
-                  },
-                ]}
-                maxHeight="14rem"
-              />
-            </div>
-
-            {/* Unpaid */}
-            <div className="flex flex-col">
-              <label className={filterFieldLabelClass}>Unpaid Jobs</label>
-              <CustomDropdown
-                trigger={
-                  <Button
-                    variant="default"
-                    size="md"
-                    border={false}
-                    type="button"
-                    className={filterTriggerClass}>
-                    <span className={filterTriggerTextClass}>
-                      {unpaidLabel}
-                    </span>
-                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
-                }
-                options={[
-                  {
-                    label: "All",
-                    onClick: () => {
-                      setUnpaidFilter("all");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "Has Unpaid",
-                    onClick: () => {
-                      setUnpaidFilter("has");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "No Unpaid",
-                    onClick: () => {
-                      setUnpaidFilter("none");
-                      setPage(1);
-                    },
-                  },
-                ]}
-                maxHeight="14rem"
-              />
-            </div>
-
-            {/* Discount */}
-            <div className="flex flex-col">
-              <label className={filterFieldLabelClass}>Discount</label>
-              <CustomDropdown
-                trigger={
-                  <Button
-                    variant="default"
-                    size="md"
-                    border={false}
-                    type="button"
-                    className={filterTriggerClass}>
-                    <span className={filterTriggerTextClass}>
-                      {discountLabel}
-                    </span>
-                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
-                }
-                options={[
-                  {
-                    label: "All",
-                    onClick: () => {
-                      setDiscountFilter("all");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "Has Discount",
-                    onClick: () => {
-                      setDiscountFilter("has");
-                      setPage(1);
-                    },
-                  },
-                  {
-                    label: "No Discount",
-                    onClick: () => {
-                      setDiscountFilter("none");
-                      setPage(1);
-                    },
-                  },
-                ]}
-                maxHeight="14rem"
-              />
-            </div>
-
-            {/* Sort By */}
-            <div className="flex flex-col">
-              <label className={filterFieldLabelClass}>Sort By</label>
-              <CustomDropdown
-                trigger={
-                  <Button
-                    variant="default"
-                    size="md"
-                    border={false}
-                    type="button"
-                    className={filterTriggerClass}>
-                    <span className={filterTriggerTextClass}>{sortLabel}</span>
-                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
-                }
-                options={[
-                  { label: "Name (A–Z)", onClick: () => setSortBy("name") },
-                  {
-                    label: "Revenue (High–Low)",
-                    onClick: () => setSortBy("revenue"),
-                  },
-                  { label: "Most Jobs", onClick: () => setSortBy("jobs") },
-                  {
-                    label: "Recent Activity",
-                    onClick: () => setSortBy("recent"),
-                  },
-                ]}
-                maxHeight="14rem"
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="sm:col-span-2 lg:col-span-4 flex items-end justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="md"
-                border={false}
-                onClick={clearAllFilters}
-                className="h-[42px] px-4">
-                <span className="text-sm font-[350]">Clear</span>
-              </Button>
-              <Button
-                variant="cleano"
-                size="md"
-                border={false}
-                onClick={() => setShowFilters(false)}
-                className="h-[42px] px-4">
-                <span className="text-sm font-[350]">Apply Filters</span>
-              </Button>
-            </div>
+          <div className="field">
+            <label className="label">Unpaid</label>
+            <PremiumSelect
+              value={unpaidFilter}
+              onChange={v => { setUnpaidFilter(v as typeof unpaidFilter); setPage(1); }}
+              options={[{ value: "all", label: "All" }, { value: "has", label: "Has unpaid" }, { value: "none", label: "No unpaid" }]}
+              size="sm"
+            />
+          </div>
+          <div className="field">
+            <label className="label">Discount</label>
+            <PremiumSelect
+              value={discountFilter}
+              onChange={v => { setDiscountFilter(v as typeof discountFilter); setPage(1); }}
+              options={[{ value: "all", label: "All" }, { value: "has", label: "Has discount" }, { value: "none", label: "No discount" }]}
+              size="sm"
+            />
+          </div>
+          <div className="field">
+            <label className="label">Sort by</label>
+            <PremiumSelect
+              value={sortBy}
+              onChange={v => setSortBy(v as typeof sortBy)}
+              options={[
+                { value: "name", label: "Name (A–Z)" },
+                { value: "revenue", label: "Revenue (High–Low)" },
+                { value: "jobs", label: "Most jobs" },
+                { value: "recent", label: "Recent activity" },
+              ]}
+              size="sm"
+            />
+          </div>
+          <div className="afilter-panel-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>Clear all</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowFilters(false)}>Done</button>
           </div>
         </div>
       )}
 
-      {/* Table */}
       {total === 0 ? (
-        <div className="bg-white rounded-2xl">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Users className="w-8 h-8 text-[#005F6A]/40" />
-            </div>
-            <p className="text-sm font-[350] text-[#005F6A]/70">
-              No clients found
-            </p>
-            <p className="text-xs font-[350] text-[#005F6A]/60 mt-1">
-              Create your first client to get started
-            </p>
-          </div>
+        <div className="atable-wrap" style={{ padding: "80px 40px", textAlign: "center", color: "var(--primary-60)" }}>
+          No clients match these filters.
         </div>
       ) : (
-        <div className="bg-white rounded-2xl">
-          <div className="hidden lg:block overflow-x-auto rounded-t-2xl">
-            <div className="min-w-max">
-              <div className="flex bg-[#005F6A]/5 rounded-t-2xl">
-                {[
-                  { label: "Name", className: "w-[220px] text-left" },
-                  { label: "Contact", className: "w-[240px] text-left" },
-                  { label: "Jobs", className: "w-[100px] text-center" },
-                  { label: "Revenue", className: "w-[140px] text-right" },
-                  { label: "Unpaid", className: "w-[100px] text-center" },
-                  { label: "Last Job", className: "w-[140px] text-left" },
-                  { label: "Actions", className: "w-[220px] text-left" },
-                ].map((col) => (
-                  <div
-                    key={col.label}
-                    className={`p-4 text-xs font-[350] !text-[#005F6A]/40 uppercase !tracking-wider ${col.className}`}>
-                    {col.label}
-                  </div>
-                ))}
-              </div>
-
-              <div className="divide-y divide-[#005F6A]/4">
-                {paginated.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center hover:bg-[#005F6A]/1 transition-colors">
-                    <div className="w-[220px] p-4">
-                      <Link
-                        href={`/clients/${c.id}`}
-                        className="app-title-small truncate text-[#005F6A] hover:underline">
-                        {c.name}
-                      </Link>
-                      {c.address && (
-                        <p className="app-subtitle !text-[#005F6A]/50 truncate text-xs mt-0.5">
-                          {c.address}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="w-[240px] p-4 space-y-0.5">
-                      {c.email && (
-                        <p className="app-subtitle !text-[#005F6A]/70 truncate text-xs flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {c.email}
-                        </p>
-                      )}
-                      {c.phone && (
-                        <p className="app-subtitle !text-[#005F6A]/70 truncate text-xs flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {c.phone}
-                        </p>
-                      )}
-                      {!c.email && !c.phone && (
-                        <p className="app-subtitle !text-[#005F6A]/40 text-xs">
-                          —
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="w-[100px] p-4 text-center">
-                      <span className="app-title-small !text-[#005F6A]">
-                        {c.totalJobs}
-                      </span>
-                      {c.completedJobs > 0 && (
-                        <p className="text-[10px] text-[#005F6A]/50">
-                          {c.completedJobs} done
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="w-[140px] p-4 text-right">
-                      <span className="app-title-small !text-[#005F6A]">
-                        ${c.totalRevenue.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="w-[100px] p-4 text-center">
-                      {c.unpaidJobs > 0 ? (
-                        <span className="text-sm font-[400] text-yellow-600">
-                          {c.unpaidJobs}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-[#005F6A]/40">—</span>
-                      )}
-                    </div>
-
-                    <div className="w-[140px] p-4">
-                      <span className="app-title-small !text-[#005F6A]/60 text-xs">
-                        {c.lastJobDate
-                          ? new Date(c.lastJobDate).toLocaleDateString("en-US")
-                          : "—"}
-                      </span>
-                    </div>
-
-                    <div className="w-[220px] p-4 flex items-center gap-2">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        border={false}
-                        onClick={() => handleEdit(c)}
-                        className="rounded-2xl px-3 py-2">
-                        <Pencil className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        border={false}
-                        href={`/clients/${c.id}`}
-                        className="rounded-2xl px-3 py-2">
-                        View
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        border={false}
-                        disabled={deletingId === c.id}
-                        onClick={() => handleDelete(c)}
-                        className="rounded-2xl px-2 py-2">
-                        {deletingId === c.id ? (
-                          <Loader className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3 h-3" />
+        <div className="atable-wrap">
+          <div id="cl-desktop">
+            <div className="atable-scroll">
+              <table className="atable">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Contact</th>
+                    <th className="num">Jobs</th>
+                    <th className="num">Revenue</th>
+                    <th className="num">Unpaid</th>
+                    <th>Last job</th>
+                    <th className="col-actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(c => (
+                    <tr key={c.id} onClick={() => { window.location.href = `/clients/${c.id}`; }}>
+                      <td style={{ minWidth: 200 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span
+                            className="avatar"
+                            style={{ background: avatarColor(c.name), fontSize: 12, width: 36, height: 36 }}>
+                            {initials(c.name)}
+                          </span>
+                          <div>
+                            <div className="col-client">{c.name}</div>
+                            {c.address && <div className="col-client-sub" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{c.address}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ minWidth: 180 }}>
+                        {c.email && <div className="col-client-sub">{c.email}</div>}
+                        {c.phone && <div className="col-client-sub">{c.phone}</div>}
+                        {!c.email && !c.phone && <span style={{ color: "var(--primary-40)" }}>—</span>}
+                      </td>
+                      <td className="num">
+                        <span style={{ fontWeight: 600, color: "var(--ink)" }}>{c.totalJobs}</span>
+                        {c.completedJobs > 0 && (
+                          <div style={{ fontSize: 11, color: "var(--primary-60)" }}>{c.completedJobs} done</div>
                         )}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </td>
+                      <td className="num" style={{ fontWeight: 600, color: "var(--ink)" }}>
+                        ${c.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="num">
+                        {c.unpaidJobs > 0 ? (
+                          <span style={{ fontWeight: 600, color: "#d97706" }}>{c.unpaidJobs}</span>
+                        ) : <span style={{ color: "var(--primary-40)" }}>—</span>}
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 12, color: "var(--primary-70)" }}>
+                          {c.lastJobDate ? new Date(c.lastJobDate).toLocaleDateString("en-US") : "—"}
+                        </span>
+                      </td>
+                      <td className="col-actions" onClick={e => e.stopPropagation()}>
+                        <div className="row">
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            title="Edit"
+                            onClick={() => handleEdit(c)}>
+                            <Pencil size={14} />
+                          </button>
+                          <a href={`/clients/${c.id}`} className="btn btn-secondary btn-sm">View</a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Mobile */}
-          <div className="lg:hidden space-y-3 p-4">
-            {paginated.map((c) => (
-              <Card key={c.id} variant="cleano_light" className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <Link
-                      href={`/clients/${c.id}`}
-                      className="text-sm font-[400] text-[#005F6A] hover:underline">
-                      {c.name}
-                    </Link>
-                    <span className="text-sm font-[400] text-[#005F6A]">
-                      ${c.totalRevenue.toFixed(2)}
+          <div id="cl-mobile" style={{ display: "none", flexDirection: "column", gap: 10, padding: 16 }}>
+            {paginated.map(c => (
+              <article key={c.id} className="jcard" style={{ cursor: "pointer" }} onClick={() => { window.location.href = `/clients/${c.id}`; }}>
+                <div className="jcard-top">
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span className="avatar" style={{ background: avatarColor(c.name), fontSize: 12, width: 36, height: 36 }}>
+                      {initials(c.name)}
                     </span>
+                    <div>
+                      <div className="jcard-client">{c.name}</div>
+                      {c.email && <div className="jcard-meta">{c.email}</div>}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-[#005F6A]/60">
-                    <span>
-                      {c.totalJobs} job{c.totalJobs === 1 ? "" : "s"}
-                    </span>
-                    {c.unpaidJobs > 0 && (
-                      <span className="text-yellow-600">
-                        {c.unpaidJobs} unpaid
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      border={false}
-                      onClick={() => handleEdit(c)}
-                      className="rounded-2xl px-4 py-2 flex-1">
-                      Edit
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      border={false}
-                      href={`/clients/${c.id}`}
-                      className="rounded-2xl px-4 py-2 flex-1">
-                      View
-                    </Button>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="jcard-price">${c.totalRevenue.toFixed(0)}</div>
+                    <div className="jcard-meta">{c.totalJobs} job{c.totalJobs !== 1 ? "s" : ""}</div>
                   </div>
                 </div>
-              </Card>
+                {c.unpaidJobs > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#d97706", fontWeight: 600 }}>
+                    {c.unpaidJobs} unpaid job{c.unpaidJobs !== 1 ? "s" : ""}
+                  </div>
+                )}
+              </article>
             ))}
           </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between p-2 px-3 bg-[#005F6A]/4 rounded-b-2xl">
-            <div className="text-xs text-[#005F6A]/70 font-[350]">
-              Showing {startIdx + 1} to {Math.min(startIdx + rowsPerPage, total)} of{" "}
-              {total} clients
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => goToPage(1)}
-                disabled={page === 1}
-                className="px-2">
-                <ChevronsLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => goToPage(page - 1)}
-                disabled={page === 1}
-                className="px-2">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-xs text-[#005F6A]/70 px-2">
-                Page {page} / {totalPages}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => goToPage(page + 1)}
-                disabled={page >= totalPages}
-                className="px-2">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => goToPage(totalPages)}
-                disabled={page >= totalPages}
-                className="px-2">
-                <ChevronsRight className="w-4 h-4" />
-              </Button>
+          <div className="apager">
+            <span>Showing {startIdx + 1}–{Math.min(startIdx + rowsPerPage, total)} of {total}</span>
+            <div className="apager-controls">
+              <button type="button" className="apager-btn" disabled={page === 1} onClick={() => goToPage(1)}>«</button>
+              <button type="button" className="apager-btn" disabled={page === 1} onClick={() => goToPage(page - 1)}>
+                <ChevronLeft size={14} />
+              </button>
+              <span className="apager-btn active">{page}</span>
+              <span style={{ fontSize: 12, color: "var(--primary-50)", alignSelf: "center" }}>/ {totalPages}</span>
+              <button type="button" className="apager-btn" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>
+                <ChevronRight size={14} />
+              </button>
+              <button type="button" className="apager-btn" disabled={page >= totalPages} onClick={() => goToPage(totalPages)}>»</button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @media (max-width: 900px) {
+          #cl-desktop { display: none !important; }
+          #cl-mobile  { display: flex !important; }
+        }
+      `}</style>
 
       <ClientModal
         isOpen={isModalOpen}

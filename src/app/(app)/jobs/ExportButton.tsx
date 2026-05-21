@@ -5,6 +5,7 @@ import { Download, Loader } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CustomDropdown from "@/components/ui/custom-dropdown";
 import Modal from "@/components/ui/Modal";
+import DatePicker from "@/components/ui/DatePicker";
 import { exportJobs } from "../actions/exportJobs";
 import type { JobExportRow } from "../actions/exportJobs.types";
 
@@ -413,24 +414,22 @@ export default function ExportButton({ filters }: ExportButtonProps) {
             <label className="text-[11px] uppercase tracking-wider text-[#005F6A]/50 font-[400] mb-1.5">
               Start Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={startDate}
               max={endDate || undefined}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={dateInputClass}
+              onChange={setStartDate}
+              size="sm"
             />
           </div>
           <div className="flex flex-col">
             <label className="text-[11px] uppercase tracking-wider text-[#005F6A]/50 font-[400] mb-1.5">
               End Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={endDate}
               min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={dateInputClass}
+              onChange={setEndDate}
+              size="sm"
             />
           </div>
         </div>

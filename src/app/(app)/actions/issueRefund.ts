@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { stripe } from "@/lib/stripe";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -12,9 +13,6 @@ interface IssueRefundInput {
   reason?: string;
 }
 
-// Records a manual refund on a job. Once Stripe is wired, this will also
-// trigger the actual refund via the Stripe API; for now it's a ledger entry
-// that admins use after refunding by other means (e-transfer, cash, etc.).
 export async function issueRefund(input: IssueRefundInput) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -41,25 +39,43 @@ export async function issueRefund(input: IssueRefundInput) {
     if (input.amount > refundableRemaining + 0.001) {
       return {
         success: false,
-        error: `Cannot refund more than $${refundableRemaining.toFixed(
-          2
-        )} (already refunded $${alreadyRefunded.toFixed(2)})`,
+        error: `Cannot refund more than $${refundableRemaining.toFixed(2)} (already refunded $${alreadyRefunded.toFixed(2)})`,
       };
     }
+
+    let stripeRefundId: string | null = null;
+
+    // If this job was paid via Stripe, issue the refund through Stripe too
+    if (job.stripePaymentIntentId) {
+      try {
+        const refund = await stripe.refunds.create({
+          payment_intent: job.stripePaymentIntentId,
+          amount: Math.round(input.amount * 100),
+          reason: "requested_by_customer",
+          metadata: { jobId: job.id, jobNumber: String(job.jobNumber) },
+        });
+        stripeRefundId = refund.id;
+      } catch (stripeErr: any) {
+        const msg = stripeErr?.raw?.message ?? stripeErr?.message ?? "Stripe refund failed";
+        return { success: false, error: `Stripe error: ${msg}` };
+      }
+    }
+
+    const description = stripeRefundId
+      ? `Stripe refund — Job #${job.jobNumber} (refund: ${stripeRefundId})`
+      : `Refund — Job #${job.jobNumber}`;
 
     await db.$transaction([
       db.job.update({
         where: { id: input.jobId },
-        data: {
-          refundedAmount: alreadyRefunded + input.amount,
-        },
+        data: { refundedAmount: alreadyRefunded + input.amount },
       }),
       db.transaction.create({
         data: {
           date: new Date(),
           category: "REVENUE",
           amount: -input.amount,
-          description: `Refund — Job #${job.jobNumber}`,
+          description,
           notes: input.reason?.trim() || null,
           jobId: input.jobId,
           source: "refund",
@@ -74,9 +90,7 @@ export async function issueRefund(input: IssueRefundInput) {
           field: "refundedAmount",
           oldValue: String(alreadyRefunded),
           newValue: String(alreadyRefunded + input.amount),
-          description: `Refund of $${input.amount.toFixed(2)} issued${
-            input.reason ? `: ${input.reason}` : ""
-          }`,
+          description: `Refund of $${input.amount.toFixed(2)} issued${input.reason ? `: ${input.reason}` : ""}${stripeRefundId ? ` (Stripe: ${stripeRefundId})` : ""}`,
         },
       }),
       ...(job.client?.email
@@ -94,17 +108,13 @@ export async function issueRefund(input: IssueRefundInput) {
         : []),
     ]);
 
-    // Fire refund email (non-blocking)
     queueAndSendRefund(input.jobId, input.amount, input.reason).catch(() => {});
 
     revalidatePath(`/jobs/${input.jobId}`);
     revalidatePath("/jobs");
     revalidatePath("/finances");
 
-    return {
-      success: true,
-      refundedTotal: alreadyRefunded + input.amount,
-    };
+    return { success: true, refundedTotal: alreadyRefunded + input.amount };
   } catch (error) {
     console.error("Error issuing refund:", error);
     return { success: false, error: "Failed to issue refund" };

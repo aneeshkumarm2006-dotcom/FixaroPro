@@ -1,0 +1,172 @@
+import { NextRequest, NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { db } from "@/db";
+import { queueAndSendReceipt, queueAndSendRefund } from "@/lib/email";
+import Stripe from "stripe";
+
+export const config = { api: { bodyParser: false } };
+
+async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
+  const jobId = pi.metadata?.jobId;
+  if (!jobId) return;
+
+  const job = await db.job.findUnique({ where: { id: jobId } });
+  if (!job || job.paymentReceived) return;
+
+  await db.$transaction([
+    db.job.update({
+      where: { id: jobId },
+      data: {
+        paymentReceived: true,
+        paidAt: new Date(),
+        stripePaymentIntentId: pi.id,
+        paymentFailedAt: null,
+        paymentFailureReason: null,
+      },
+    }),
+    db.transaction.create({
+      data: {
+        date: new Date(),
+        category: "REVENUE",
+        amount: pi.amount_received / 100,
+        description: `Stripe payment confirmed — job #${job.jobNumber}`,
+        jobId,
+        source: "CREDIT_CARD",
+        isAuto: true,
+      },
+    }),
+    db.jobLog.create({
+      data: {
+        jobId,
+        action: "PAYMENT_RECEIVED",
+        description: `Payment of $${(pi.amount_received / 100).toFixed(2)} confirmed via Stripe webhook (PI: ${pi.id})`,
+      },
+    }),
+  ]);
+
+  queueAndSendReceipt(jobId).catch(() => {});
+}
+
+async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
+  const jobId = pi.metadata?.jobId;
+  if (!jobId) return;
+
+  const reason =
+    pi.last_payment_error?.message ?? "Payment failed";
+
+  await db.job.update({
+    where: { id: jobId },
+    data: {
+      paymentFailedAt: new Date(),
+      paymentFailureReason: reason,
+    },
+  }).catch(() => {});
+}
+
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  // charge.refunds.data contains the individual refunds
+  const latestRefund = charge.refunds?.data?.[0];
+  if (!latestRefund) return;
+
+  // Look up the job by the payment intent
+  const job = await db.job.findFirst({
+    where: { stripePaymentIntentId: charge.payment_intent as string },
+  });
+  if (!job) return;
+
+  const refundAmount = latestRefund.amount / 100;
+  const alreadyRefunded = job.refundedAmount ?? 0;
+
+  await db.$transaction([
+    db.job.update({
+      where: { id: job.id },
+      data: { refundedAmount: alreadyRefunded + refundAmount },
+    }),
+    db.transaction.create({
+      data: {
+        date: new Date(),
+        category: "REVENUE",
+        amount: -refundAmount,
+        description: `Stripe refund — Job #${job.jobNumber}`,
+        jobId: job.id,
+        source: "refund",
+        isAuto: true,
+      },
+    }),
+    db.jobLog.create({
+      data: {
+        jobId: job.id,
+        action: "UPDATED",
+        field: "refundedAmount",
+        oldValue: String(alreadyRefunded),
+        newValue: String(alreadyRefunded + refundAmount),
+        description: `Refund of $${refundAmount.toFixed(2)} confirmed via Stripe webhook (refund: ${latestRefund.id})`,
+      },
+    }),
+  ]);
+}
+
+async function handleSetupIntentSucceeded(si: Stripe.SetupIntent) {
+  const customerId = si.customer as string;
+  const paymentMethodId = si.payment_method as string;
+  if (!customerId || !paymentMethodId) return;
+
+  // Save the default payment method on the client record
+  await db.client.updateMany({
+    where: { stripeCustomerId: customerId },
+    data: { defaultPaymentMethodId: paymentMethodId },
+  });
+
+  // Also set it as default on the Stripe customer
+  await stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId },
+  });
+}
+
+export async function POST(req: NextRequest) {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET not set");
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) {
+    return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
+  }
+
+  const rawBody = await req.text();
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+  } catch (err: any) {
+    console.error("Webhook signature verification failed:", err.message);
+    return NextResponse.json({ error: `Webhook error: ${err.message}` }, { status: 400 });
+  }
+
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+        break;
+      case "charge.refunded":
+        await handleChargeRefunded(event.data.object as Stripe.Charge);
+        break;
+      case "setup_intent.succeeded":
+        await handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent);
+        break;
+      default:
+        // Unhandled event — acknowledge so Stripe doesn't retry
+        break;
+    }
+  } catch (err: any) {
+    console.error(`Error handling ${event.type}:`, err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+
+  return NextResponse.json({ received: true });
+}

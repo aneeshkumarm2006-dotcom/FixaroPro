@@ -2,15 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
-import TimePicker from "@/components/ui/TimePicker";
-import DatePicker from "@/components/ui/DatePicker";
 import { getAvailability } from "../../actions/getAvailability";
 import { setAvailability } from "../../actions/setAvailability";
 import type { AvailabilitySlotInput } from "../../actions/setAvailability.types";
 import type { AvailabilityDay } from "@prisma/client";
-import { SectionCard, Field, Feedback, Msg } from "./_shared";
+import { SectionCard, Feedback, Msg } from "./_shared";
 
 const DAYS: { key: AvailabilityDay; label: string }[] = [
   { key: "MONDAY", label: "Monday" },
@@ -136,96 +132,71 @@ export default function AvailabilityTab({ employeeId }: AvailabilityTabProps) {
 
   return (
     <SectionCard
-      title="Weekly Availability"
+      title="Weekly availability"
       description="Mark the days and hours you're available for jobs."
       icon={Calendar}>
       {loading ? (
-        <p className="text-sm text-[#005F6A]/60">Loading availability...</p>
+        <p style={{ fontSize: 13, color: "var(--primary-60)" }}>Loading availability...</p>
       ) : (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            {rows.map((row) => {
-              const label = DAYS.find((d) => d.key === row.day)?.label ?? row.day;
-              return (
-                <div
-                  key={row.day}
-                  className="grid grid-cols-[110px_auto_1fr_auto_1fr] gap-2 items-center p-3 rounded-xl bg-[#005F6A]/5">
-                  <span className="text-sm font-[400] text-[#005F6A]">
-                    {label}
-                  </span>
-                  <label className="flex items-center gap-2 text-xs text-[#005F6A] select-none">
-                    <input
-                      type="checkbox"
-                      checked={row.isAvailable}
-                      onChange={(e) =>
-                        updateRow(row.day, { isAvailable: e.target.checked })
-                      }
-                      className="accent-[#005F6A]"
-                    />
-                    Available
-                  </label>
-                  <TimePicker
-                    value={row.startTime}
-                    disabled={!row.isAvailable}
-                    onChange={(v) =>
-                      updateRow(row.day, { startTime: v })
-                    }
-                    size="sm"
+        <>
+          {rows.map((row) => {
+            const label = DAYS.find((d) => d.key === row.day)?.label ?? row.day;
+            return (
+              <div key={row.day} className={`cl-avail-row${row.isAvailable ? "" : " disabled"}`}>
+                <div className="day-name">{label}</div>
+                <label className="avail-check">
+                  <input
+                    type="checkbox"
+                    className="cl-checkbox"
+                    checked={row.isAvailable}
+                    onChange={(e) => updateRow(row.day, { isAvailable: e.target.checked })}
                   />
-                  <span className="text-xs text-[#005F6A]/60">to</span>
-                  <TimePicker
-                    value={row.endTime}
-                    disabled={!row.isAvailable}
-                    onChange={(v) =>
-                      updateRow(row.day, { endTime: v })
-                    }
-                    size="sm"
-                  />
-                </div>
-              );
-            })}
-          </div>
+                  <span>Available</span>
+                </label>
+                <input
+                  className="cl-form-input"
+                  type="time"
+                  value={row.startTime}
+                  disabled={!row.isAvailable}
+                  onChange={(e) => updateRow(row.day, { startTime: e.target.value })}
+                />
+                <span className="sep">to</span>
+                <input
+                  className="cl-form-input"
+                  type="time"
+                  value={row.endTime}
+                  disabled={!row.isAvailable}
+                  onChange={(e) => updateRow(row.day, { endTime: e.target.value })}
+                />
+              </div>
+            );
+          })}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-            <label className="flex items-center gap-2 text-sm text-[#005F6A] select-none">
-              <input
-                type="checkbox"
-                checked={isRecurring}
-                onChange={(e) => setIsRecurring(e.target.checked)}
-                className="accent-[#005F6A]"
-              />
-              Recurring weekly
+          <div className="cl-avail-foot">
+            <label className="avail-check" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--ink)" }}>
+              <input type="checkbox" className="cl-checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} />
+              <span>Recurring weekly</span>
             </label>
-            <Field label="Effective From">
-              <DatePicker
-                value={effectiveFrom}
-                onChange={setEffectiveFrom}
-                size="sm"
-              />
-            </Field>
-            <Field label="Effective To">
-              <DatePicker
-                value={effectiveTo}
-                onChange={setEffectiveTo}
-                size="sm"
-              />
-            </Field>
+            <div className="cl-avail-eff">
+              <div>
+                <label className="cl-form-label">Effective from</label>
+                <input className="cl-form-input" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="cl-form-label">Effective to</label>
+                <input className="cl-form-input" type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} />
+              </div>
+            </div>
           </div>
 
           {msg && <Feedback msg={msg} />}
 
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="action"
-              border={false}
-              disabled={saving}
-              onClick={handleSave}
-              className="rounded-xl px-6 py-2.5">
-              {saving ? "Saving..." : "Save Availability"}
-            </Button>
+          <div className="cl-form-actions" style={{ marginTop: 18 }}>
+            <button type="button" className="cl-form-save" disabled={saving} onClick={handleSave}>
+              {saving ? "Saving..." : "Save availability"}
+            </button>
           </div>
-        </div>
+        </>
       )}
     </SectionCard>
   );

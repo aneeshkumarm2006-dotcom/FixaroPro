@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { DollarSign, Download, FileText } from "lucide-react";
-import Button from "@/components/ui/Button";
 import { getIncomeData } from "../../actions/getIncomeData";
 import type { IncomeData } from "../../actions/getIncomeData.types";
 import { generateTaxSummary } from "../../actions/generateTaxSummary";
@@ -269,49 +268,20 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
         description="Earnings from PAID payouts and estimated taxes."
         icon={DollarSign}
         actions={
-          <Button
-            variant="cleano"
-            submit={false}
-            onClick={handleDownload}
-            disabled={downloading}>
-            <Download className="w-4 h-4 mr-1" />
-            {downloading ? "Generating..." : "Download Tax Summary"}
-          </Button>
+          <button className="cl-action-btn" onClick={handleDownload} disabled={downloading}>
+            <Download className="w-[13px] h-[13px]" />
+            {downloading ? "Generating..." : "Download tax summary"}
+          </button>
         }>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat label="Gross YTD" value={formatCurrency(data.grossYTD)} />
-          <Stat
-            label="Net Income"
-            value={formatCurrency(data.netYTD)}
-            highlight
-          />
-          <Stat
-            label={`Est. Taxes (${(data.estimatedTaxRate * 100).toFixed(1)}%)`}
-            value={formatCurrency(data.estimatedTaxes)}
-            tone="amber"
-          />
-          <Stat
-            label="Cleano Deductions"
-            value={formatCurrency(data.deductionsYTD)}
-            tone="red"
-          />
-          <Stat
-            label="Adjustments"
-            value={formatCurrency(data.adjustmentsYTD)}
-            tone="blue"
-          />
-          <Stat
-            label="Reimbursements"
-            value={formatCurrency(data.reimbursementsYTD)}
-          />
-          <Stat
-            label="Hours Worked"
-            value={`${data.totalHoursYTD.toFixed(1)}h`}
-          />
-          <Stat
-            label="Jobs Completed"
-            value={data.jobsCompletedYTD.toString()}
-          />
+        <div className="cl-income-stats-grid">
+          <div className="cl-income-mini"><div className="label">Gross YTD</div><div className="val">{formatCurrency(data.grossYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Net income</div><div className="val">{formatCurrency(data.netYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Est. taxes ({(data.estimatedTaxRate * 100).toFixed(1)}%)</div><div className="val amber">{formatCurrency(data.estimatedTaxes)}</div></div>
+          <div className="cl-income-mini"><div className="label">Cleano deductions</div><div className="val red">{formatCurrency(data.deductionsYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Adjustments</div><div className="val blue">{formatCurrency(data.adjustmentsYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Reimbursements</div><div className="val">{formatCurrency(data.reimbursementsYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Hours worked</div><div className="val">{data.totalHoursYTD.toFixed(1)}h</div></div>
+          <div className="cl-income-mini"><div className="label">Jobs completed</div><div className="val">{data.jobsCompletedYTD}</div></div>
         </div>
       </SectionCard>
 
@@ -319,23 +289,14 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
         title="Other Activity"
         description="Pending earnings and withdrawals this year."
         icon={FileText}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Stat
-            label="Pending Pay"
-            value={formatCurrency(data.pendingAmount)}
-          />
-          <Stat
-            label="Withdrawn YTD"
-            value={formatCurrency(data.withdrawnYTD)}
-          />
-          <Stat
-            label="Paid Periods"
-            value={data.paidPayoutCount.toString()}
-          />
+        <div className="cl-income-stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="cl-income-mini"><div className="label">Pending pay</div><div className="val">{formatCurrency(data.pendingAmount)}</div></div>
+          <div className="cl-income-mini"><div className="label">Withdrawn YTD</div><div className="val">{formatCurrency(data.withdrawnYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Paid periods</div><div className="val">{data.paidPayoutCount}</div></div>
         </div>
-        <p className="text-[11px] text-[#005F6A]/60 mt-3">
+        <div className="cl-form-hint" style={{ marginTop: 14 }}>
           Estimated taxes are an approximation; not an official tax document.
-        </p>
+        </div>
       </SectionCard>
     </div>
   );

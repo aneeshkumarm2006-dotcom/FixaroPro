@@ -142,7 +142,11 @@ export default function Sidebar({
         className={`fixed left-0 top-0 bottom-0 p-3 z-50 transition-all duration-300 ease-in-out w-64 print:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 ${hovered ? "md:w-64" : "md:w-[5.5rem]"}`}>
-        <div className="w-full h-full bg-white/70 backdrop-blur-md shadow-lg rounded-2xl flex flex-col overflow-hidden">
+        <div className={`w-full h-full shadow-lg rounded-2xl flex flex-col overflow-hidden ${
+          isAdmin
+            ? "bg-white/70 backdrop-blur-md"
+            : "bg-gradient-to-b from-white to-[#f5f2ec] border border-[rgba(0,95,106,0.08)]"
+        }`}>
           {/* Logo + mobile close */}
           <div
             className={`h-16 flex items-center ${

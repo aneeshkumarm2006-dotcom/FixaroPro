@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Clock, Briefcase, Users, CheckCircle2, Loader2 } from "lucide-react";
 import { claimJob } from "./claimJob";
 
 interface AvailableJob {
@@ -51,110 +50,106 @@ export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) 
 
   if (visible.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
-        <CheckCircle2 className="w-12 h-12 text-gray-300" />
-        <p className="text-gray-500 font-medium">No available jobs right now.</p>
-        <p className="text-gray-400 text-sm">Check back later — new jobs are posted as bookings come in.</p>
+      <div className="cl-empty-block">
+        <div className="icon-bubble">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+        </div>
+        <h3 style={{ fontSize: 17, color: "var(--ink)", margin: "0 0 6px" }}>No open jobs right now</h3>
+        <p style={{ margin: 0, fontSize: 13 }}>Check back later — new shifts appear here as soon as they&apos;re posted.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="cl-jobs-grid">
       {visible.map((job) => {
         const spotsLeft = job.requiredCleaners - job.claimedCount;
         const isBusy = busyId === job.id;
+        const dateStr = fmtDate(job.startTime);
+        const timeStr = !job.isFlexible ? fmtTime(job.startTime) : null;
 
         return (
-          <div
-            key={job.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between gap-2">
+          <article key={job.id} className="cl-job-card">
+            <div className="cl-job-card-head">
               <div>
-                <p className="text-xs font-semibold text-[#005F6A]/60 uppercase tracking-wide mb-1">
-                  Job #{job.jobNumber}
-                </p>
-                <p className="text-lg font-semibold text-[#005F6A]">
-                  {fmtDate(job.startTime)}
-                  {!job.isFlexible && (
-                    <span className="text-sm font-normal text-gray-500 ml-2">
-                      · {fmtTime(job.startTime)}
+                <div className="cl-job-card-id">JOB #{job.jobNumber}</div>
+                <h3 className="cl-job-card-date">
+                  {dateStr}
+                  {timeStr && (
+                    <span style={{ fontFamily: "var(--font)", fontSize: 14, color: "var(--primary-60)", fontWeight: 500, marginLeft: 8 }}>
+                      · {timeStr}
                     </span>
                   )}
-                </p>
+                </h3>
                 {job.isFlexible && (
-                  <span className="inline-block mt-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                    Flexible time
-                  </span>
+                  <span className="cl-pill flex" style={{ marginTop: 8 }}>Flexible time</span>
                 )}
               </div>
               {job.price != null && (
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">Est. pay</p>
-                  <p className="text-lg font-bold text-[#005F6A]">
-                    ${(job.price / 2).toFixed(0)}
-                    <span className="text-xs font-normal text-gray-400">+</span>
-                  </p>
+                <div className="cl-job-card-pay">
+                  <div className="cl-job-card-pay-lbl">Est. pay</div>
+                  <div className="cl-job-card-pay-val">
+                    ${Math.round(job.price / 2)}<sup>+</sup>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5 text-sm text-gray-600">
+            <div className="cl-job-card-meta">
               {job.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <span className="truncate">{job.location}</span>
+                <div className="row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  </span>
+                  <span>{job.location}</span>
                 </div>
               )}
               {job.jobType && (
-                <div className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <span>{job.jobType}</span>
-                  {(job.bedCount || job.bathCount) && (
-                    <span className="text-gray-400">
-                      · {job.bedCount ?? 0}bd / {job.bathCount ?? 0}ba
-                    </span>
-                  )}
+                <div className="row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+                  </span>
+                  <span>
+                    <strong style={{ fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "0.04em" }}>{job.jobType}</strong>
+                    {(job.bedCount || job.bathCount) && (
+                      <span style={{ color: "var(--primary-50)" }}> · {job.bedCount ?? 0}bd / {job.bathCount ?? 0}ba</span>
+                    )}
+                  </span>
                 </div>
               )}
               {job.isFlexible && (
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <span className="text-gray-400">Time TBD by admin</span>
+                <div className="row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                  </span>
+                  <span>Time TBD by admin</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span>
-                  <span className="font-medium text-[#005F6A]">{spotsLeft}</span> spot{spotsLeft !== 1 ? "s" : ""} remaining
+              <div className="row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                 </span>
+                <span><strong>{spotsLeft}</strong> spot{spotsLeft !== 1 ? "s" : ""} remaining</span>
               </div>
             </div>
 
             {job.notes && (
-              <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 italic">
+              <p style={{ fontSize: 12, color: "var(--primary-60)", background: "var(--cream)", borderRadius: 10, padding: "10px 14px", fontStyle: "italic", margin: 0 }}>
                 {job.notes}
               </p>
             )}
 
             {errors[job.id] && (
-              <p className="text-xs text-red-600">{errors[job.id]}</p>
+              <p style={{ fontSize: 12, color: "#dc2626", margin: 0 }}>{errors[job.id]}</p>
             )}
 
             <button
               onClick={() => handleClaim(job.id)}
               disabled={isBusy}
-              className="mt-auto w-full py-2.5 rounded-xl bg-[#005F6A] text-white text-sm font-semibold hover:bg-[#00424a] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-              {isBusy ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Claiming…
-                </>
-              ) : (
-                "Claim this job"
-              )}
+              className="cl-claim-btn">
+              {isBusy ? "Claiming…" : "Claim this job"}
             </button>
-          </div>
+          </article>
         );
       })}
     </div>

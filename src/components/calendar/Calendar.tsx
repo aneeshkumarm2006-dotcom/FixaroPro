@@ -30,9 +30,10 @@ interface CalendarProps {
   onEventAdd?: (event: CalendarEvent) => void;
   persist?: boolean;
   onEventsChange?: (events: CalendarEvent[]) => void;
+  hideNewJobButton?: boolean;
 }
 
-const Calendar = React.forwardRef<CalendarRef, CalendarProps>((props, ref) => {
+const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButton = false, ...props }, ref) => {
   const {
     view,
     setView,
@@ -501,15 +502,17 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>((props, ref) => {
                 />
               </Button>
             </Card>
-            <Button
-              variant="primary"
-              size="md"
-              className="px-6 py-3"
-              onClick={() => {
-                setShowJobModal(true);
-              }}>
-              New Job
-            </Button>
+            {!hideNewJobButton && (
+              <Button
+                variant="primary"
+                size="md"
+                className="px-6 py-3"
+                onClick={() => {
+                  setShowJobModal(true);
+                }}>
+                New Job
+              </Button>
+            )}
           </div>
         </div>
       </div>

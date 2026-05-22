@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getCachedSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import Link from "next/link";
@@ -20,9 +19,24 @@ import {
 } from "lucide-react";
 
 import { requireAdmin } from "@/lib/page-guards";
+import { isAdminRole } from "@/lib/role-routing";
+import CleanerDashboard from "./CleanerDashboard";
 
 export default async function DashboardPage() {
-  // Admin-only — cleaners go to /my-jobs, clients to /portal.
+  const preCheck = await getCachedSession();
+  if (!preCheck) redirect("/sign-in");
+
+  const role = (preCheck.user as any).role;
+  if (!isAdminRole(role)) {
+    return (
+      <CleanerDashboard
+        userId={preCheck.user.id}
+        userName={preCheck.user.name ?? ""}
+      />
+    );
+  }
+
+  // Admin path — unchanged below
   const session = await requireAdmin();
 
   const { user } = session;
@@ -544,7 +558,7 @@ export default async function DashboardPage() {
               Quick Actions
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <QuickAction title="New Job" href="/jobs" icon={Briefcase} />
+              <QuickAction title="New Job" href="/jobs/new" icon={Briefcase} />
               <QuickAction title="Employees" href="/employees" icon={Users} />
               <QuickAction title="Inventory" href="/inventory" icon={Package} />
               <QuickAction

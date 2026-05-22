@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
-import Input from "@/components/ui/Input";
-import { LogOut, Package, AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { createPortal } from "react-dom";
 import { clockOut } from "../actions/clockOut";
 import { requestRefill } from "../actions/requestRefill";
 
@@ -30,268 +27,221 @@ interface ClockOutButtonProps {
   employeeProducts: EmployeeProduct[];
 }
 
-export default function ClockOutButton({
-  jobId,
-  employeeProducts,
-}: ClockOutButtonProps) {
-  const [showModal, setShowModal] = useState(false);
+export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButtonProps) {
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [inventories, setInventories] = useState<{ [key: string]: string }>({});
+  const [inventories, setInventories] = useState<Record<string, string>>({});
   const [refillingId, setRefillingId] = useState<string | null>(null);
-  const [refillRequested, setRefillRequested] = useState<{ [key: string]: boolean }>({});
+  const [refillDone, setRefillDone] = useState<Record<string, boolean>>({});
 
-  const handleOpenModal = () => {
-    const initial: { [key: string]: string } = {};
-    employeeProducts.forEach((ep) => {
-      initial[ep.productId] = ep.quantity.toString();
-    });
-    setInventories(initial);
-    setRefillRequested({});
-    setShowModal(true);
-  };
+  function handleOpen() {
+    const init: Record<string, string> = {};
+    employeeProducts.forEach((ep) => { init[ep.productId] = ep.quantity.toString(); });
+    setInventories(init);
+    setRefillDone({});
+    setOpen(true);
+  }
 
-  const handleClockOut = async () => {
+  async function handleConfirm() {
     setLoading(true);
     try {
       const productInventories = employeeProducts
         .map((ep) => ({
           productId: ep.productId,
-          inventoryAfter: parseFloat(inventories[ep.productId] || "0"),
+          inventoryAfter: parseFloat(inventories[ep.productId] ?? "0"),
         }))
         .filter((inv) => !isNaN(inv.inventoryAfter));
 
       const result = await clockOut(jobId, productInventories);
       if (result.success) {
-        setShowModal(false);
+        setOpen(false);
       } else {
         alert(result.error || "Failed to clock out");
       }
-    } catch (error) {
-      console.error("Error clocking out:", error);
+    } catch {
       alert("Failed to clock out");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleInventoryChange = (productId: string, value: string) => {
-    setInventories((prev) => ({
-      ...prev,
-      [productId]: value,
-    }));
-  };
-
-  const handleRequestRefill = async (ep: EmployeeProduct) => {
+  async function handleRefill(ep: EmployeeProduct) {
     setRefillingId(ep.productId);
     try {
       const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
-      const suggestedQty = usagePerJob > 0 ? Math.max(usagePerJob * 5, 1) : 1;
+      const qty = usagePerJob > 0 ? Math.max(usagePerJob * 5, 1) : 1;
       const result = await requestRefill({
         productId: ep.productId,
-        quantity: suggestedQty,
+        quantity: qty,
         reason: `Low stock during clock-out for job ${jobId}`,
       });
       if (result.success) {
-        setRefillRequested((prev) => ({ ...prev, [ep.productId]: true }));
+        setRefillDone((prev) => ({ ...prev, [ep.productId]: true }));
       } else {
         alert(result.error || "Failed to request refill");
       }
-    } catch (error) {
-      console.error("Error requesting refill:", error);
+    } catch {
       alert("Failed to request refill");
     } finally {
       setRefillingId(null);
     }
-  };
+  }
+
+  const modal = open ? (
+    <div className="co-overlay" onClick={() => !loading && setOpen(false)}>
+      <div className="co-sheet" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="co-head">
+          <div className="co-head-left">
+            <span className="co-head-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </span>
+            <div>
+              <h2 className="co-title">Clock out</h2>
+              <p className="co-subtitle">Update your remaining supply levels before finishing.</p>
+            </div>
+          </div>
+          <button className="co-close" onClick={() => !loading && setOpen(false)} aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Product list */}
+        <div className="co-body">
+          {employeeProducts.length === 0 ? (
+            <div className="co-empty">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              </svg>
+              <p>No products assigned to you.</p>
+            </div>
+          ) : (
+            employeeProducts.map((ep) => {
+              const current = parseFloat(inventories[ep.productId] ?? "0");
+              const used = isNaN(current) ? 0 : Math.max(0, ep.quantity - current);
+              const remaining = isNaN(current) ? ep.quantity : current;
+              const threshold = ep.product.inventoryRule?.refillThreshold ?? 0;
+              const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
+              const isOut = remaining <= 0;
+              const isLow = !isOut && threshold > 0 && remaining < threshold;
+
+              return (
+                <div key={ep.productId} className={`co-product${isOut ? " danger" : isLow ? " warn" : ""}`}>
+                  <div className="co-product-top">
+                    <span className="co-product-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                      </svg>
+                    </span>
+                    <div className="co-product-info">
+                      <span className="co-product-name">{ep.product.name}</span>
+                      <span className="co-product-sub">Started with {ep.quantity} {ep.product.unit}</span>
+                    </div>
+                    {isOut && <span className="co-badge danger">Out of stock</span>}
+                    {isLow && <span className="co-badge warn">Low stock</span>}
+                  </div>
+
+                  <div className="co-input-row">
+                    <label className="co-input-label">
+                      Remaining {ep.product.unit}
+                    </label>
+                    <input
+                      className="co-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={ep.quantity}
+                      value={inventories[ep.productId] ?? ""}
+                      onChange={(e) =>
+                        setInventories((prev) => ({ ...prev, [ep.productId]: e.target.value }))
+                      }
+                      placeholder="Enter remaining quantity"
+                    />
+                    {usagePerJob > 0 && (
+                      <span className="co-input-hint">Avg usage: {usagePerJob} {ep.product.unit} per job</span>
+                    )}
+                  </div>
+
+                  <div className="co-stats">
+                    <div className="co-stat">
+                      <span className="lbl">Used</span>
+                      <span className="val">{used > 0 ? used.toFixed(2) : "0"} {ep.product.unit}</span>
+                    </div>
+                    <div className={`co-stat${isOut ? " danger" : isLow ? " warn" : ""}`}>
+                      <span className="lbl">Remaining</span>
+                      <span className="val">{isNaN(current) ? "—" : current.toFixed(2)} {ep.product.unit}</span>
+                    </div>
+                  </div>
+
+                  {(isOut || isLow) && (
+                    <div className="co-refill">
+                      {refillDone[ep.productId] ? (
+                        <span className="co-refill-done">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          Replenishment requested
+                        </span>
+                      ) : (
+                        <button
+                          className="co-refill-btn"
+                          onClick={() => handleRefill(ep)}
+                          disabled={refillingId === ep.productId}
+                        >
+                          {refillingId === ep.productId ? "Requesting…" : "Replenish — pick up from warehouse"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="co-footer">
+          <button className="co-btn-ghost" onClick={() => !loading && setOpen(false)} disabled={loading}>
+            Cancel
+          </button>
+          <button className="co-btn-confirm" onClick={handleConfirm} disabled={loading}>
+            {loading ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "co-spin 0.8s linear infinite" }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                Clocking out…
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+                Confirm clock out
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
-      <Button
-        variant="cleano"
-        size="md"
-        onClick={handleOpenModal}
-        className="flex-1">
-        <LogOut className="w-4 h-4 mr-2" />
+      <button className="cl-jd-clock out" onClick={handleOpen}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        </svg>
         Clock Out
-      </Button>
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Clock Out"
-        className="max-w-2xl">
-        <div className="space-y-4">
-          <p className="text-sm text-neutral-950/70">
-            Before clocking out, please update your product inventory levels.
-            The system will calculate how much you&apos;ve used during this job.
-          </p>
-
-          {employeeProducts.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="w-12 h-12 text-neutral-950/40 mx-auto mb-4" />
-              <p className="text-sm text-neutral-950/60">
-                No products assigned to you
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {employeeProducts.map((ep) => {
-                const currentValue = parseFloat(
-                  inventories[ep.productId] || "0"
-                );
-                const originalValue = ep.quantity;
-                const used = originalValue - currentValue;
-                const remaining = isNaN(currentValue) ? originalValue : currentValue;
-
-                const refillThreshold = ep.product.inventoryRule?.refillThreshold ?? 0;
-                const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
-
-                const isOutOfStock = remaining <= 0;
-                const isLowStock =
-                  !isOutOfStock &&
-                  refillThreshold > 0 &&
-                  remaining < refillThreshold;
-
-                const cardBorder = isOutOfStock
-                  ? "border-red-500/40 bg-red-500/5"
-                  : isLowStock
-                  ? "border-orange-500/40 bg-orange-500/5"
-                  : "border-neutral-950/10 bg-neutral-950/10";
-
-                return (
-                  <div
-                    key={ep.productId}
-                    className={`p-4 rounded-lg border ${cardBorder}`}>
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 bg-neutral-950/10 rounded-lg">
-                        <Package className="w-5 h-5 text-neutral-950" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-3 gap-2">
-                          <div>
-                            <h4 className="font-[400] text-neutral-950">
-                              {ep.product.name}
-                            </h4>
-                            <p className="text-sm text-neutral-950/60">
-                              Started with: {originalValue} {ep.product.unit}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {isOutOfStock && (
-                              <span className="inline-flex items-center gap-1 text-xs font-[400] text-red-700 bg-red-500/10 border border-red-500/30 rounded px-2 py-0.5">
-                                <AlertCircle className="w-3 h-3" />
-                                Out of stock
-                              </span>
-                            )}
-                            {isLowStock && (
-                              <span className="inline-flex items-center gap-1 text-xs font-[400] text-orange-700 bg-orange-500/10 border border-orange-500/30 rounded px-2 py-0.5">
-                                <AlertTriangle className="w-3 h-3" />
-                                Low stock
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Input
-                            label={`Remaining ${ep.product.unit}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={originalValue}
-                            value={inventories[ep.productId] || ""}
-                            onChange={(e) =>
-                              handleInventoryChange(
-                                ep.productId,
-                                e.target.value
-                              )
-                            }
-                            placeholder="Enter remaining quantity"
-                          />
-
-                          {usagePerJob > 0 && (
-                            <div className="flex items-center gap-2 text-xs text-neutral-950/60">
-                              <Info className="w-3 h-3" />
-                              <span>
-                                Average usage: {usagePerJob} {ep.product.unit}{" "}
-                                per job
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center justify-between p-2 bg-neutral-950/5 rounded">
-                              <span className="text-neutral-950/70">Used:</span>
-                              <span className="font-[400] text-neutral-950">
-                                {used > 0 ? used.toFixed(2) : "0"}{" "}
-                                {ep.product.unit}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between p-2 bg-neutral-950/5 rounded">
-                              <span className="text-neutral-950/70">
-                                Remaining:
-                              </span>
-                              <span
-                                className={`font-[400] ${
-                                  isOutOfStock
-                                    ? "text-red-700"
-                                    : isLowStock
-                                    ? "text-orange-700"
-                                    : "text-neutral-950"
-                                }`}>
-                                {isNaN(currentValue)
-                                  ? "-"
-                                  : currentValue.toFixed(2)}{" "}
-                                {ep.product.unit}
-                              </span>
-                            </div>
-                          </div>
-
-                          {(isLowStock || isOutOfStock) && (
-                            <div className="pt-1">
-                              {refillRequested[ep.productId] ? (
-                                <p className="text-xs text-neutral-950/60 italic">
-                                  Refill requested
-                                </p>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRequestRefill(ep)}
-                                  loading={refillingId === ep.productId}
-                                  className="text-xs">
-                                  Request refill
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="ghost"
-              onClick={() => setShowModal(false)}
-              disabled={loading}
-              className="flex-1">
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleClockOut}
-              loading={loading}
-              className="flex-1">
-              Confirm Clock Out
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      </button>
+      {typeof window !== "undefined" && modal
+        ? createPortal(modal, document.body)
+        : null}
     </>
   );
 }

@@ -14,6 +14,9 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import PriceSummary from "./PriceSummary";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export default async function JobFormPage({
   searchParams,
@@ -83,7 +86,7 @@ export default async function JobFormPage({
   // Get all clients for the client selector
   const clients = await db.client.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, address: true },
+    select: { id: true, name: true, address: true, email: true, phone: true },
   });
 
   async function saveJob(formData: FormData) {
@@ -234,427 +237,379 @@ export default async function JobFormPage({
   const selectedCleanerIds = existingJob?.cleaners.map((c) => c.id) || [];
 
   return (
-    <div className="max-w-[80rem] mx-auto text-black">
-      <Card variant="ghost" className="mb-6">
-        <h1 className="text-3xl font-[400] text-neutral-950">
-          {isEditing ? "Edit Cleaning Job" : "Create New Cleaning Job"}
-        </h1>
-        <p className="text-neutral-950/80 mt-1">
-          {isEditing
-            ? "Update the details for your cleaning job"
-            : "Fill in the details for your cleaning job"}
-        </p>
-      </Card>
+    <div className="max-w-[68rem] mx-auto text-black pb-24">
+      {/* Back button */}
+      <Link
+        href="/jobs"
+        className="inline-flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
+        style={{ color: "var(--primary-60)" }}
+      >
+        <ArrowLeft size={14} />
+        Back to Jobs
+      </Link>
 
-      <form action={saveJob} className="space-y-6">
-        {/* Hidden field for job ID when editing */}
+      {/* Page header */}
+      <header style={{ marginBottom: 36 }}>
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--primary-60)",
+            marginBottom: 6,
+          }}
+        >
+          {isEditing ? "Edit" : "Create"}
+        </p>
+        <h1
+          style={{
+            fontSize: "clamp(32px, 4vw, 46px)",
+            fontWeight: 300,
+            lineHeight: 1.1,
+            color: "var(--ink)",
+            margin: 0,
+          }}
+        >
+          {isEditing ? (
+            <>Edit <em style={{ fontStyle: "italic" }}>cleaning job.</em></>
+          ) : (
+            <>New <em style={{ fontStyle: "italic" }}>cleaning job.</em></>
+          )}
+        </h1>
+        <p style={{ marginTop: 10, fontSize: 15, color: "var(--primary-60)" }}>
+          Fill in the details below. You can update most fields later from the job detail page.
+        </p>
+      </header>
+
+      <form action={saveJob} className="space-y-5">
         {isEditing && existingJob && (
           <input type="hidden" name="jobId" value={existingJob.id} />
         )}
+
         {/* Basic Information */}
-        <Card variant="ghost">
-          <Card variant="cleano_dark" className="mb-4">
-            <h2 className="text-xl font-[400] text-neutral-950 w-full">
-              Basic Information
-            </h2>
-          </Card>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="clientId"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Link Client (optional)
-              </label>
+        <SectionCard title="Basic information" subtitle="Who, what, where">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <FieldWrap label="Link client" hint="Pulls in saved name + address">
               <ClientLinkSelector
                 clients={clients}
                 defaultValue={existingJob?.clientId || ""}
               />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="clientName"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Client Name <span className="text-red-500">*</span>
-              </label>
+            <FieldWrap label="Client name" required>
               <Input
                 type="text"
                 id="clientName"
                 name="clientName"
                 required
                 defaultValue={existingJob?.clientName || ""}
-                placeholder="e.g., Alexis Juarez"
+                placeholder="e.g. Alexis Juarez"
               />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="jobType"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Job Type
-              </label>
+            <FieldWrap label="Job type">
               <JobTypeSelector initialValue={existingJob?.jobType} />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="location"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Location
-              </label>
+            <FieldWrap label="Location" hint="Address or general area">
               <Input
                 type="text"
                 id="location"
                 name="location"
                 defaultValue={existingJob?.location || ""}
-                placeholder="Address or area"
+                placeholder="123 rue Sainte-Catherine, Montréal"
               />
-            </div>
+            </FieldWrap>
 
             <div className="md:col-span-2">
-              <label
-                htmlFor="description"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Description
-              </label>
-              <Textarea
-                id="description"
-                name="description"
-                rows={2}
-                defaultValue={existingJob?.description || ""}
-                placeholder="Brief description of the job..."
-              />
+              <FieldWrap label="Description">
+                <Textarea
+                  id="description"
+                  name="description"
+                  rows={2}
+                  defaultValue={existingJob?.description || ""}
+                  placeholder="Brief description of the job…"
+                />
+              </FieldWrap>
             </div>
           </div>
-        </Card>
+        </SectionCard>
 
         {/* Date & Time */}
-        <Card variant="ghost">
-          <Card variant="cleano_dark" className="mb-4">
-            <h2 className="text-xl font-[400] text-neutral-950 w-full">
-              Date & Time
-            </h2>
-          </Card>
-          <div className="space-y-4">
-            {/* Start Date & Time */}
-            <div>
-              <h3 className="text-sm font-[500] text-neutral-950/90 mb-2">
-                Start
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="startDate"
-                    className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                    Start Date
-                  </label>
-                  <ControlledDatePicker
-                    name="startDate"
-                    defaultValue={
-                      existingJob?.startTime
-                        ? new Date(existingJob.startTime)
-                            .toISOString()
-                            .split("T")[0]
-                        : ""
-                    }
-                    size="md"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="startTime"
-                    className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                    Start Time
-                  </label>
-                  <ControlledTimePicker
-                    name="startTime"
-                    defaultValue={
-                      existingJob?.startTime
-                        ? new Date(existingJob.startTime)
-                            .toISOString()
-                            .split("T")[1]
-                            .slice(0, 5)
-                        : ""
-                    }
-                    size="md"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* End Date & Time */}
-            <div>
-              <h3 className="text-sm font-[500] text-neutral-950/90 mb-2">
-                End
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="endDate"
-                    className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                    End Date
-                  </label>
-                  <ControlledDatePicker
-                    name="endDate"
-                    defaultValue={
-                      existingJob?.endTime
-                        ? new Date(existingJob.endTime)
-                            .toISOString()
-                            .split("T")[0]
-                        : ""
-                    }
-                    size="md"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="endTime"
-                    className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                    End Time
-                  </label>
-                  <ControlledTimePicker
-                    name="endTime"
-                    defaultValue={
-                      existingJob?.endTime
-                        ? new Date(existingJob.endTime)
-                            .toISOString()
-                            .split("T")[1]
-                            .slice(0, 5)
-                        : ""
-                    }
-                    size="md"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Team & Hours */}
-        <Card variant="ghost">
-          <Card variant="cleano_dark" className="mb-4">
-            <h2 className="text-xl font-[400] text-neutral-950 w-full">Team</h2>
-          </Card>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <CleanerSelector
-                users={usersForSelector}
-                initialSelectedIds={selectedCleanerIds}
+        <SectionCard title="Date & time" subtitle="Scheduled window">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <FieldWrap label="Start date">
+              <ControlledDatePicker
+                name="startDate"
+                defaultValue={
+                  existingJob?.startTime
+                    ? new Date(existingJob.startTime).toISOString().split("T")[0]
+                    : ""
+                }
+                size="md"
               />
-            </div>
+            </FieldWrap>
+
+            <FieldWrap label="Start time">
+              <ControlledTimePicker
+                name="startTime"
+                defaultValue={
+                  existingJob?.startTime
+                    ? new Date(existingJob.startTime).toISOString().split("T")[1].slice(0, 5)
+                    : ""
+                }
+                size="md"
+              />
+            </FieldWrap>
+
+            <FieldWrap label="End date">
+              <ControlledDatePicker
+                name="endDate"
+                defaultValue={
+                  existingJob?.endTime
+                    ? new Date(existingJob.endTime).toISOString().split("T")[0]
+                    : ""
+                }
+                size="md"
+              />
+            </FieldWrap>
+
+            <FieldWrap label="End time">
+              <ControlledTimePicker
+                name="endTime"
+                defaultValue={
+                  existingJob?.endTime
+                    ? new Date(existingJob.endTime).toISOString().split("T")[1].slice(0, 5)
+                    : ""
+                }
+                size="md"
+              />
+            </FieldWrap>
           </div>
-        </Card>
+        </SectionCard>
+
+        {/* Team */}
+        <SectionCard title="Team" subtitle="Assign cleaners to this job">
+          <CleanerSelector
+            users={usersForSelector}
+            initialSelectedIds={selectedCleanerIds}
+          />
+        </SectionCard>
 
         {/* Pricing & Payment */}
-        <Card variant="ghost">
-          <Card variant="cleano_dark" className="mb-4">
-            <h2 className="text-xl font-[400] text-neutral-950 w-full">
-              Pricing & Payment
-            </h2>
-          </Card>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="price"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Price
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  id="price"
-                  name="price"
-                  defaultValue={existingJob?.price || ""}
-                  placeholder="0.00"
-                  className="pl-7"
-                />
-              </div>
-            </div>
+        <SectionCard title="Pricing & payment" subtitle="Charges, costs, and payment method">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <MoneyFieldWrap label="Price" id="price" name="price" defaultValue={existingJob?.price} />
+            <MoneyFieldWrap label="Employee pay" id="employeePay" name="employeePay" defaultValue={existingJob?.employeePay} />
+            <MoneyFieldWrap label="Total tip" id="totalTip" name="totalTip" defaultValue={existingJob?.totalTip} />
+            <MoneyFieldWrap label="Parking" id="parking" name="parking" defaultValue={existingJob?.parking} />
+            <MoneyFieldWrap label="Discount amount" id="discountAmount" name="discountAmount" defaultValue={existingJob?.discountAmount} />
 
-            <div>
-              <label
-                htmlFor="employeePay"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Employee Pay
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  id="employeePay"
-                  name="employeePay"
-                  defaultValue={existingJob?.employeePay || ""}
-                  placeholder="0.00"
-                  className="pl-7"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="totalTip"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Total Tip
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  id="totalTip"
-                  name="totalTip"
-                  defaultValue={existingJob?.totalTip || ""}
-                  placeholder="0.00"
-                  className="pl-7"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="parking"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Parking
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  id="parking"
-                  name="parking"
-                  defaultValue={existingJob?.parking || ""}
-                  placeholder="0.00"
-                  className="pl-7"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="discountAmount"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Discount Amount
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  id="discountAmount"
-                  name="discountAmount"
-                  defaultValue={existingJob?.discountAmount || ""}
-                  placeholder="0.00"
-                  className="pl-7"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="payRateMultiplier"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Pay Rate Multiplier
-              </label>
+            <FieldWrap label="Pay rate multiplier" hint="1.5 for overtime, 2.0 for holidays">
               <Input
                 type="number"
-                step="0.05"
+                step="0.1"
+                min="0.5"
+                max="3"
                 id="payRateMultiplier"
                 name="payRateMultiplier"
                 defaultValue={existingJob?.payRateMultiplier ?? 1.0}
-                placeholder="1.00"
+                placeholder="1.0"
               />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="paymentType"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Payment Type
-              </label>
+            <FieldWrap label="Payment type">
               <PaymentTypeSelect defaultValue={existingJob?.paymentType || ""} />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="bedCount"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Bed Count
-              </label>
+            <FieldWrap label="Bed count">
               <Input
                 type="number"
                 min="0"
+                max="10"
                 id="bedCount"
                 name="bedCount"
                 defaultValue={existingJob?.bedCount ?? ""}
                 placeholder="0"
               />
-            </div>
+            </FieldWrap>
 
-            <div>
-              <label
-                htmlFor="bathCount"
-                className="block text-sm font-[400] text-neutral-950/80 mb-1">
-                Bath Count
-              </label>
+            <FieldWrap label="Bath count">
               <Input
                 type="number"
                 min="0"
+                max="10"
                 id="bathCount"
                 name="bathCount"
                 defaultValue={existingJob?.bathCount ?? ""}
                 placeholder="0"
               />
-            </div>
+            </FieldWrap>
           </div>
-        </Card>
+
+          <PriceSummary />
+        </SectionCard>
 
         {/* Notes */}
-        <Card variant="ghost">
-          <Card variant="cleano_dark" className="mb-4">
-            <h2 className="text-xl font-[400] text-neutral-950 w-full">
-              Additional Details
-            </h2>
-          </Card>
-          <div>
-            <label
-              htmlFor="notes"
-              className="block text-sm font-[400] text-neutral-950/80 mb-1">
-              Notes
-            </label>
+        <SectionCard title="Additional details" subtitle="Notes for the team">
+          <FieldWrap label="Notes">
             <Textarea
               id="notes"
               name="notes"
-              rows={3}
+              rows={4}
               defaultValue={existingJob?.notes || ""}
-              placeholder="Any additional notes or special requirements..."
+              placeholder="Pets, parking, door codes, sensitive surfaces, special requirements…"
             />
-          </div>
-        </Card>
+          </FieldWrap>
+        </SectionCard>
 
-        {/* Action Buttons */}
-        <div className="flex justify-between">
+        {/* Sticky footer */}
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: "rgba(250, 247, 242, 0.92)",
+            backdropFilter: "blur(8px)",
+            borderTop: "1px solid rgba(0,95,106,0.10)",
+            padding: "14px 32px",
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 12,
+            zIndex: 40,
+          }}
+        >
           {isEditing && existingJob && (
-            <form action={deleteJob}>
+            <form action={deleteJob} style={{ marginRight: "auto" }}>
               <input type="hidden" name="jobId" value={existingJob.id} />
               <DeleteButton />
             </form>
           )}
-          <div className={`flex space-x-4 ${!isEditing ? "ml-auto" : ""}`}>
-            <a href={isEditing ? `/jobs/${existingJob?.id}` : "/jobs"}>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </a>
-            <SubmitButton isEditing={isEditing} />
-          </div>
+          <Link href={isEditing ? `/jobs/${existingJob?.id}` : "/jobs"}>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </Link>
+          <SubmitButton isEditing={isEditing} />
         </div>
       </form>
     </div>
+  );
+}
+
+// ─── Section card ───
+function SectionCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        background: "#fff",
+        border: "1px solid rgba(0,95,106,0.08)",
+        borderRadius: 16,
+        padding: "24px 28px",
+        boxShadow: "0 1px 6px rgba(0,95,106,0.05)",
+      }}
+    >
+      <div style={{ marginBottom: 20 }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 17,
+            fontWeight: 600,
+            color: "var(--ink)",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {title}
+        </h2>
+        {subtitle && (
+          <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--primary-60)" }}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ─── Field wrapper ───
+function FieldWrap({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--primary-60)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+        {required && <span style={{ color: "var(--error)", marginLeft: 3 }}>*</span>}
+        {hint && (
+          <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, marginLeft: 6 }}>
+            · {hint}
+          </span>
+        )}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ─── Money field wrapper ───
+function MoneyFieldWrap({
+  label,
+  id,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  id: string;
+  name: string;
+  defaultValue?: number | null;
+}) {
+  return (
+    <FieldWrap label={label}>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: "var(--primary-50)" }}>
+          $
+        </span>
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          id={id}
+          name={name}
+          defaultValue={defaultValue ?? ""}
+          placeholder="0.00"
+          className="pl-7"
+        />
+      </div>
+    </FieldWrap>
   );
 }

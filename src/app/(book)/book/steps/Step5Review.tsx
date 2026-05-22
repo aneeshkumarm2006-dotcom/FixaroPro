@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2 } from "lucide-react";
+import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2, Banknote } from "lucide-react";
 import { applyPromoCode } from "../../actions/applyPromoCode";
 import { BookingDraft, SERVICE_TYPES, FREQUENCIES } from "../types";
 import { calculateTax } from "@/lib/tax";
@@ -54,12 +54,12 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
     });
   }
 
-  // Fetch a SetupIntent when contact info is known
+  // Create a $20 deposit PaymentIntent when contact info is known
   useEffect(() => {
     if (!draft.email || !draft.name) return;
     setStripeLoading(true);
     setStripeError(null);
-    fetch("/api/stripe/setup-intent", {
+    fetch("/api/stripe/charge-deposit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: draft.email, name: draft.name }),
@@ -105,7 +105,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           <em>booking.</em>
         </h1>
         <p className="cl-subtitle">
-          Your card won't be charged today — only after your cleaning is complete.
+          A <strong>$20 deposit</strong> is charged today to secure your booking. The remaining balance is charged after your cleaning is complete.
         </p>
       </header>
 
@@ -142,7 +142,30 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           ) : null}
           <Row dt="GST (5%)" dd={`$${breakdown.gstAmount.toFixed(2)}`} />
           <Row dt="QST (9.975%)" dd={`$${breakdown.qstAmount.toFixed(2)}`} />
-          <RowBorder total dt="Total" dd={`$${(breakdown.total - (draft.promoDiscount ?? 0)).toFixed(2)}`} />
+          <RowBorder total dt="Total (1st cleaning)" dd={`$${(breakdown.total - (draft.promoDiscount ?? 0)).toFixed(2)}`} />
+          {(draft.frequency === "WEEKLY" || draft.frequency === "BIWEEKLY") && (
+            <div className="cl-dlist-row" style={{ marginTop: 6 }}>
+              <dt style={{ color: "var(--primary)", fontSize: 12 }}>
+                {draft.frequency === "WEEKLY" ? "12%" : "8%"} off from 2nd cleaning
+              </dt>
+              <dd style={{ color: "var(--primary)", fontSize: 12, fontWeight: 600 }}>
+                −${(basePrice * (draft.frequency === "WEEKLY" ? 0.12 : 0.08)).toFixed(2)}/visit
+              </dd>
+            </div>
+          )}
+          <div className="cl-dlist-row" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed var(--primary-15)" }}>
+            <dt style={{ color: "var(--primary)", fontWeight: 600 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Banknote size={15} />
+                Due today (deposit)
+              </span>
+            </dt>
+            <dd style={{ color: "var(--primary)", fontWeight: 700 }}>$20.00</dd>
+          </div>
+          <div className="cl-dlist-row">
+            <dt style={{ color: "var(--primary-50)", fontSize: 12 }}>Remaining balance</dt>
+            <dd style={{ color: "var(--primary-50)", fontSize: 12 }}>After cleaning</dd>
+          </div>
         </dl>
       </div>
 
@@ -172,16 +195,16 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
         </div>
       )}
 
-      {/* Stripe card save */}
+      {/* Stripe deposit charge */}
       <div className="cl-card-soft cl-stack-12">
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <CreditCard size={20} style={{ color: "var(--primary)" }} />
           <span style={{ fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
-            Save your card
+            Pay $20 deposit &amp; save card
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--primary-70)", margin: "0 0 16px", lineHeight: 1.55 }}>
-          We save your card now but only charge it after your cleaning is complete.
+          A $20 deposit is charged now to secure your booking. Your card is saved for the remaining balance after cleaning. Apple Pay and Google Pay accepted.
         </p>
 
         {stripeLoading && (
@@ -214,17 +237,34 @@ function CardForm({ onChange }: { onChange: (p: Partial<BookingDraft>) => void }
   const stripe = useStripe();
   const elements = useElements();
 
-  async function confirm() {
+  // Returns { paymentIntentId, paymentMethodId } on success, or null on failure
+  async function confirm(): Promise<{ paymentIntentId: string; paymentMethodId: string } | null> {
     if (!stripe || !elements) return null;
-    const result = await stripe.confirmSetup({
+    const result = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
     });
-    if (result.error) return null;
-    return (result.setupIntent as any).payment_method as string;
+    if (result.error) {
+      // If the PI was already confirmed on a previous attempt (e.g. booking
+      // creation failed after the charge succeeded), Stripe returns the
+      // existing succeeded PI in the error — reuse it instead of failing.
+      const pi = result.error.payment_intent;
+      if (pi?.status === "succeeded") {
+        return {
+          paymentIntentId: pi.id,
+          paymentMethodId: pi.payment_method as string,
+        };
+      }
+      return null;
+    }
+    const pi = result.paymentIntent;
+    return {
+      paymentIntentId: pi.id,
+      paymentMethodId: pi.payment_method as string,
+    };
   }
 
-  // Expose confirm handle via a data attribute so the parent page can call it before submit
+  // Expose confirm handle so the parent page can call it before submitting the booking
   useEffect(() => {
     (window as any).__stripeConfirmCard = confirm;
     return () => { delete (window as any).__stripeConfirmCard; };

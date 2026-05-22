@@ -44,28 +44,6 @@ export async function clockIn(jobId: string) {
     }
 
     const now = new Date();
-    const jobStartTime = new Date(job.startTime);
-    const fifteenMinutesBefore = new Date(jobStartTime.getTime() - 15 * 60 * 1000);
-
-    // Check if it's at least 15 minutes before the job start time
-    if (now < fifteenMinutesBefore) {
-      const minutesUntil = Math.ceil(
-        (fifteenMinutesBefore.getTime() - now.getTime()) / (60 * 1000)
-      );
-      return {
-        success: false,
-        error: `You can clock in ${minutesUntil} minute${
-          minutesUntil !== 1 ? "s" : ""
-        } before the scheduled start time (at ${fifteenMinutesBefore.toLocaleTimeString(
-          "en-US",
-          {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          }
-        )})`,
-      };
-    }
 
     // Update the job with clock in time
     await db.job.update({

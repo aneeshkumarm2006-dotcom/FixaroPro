@@ -4,6 +4,7 @@ import { calculateTax, TaxBreakdown } from "./tax";
 export interface PricingInput {
   bedCount: number;
   bathCount: number;
+  halfBathCount?: number;
   addOns: { name: string; price: number }[];
   travelFee?: number;
   discountAmount?: number;
@@ -16,36 +17,46 @@ export interface PricingResult extends TaxBreakdown {
   discountAmount: number;
 }
 
-// Server-side authoritative pricing. The client may show a preview from
-// getQuote, but the final job total is always recomputed here from the
-// PricingRule table and the resolved add-ons + travel fee.
 export async function computeBookingPrice(
   input: PricingInput
 ): Promise<PricingResult> {
-  const basePrice = await resolveBasePrice(input.bedCount, input.bathCount);
+  const basePrice = await resolveBasePrice(
+    input.bedCount,
+    input.bathCount,
+    input.halfBathCount ?? 0
+  );
   const addOnTotal = input.addOns.reduce((s, a) => s + a.price, 0);
   const travelFee = input.travelFee ?? 0;
   const discountAmount = input.discountAmount ?? 0;
 
-  const preTax = Math.max(
-    0,
-    basePrice + addOnTotal + travelFee - discountAmount
-  );
+  const preTax = Math.max(0, basePrice + addOnTotal + travelFee - discountAmount);
   const tax = calculateTax(preTax);
 
-  return {
-    basePrice,
-    addOnTotal,
-    travelFee,
-    discountAmount,
-    ...tax,
-  };
+  return { basePrice, addOnTotal, travelFee, discountAmount, ...tax };
 }
 
 async function resolveBasePrice(
   bedCount: number,
-  bathCount: number
+  bathCount: number,
+  halfBathCount: number
 ): Promise<number> {
+  // Prefer flat per-unit rates set in Settings > Pricing Rules
+  const setting = await db.appSetting.findUnique({ where: { key: "pricing.perUnit" } });
+  if (setting?.value && typeof setting.value === "object") {
+    const v = setting.value as Record<string, unknown>;
+    const perBedroom = typeof v.perBedroom === "number" ? v.perBedroom : null;
+    const perFullBath = typeof v.perFullBath === "number" ? v.perFullBath : null;
+    const perHalfBath = typeof v.perHalfBath === "number" ? v.perHalfBath : null;
+    if (perBedroom !== null && perFullBath !== null && perHalfBath !== null) {
+      return (
+        bedCount * perBedroom +
+        bathCount * perFullBath +
+        halfBathCount * perHalfBath
+      );
+    }
+  }
+
+  // Fall back to legacy PricingRule table rows
   const exact = await db.pricingRule.findFirst({
     where: { bedCount, bathCount, isActive: true },
   });
@@ -58,6 +69,21 @@ async function resolveBasePrice(
   if (closest) return closest.basePrice;
 
   return 120 + bedCount * 30 + bathCount * 20;
+}
+
+// Returns the recurring discount percentage for the 2nd+ cleaning.
+// First cleaning is always full price.
+export function recurringDiscountPercent(
+  frequency: "ONE_TIME" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY"
+): number {
+  switch (frequency) {
+    case "WEEKLY":
+      return 12;
+    case "BIWEEKLY":
+      return 8;
+    default:
+      return 0;
+  }
 }
 
 // Returns the date for the next occurrence given a base date and frequency.

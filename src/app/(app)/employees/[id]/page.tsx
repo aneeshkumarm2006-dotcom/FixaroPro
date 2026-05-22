@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import EmployeeDetailView from "./EmployeeDetailView";
+import { getEmployeeAvgRating } from "../../actions/setEmployeeRating";
 
 export default async function EmployeePage({
   params,
@@ -261,6 +262,8 @@ export default async function EmployeePage({
     })
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
+  const starRating = await getEmployeeAvgRating(id);
+
   return (
     <EmployeeDetailView
       employee={{
@@ -270,6 +273,7 @@ export default async function EmployeePage({
         phone: employee.phone,
         role: employee.role as "OWNER" | "ADMIN" | "EMPLOYEE",
       }}
+      starRating={starRating}
       availability={availabilitySlots}
       availabilityConflicts={conflicts}
       stats={{

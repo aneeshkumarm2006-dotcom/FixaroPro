@@ -8,6 +8,7 @@ export interface PremiumSelectOption {
   value: string;
   label: string;
   description?: string;
+  keywords?: string; // extra search terms (e.g. email, phone) — not displayed
   disabled?: boolean;
 }
 
@@ -54,7 +55,10 @@ export default function PremiumSelect({
 
   const selected = options.find(o => o.value === value);
   const filtered = search.trim()
-    ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    ? options.filter(o => {
+        const q = search.toLowerCase();
+        return o.label.toLowerCase().includes(q) || o.keywords?.toLowerCase().includes(q);
+      })
     : options;
 
   function updatePos() {

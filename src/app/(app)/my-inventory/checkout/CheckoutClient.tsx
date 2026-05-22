@@ -296,9 +296,14 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
             ) : filteredProducts.length === 0 ? (
               <div className="py-12 text-center text-sm text-gray-500">
                 <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                {products.length === 0
-                  ? "Nothing in stock at this location."
-                  : "No products match your search."}
+                {products.length === 0 ? (
+                  <>
+                    <p className="font-[400] text-gray-900 mb-1">No items in stock at this location</p>
+                    <p>Try selecting a different location, or contact your manager to restock.</p>
+                  </>
+                ) : (
+                  "No products match your search."
+                )}
               </div>
             ) : (
               <div className="divide-y divide-gray-100">

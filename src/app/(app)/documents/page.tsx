@@ -49,7 +49,7 @@ export default async function DocumentsPage() {
   }));
 
   return (
-    <div className="h-full overflow-hidden overflow-y-auto p-8">
+    <div className="cl-page-wrap">
       <DocumentsClient signatures={signatureData} />
     </div>
   );

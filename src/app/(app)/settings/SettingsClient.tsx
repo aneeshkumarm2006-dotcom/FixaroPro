@@ -170,44 +170,33 @@ export default function SettingsClient({
   const [activeTab, setActiveTab] = useState<TabId>("profile");
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-          Settings
-        </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
-          Manage your account and application configuration
-        </p>
+    <div className="cl-page-wrap">
+      <div className="cl-page-head">
+        <div>
+          <h1 className="cl-page-title">Settings</h1>
+          <p className="cl-page-sub">Manage your account and application configuration.</p>
+        </div>
       </div>
 
-      <div className="flex gap-6">
-        {/* Sidebar tabs */}
-        <nav className="w-60 flex-shrink-0">
-          <div className="bg-[#005F6A]/5 rounded-2xl p-1 space-y-1">
-            {visibleTabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-[350] transition-all duration-200 whitespace-nowrap ${
-                    active
-                      ? "bg-[#005F6A]/90 text-white"
-                      : "text-[#005F6A] hover:bg-[#005F6A]/10"
-                  }`}>
-                  <Icon strokeWidth={1.6} className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+      <div className="cl-settings-shell">
+        <aside className="cl-settings-side">
+          {visibleTabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={active ? "active" : ""}>
+                <Icon strokeWidth={1.9} className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </aside>
 
-        {/* Content panel */}
-        <div className="flex-1 min-w-0">
+        <section>
           {activeTab === "profile" && <ProfileTab user={user} />}
           {activeTab === "availability" && <AvailabilityTab />}
           {activeTab === "tax" && isAdmin && (
@@ -262,7 +251,7 @@ export default function SettingsClient({
           {activeTab === "serviceAreas" && isAdmin && (
             <ServiceAreasTab serviceAreas={serviceAreas} />
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

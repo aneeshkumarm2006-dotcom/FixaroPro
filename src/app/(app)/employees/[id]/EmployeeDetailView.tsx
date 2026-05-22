@@ -10,6 +10,7 @@ import Modal from "@/components/ui/Modal";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import { EmployeeModal } from "../EmployeeModal";
 import { assignKit } from "../../actions/assignKit";
+import { setEmployeeRating } from "../../actions/setEmployeeRating";
 import {
   ArrowLeft,
   Mail,
@@ -25,6 +26,7 @@ import {
   User,
   Plus,
   TrendingDown,
+  Star,
 } from "lucide-react";
 
 type TabView = "overview" | "jobs" | "products" | "availability";
@@ -144,6 +146,7 @@ interface EmployeeDetailViewProps {
     totalTips: number;
     unpaidJobs: number;
   };
+  starRating?: number | null;
   upcomingJobs: Job[];
   recentJobs: Job[];
   topProducts: ProductUsage[];
@@ -158,6 +161,7 @@ interface EmployeeDetailViewProps {
 export default function EmployeeDetailView({
   employee,
   stats,
+  starRating,
   upcomingJobs,
   recentJobs,
   topProducts,
@@ -180,6 +184,9 @@ export default function EmployeeDetailView({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [ratingEdit, setRatingEdit] = useState<string>(starRating != null ? starRating.toFixed(1) : "");
+  const [ratingSaving, setRatingSaving] = useState(false);
+  const [ratingMsg, setRatingMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const selectedKit = kitTemplates.find((k) => k.id === selectedKitId) || null;
 
@@ -323,6 +330,72 @@ export default function EmployeeDetailView({
                 valueNode={getRoleBadge(employee.role)}
               />
             </div>
+          </Card>
+
+          {/* Star Rating */}
+          <Card variant="default" className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <h3 className="text-sm font-[600] text-gray-800">Star Rating</h3>
+            </div>
+            <div className="flex items-center gap-3 mb-3">
+              {starRating != null ? (
+                <span className="text-3xl font-[600] text-amber-500">
+                  {Math.min(5, Math.max(4, Math.round(starRating * 10) / 10)).toFixed(1)}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400">No rating yet</span>
+              )}
+              {starRating != null && (
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-4 h-4 ${s <= Math.round(Math.min(5, Math.max(4, starRating))) ? "text-amber-400 fill-amber-400" : "text-gray-200 fill-gray-200"}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="4.0"
+                max="5.0"
+                step="0.1"
+                value={ratingEdit}
+                onChange={(e) => setRatingEdit(e.target.value)}
+                placeholder="4.0 – 5.0"
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-1 focus:ring-[#005F6A]"
+              />
+              <button
+                onClick={async () => {
+                  const val = parseFloat(ratingEdit);
+                  if (isNaN(val) || val < 4 || val > 5) {
+                    setRatingMsg({ type: "error", text: "Must be between 4.0 and 5.0" });
+                    return;
+                  }
+                  setRatingSaving(true);
+                  setRatingMsg(null);
+                  const res = await setEmployeeRating(employee.id, val);
+                  setRatingSaving(false);
+                  if (res.success) {
+                    setRatingMsg({ type: "success", text: "Rating updated." });
+                  } else {
+                    setRatingMsg({ type: "error", text: res.error ?? "Failed" });
+                  }
+                }}
+                disabled={ratingSaving}
+                className="px-3 py-1.5 text-sm bg-[#005F6A] text-white rounded-lg hover:bg-[#005F6A]/90 disabled:opacity-50">
+                {ratingSaving ? "Saving…" : "Set"}
+              </button>
+            </div>
+            {ratingMsg && (
+              <p className={`text-xs mt-2 ${ratingMsg.type === "success" ? "text-green-600" : "text-red-500"}`}>
+                {ratingMsg.text}
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-2">Admin override. Customer ratings also update this average.</p>
           </Card>
 
           {/* Financial Summary */}

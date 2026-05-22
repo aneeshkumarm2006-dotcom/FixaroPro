@@ -454,13 +454,13 @@ export default function TrainingClient({
   const statsModule = adminList.find((m) => m.id === statsModuleId);
 
   return (
-    <div className="max-w-[80rem] mx-auto space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className={isAdmin ? "max-w-[80rem] mx-auto space-y-6" : undefined}>
+      <div className={isAdmin ? "flex items-start justify-between gap-4 flex-wrap" : "cl-page-head"}>
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className={isAdmin ? "text-3xl !font-light tracking-tight text-[#005F6A]" : "cl-page-title"}>
             Training
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+          <p className={isAdmin ? "text-sm text-[#005F6A]/70 !font-light mt-1" : "cl-page-sub"}>
             {isAdmin
               ? "Create and manage training modules for your team"
               : "Complete required modules to stay certified"}
@@ -480,34 +480,19 @@ export default function TrainingClient({
       </div>
 
       {!isAdmin && (
-        <Card variant="cleano_light" className="p-6">
-          <div className="flex items-center justify-between gap-6 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-[#005F6A]/10 rounded-2xl">
-                <GraduationCap className="w-6 h-6 text-[#005F6A]" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[#005F6A]/70">
-                  Required Progress
-                </p>
-                <p className="text-2xl font-[400] text-[#005F6A]">
-                  {completedRequired} of {totalRequired} complete
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 min-w-[12rem] max-w-md">
-              <div className="h-3 bg-[#005F6A]/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#005F6A] transition-all duration-500"
-                  style={{ width: `${overallPct}%` }}
-                />
-              </div>
-              <p className="text-xs text-[#005F6A]/70 mt-1 text-right">
-                {overallPct}%
-              </p>
-            </div>
+        <div className="cl-progress-card">
+          <div className="icon">
+            <GraduationCap className="w-6 h-6" />
           </div>
-        </Card>
+          <div className="text">
+            <div className="label">Required progress</div>
+            <div className="val">{completedRequired} of {totalRequired} complete</div>
+          </div>
+          <div className="cl-progress-bar">
+            <div className="fill" style={{ width: `${overallPct}%` }} />
+          </div>
+          <div className="cl-progress-pct">{overallPct}%</div>
+        </div>
       )}
 
       {msg && (
@@ -890,16 +875,16 @@ function ModuleSection({
   emptyText: string;
 }) {
   return (
-    <div className="space-y-3">
-      <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
+    <div style={{ marginBottom: 28 }}>
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 22, color: "var(--ink)", margin: "4px 0 12px", letterSpacing: "-0.01em", fontWeight: 400 }}>
         {title}
       </h2>
       {modules.length === 0 ? (
-        <Card variant="ghost" className="p-8">
-          <p className="text-sm text-[#005F6A]/60 text-center">{emptyText}</p>
-        </Card>
+        <div className="cl-empty-block" style={{ marginBottom: 0 }}>
+          <p style={{ margin: 0, color: "var(--ink-soft)" }}>{emptyText}</p>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {modules.map((m) => (
             <ModuleRow key={m.id} module={m} />
           ))}
@@ -916,52 +901,36 @@ function ModuleRow({ module: m }: { module: ModuleData }) {
   const duration = formatDuration(m.duration);
   const videoPct = Math.round((m.progress?.videoProgress ?? 0) * 100);
 
+  const statusPillCls = status === "COMPLETED" ? "passed" : status === "IN_PROGRESS" ? "scheduled" : status === "FAILED" ? "failed" : "";
+  const statusLabel = info.label;
+
   return (
-    <Link
-      href={`/training/${m.id}`}
-      className="block p-4 border border-[#005F6A]/10 rounded-2xl bg-white hover:bg-[#005F6A]/3 transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-[400] text-[#005F6A]">{m.title}</h3>
-            <Badge variant={info.variant} size="sm">
-              <Icon className="w-3 h-3 mr-1" />
-              {info.label}
-            </Badge>
-            {m.isRequired && (
-              <Badge variant="cleano" size="sm">
-                Required
-              </Badge>
-            )}
-            {m.hasQuiz && (
-              <Badge variant="default" size="sm">
-                Quiz
-              </Badge>
-            )}
-          </div>
-          {m.description && (
-            <p className="text-xs text-[#005F6A]/60 mt-1 line-clamp-2">
-              {m.description}
-            </p>
-          )}
-          <div className="flex items-center gap-4 mt-2 text-xs text-[#005F6A]/60">
-            {duration && (
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {duration}
-              </span>
-            )}
+    <Link href={`/training/${m.id}`} className="cl-module">
+      <div className="cl-module-meta">
+        <div className="cl-module-head">
+          <span className="cl-module-title">{m.title}</span>
+          <span className={`cl-pill ${statusPillCls}`}>
+            <Icon className="w-3 h-3" style={{ marginRight: 4 }} />
+            {statusLabel}
+          </span>
+          {m.isRequired && <span className="cl-pill required">Required</span>}
+          {m.hasQuiz && <span className="cl-pill quiz">Quiz</span>}
+        </div>
+        {m.description && (
+          <div className="cl-module-summary">{m.description}</div>
+        )}
+        {(duration || (status === "IN_PROGRESS") || m.progress?.quizScore != null) && (
+          <div style={{ fontSize: 11.5, color: "var(--primary-50)", marginTop: 6, display: "flex", gap: 12 }}>
+            {duration && <span>{duration}</span>}
             {status === "IN_PROGRESS" && <span>{videoPct}% watched</span>}
             {m.progress?.quizScore != null && (
-              <span>
-                Quiz: {Math.round(m.progress.quizScore * 100)}%
-                {m.progress.quizAttempts > 1 &&
-                  ` (${m.progress.quizAttempts} attempts)`}
-              </span>
+              <span>Quiz: {Math.round(m.progress.quizScore * 100)}%{m.progress.quizAttempts > 1 ? ` (${m.progress.quizAttempts} attempts)` : ""}</span>
             )}
           </div>
-        </div>
-        <ChevronRight className="w-5 h-5 text-[#005F6A]/40 flex-shrink-0" />
+        )}
+      </div>
+      <div className="cl-module-chev">
+        <ChevronRight className="w-5 h-5" />
       </div>
     </Link>
   );

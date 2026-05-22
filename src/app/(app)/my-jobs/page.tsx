@@ -1,10 +1,8 @@
 import { db } from "@/db";
 import { requireCleaner } from "@/lib/page-guards";
-import Card from "@/components/ui/Card";
 import { Prisma } from "@prisma/client";
 import { JobsFilters } from "./JobsFilters";
 import { JobsPagination } from "./JobsPagination";
-import { TableHeader } from "./TableHeader";
 import { TableLoadingOverlay } from "./TableLoadingOverlay";
 import { JobsLoadingProvider } from "./JobsLoadingContext";
 import { ClearLoadingOnMount } from "./ClearLoadingOnMount";
@@ -306,128 +304,55 @@ export default async function MyJobsPage({
   return (
     <JobsLoadingProvider>
       <ClearLoadingOnMount dataKey={dataKey} />
-      <div className="space-y-6">
+      <div className="cl-page-wrap">
         {/* Header */}
-        <Card variant="ghost">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-[400] text-gray-900">My Jobs</h1>
+        <div className="cl-page-head">
+          <div>
+            <h1 className="cl-page-title">My jobs</h1>
+            <p className="cl-page-sub">
+              Here&apos;s everything you&apos;re booked on.
+            </p>
           </div>
-        </Card>
+        </div>
 
-        {/* Search and Filters */}
+        {/* Filters */}
         <JobsFilters />
 
-        {/* Jobs Table */}
-        <Card variant="default">
-          <div className="overflow-hidden rounded-lg relative">
-            <TableLoadingOverlay />
-            <div className="overflow-x-auto">
-              {/* Header row */}
-              <div className="flex bg-gray-50/50 min-w-max">
-                <div className="w-[200px] min-w-[200px]">
-                  <TableHeader label="Client" sortKey="clientName" />
-                </div>
-                <span className="px-6 py-3 text-left text-xs font-[400] text-gray-500 uppercase tracking-wider flex items-center w-[220px] min-w-[220px]">
-                  Location
-                </span>
-                <div className="w-[140px] min-w-[140px]">
-                  <TableHeader label="Date" sortKey="jobDate" />
-                </div>
-                <div className="w-[140px] min-w-[140px]">
-                  <TableHeader label="Start Time" sortKey="startTime" />
-                </div>
-                <span className="px-6 py-3 text-left text-xs font-[400] text-gray-500 uppercase tracking-wider flex items-center w-[140px] min-w-[140px]">
-                  End Time
-                </span>
-                <span className="px-6 py-3 text-left text-xs font-[400] text-gray-500 uppercase tracking-wider flex items-center w-[150px] min-w-[150px]">
-                  Actual End
-                </span>
-                <div className="w-[140px] min-w-[140px]">
-                  <TableHeader label="Pay" sortKey="employeePay" />
-                </div>
-                <div className="w-[200px] min-w-[200px]">
-                  <TableHeader label="Status" sortKey="status" />
-                </div>
-                <span className="px-6 py-3 text-right text-xs font-[400] text-gray-500 uppercase tracking-wider flex items-center justify-end w-[160px] min-w-[160px]">
-                  Actions
-                </span>
+
+        {/* Job cards */}
+        <div style={{ position: "relative" }}>
+          <TableLoadingOverlay />
+          {filteredJobs.length === 0 ? (
+            <div className="cl-empty-block">
+              <div className="icon-bubble">
+                <Calendar size={28} />
               </div>
-              {/* Jobs - Fixed height for 10 rows */}
-              <div className="bg-white divide-y divide-gray-50 relative">
-                {filteredJobs.length === 0 ? (
-                  <>
-                    <div className="px-6 py-8 text-center text-sm text-gray-500">
-                      {search || status !== "all" || jobType !== "all" ? (
-                        <>
-                          <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                          <p>No jobs found matching your filters.</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-[400] text-gray-900 mb-1">
-                            No Jobs Assigned
-                          </p>
-                          <p>
-                            You don&apos;t have any jobs assigned to you yet
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    {/* Placeholder rows */}
-                    {Array.from({ length: minDisplayRows - 1 }).map(
-                      (_, idx) => (
-                        <div
-                          key={`placeholder-${idx}`}
-                          className="flex h-16 min-w-max">
-                          <div className="px-6 py-4 w-[200px] min-w-[200px]"></div>
-                          <div className="px-6 py-4 w-[220px] min-w-[220px]"></div>
-                          <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                          <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                          <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                          <div className="px-6 py-4 w-[150px] min-w-[150px]"></div>
-                          <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                          <div className="px-6 py-4 w-[200px] min-w-[200px]"></div>
-                          <div className="px-6 py-4 w-[160px] min-w-[160px]"></div>
-                        </div>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {filteredJobs.map((job) => (
-                      <JobRow
-                        key={job.id}
-                        job={job}
-                        isMainEmployee={isMainEmployee(job.id)}
-                        missingEquipment={
-                          missingEquipmentByJob.get(job.id) || []
-                        }
-                      />
-                    ))}
-                    {/* Placeholder rows to fill up to minimum display rows */}
-                    {placeholderRowCount > 0 &&
-                      Array.from({ length: placeholderRowCount }).map(
-                        (_, idx) => (
-                          <div
-                            key={`placeholder-${idx}`}
-                            className="flex h-16 min-w-max">
-                            <div className="px-6 py-4 w-[200px] min-w-[200px]"></div>
-                            <div className="px-6 py-4 w-[220px] min-w-[220px]"></div>
-                            <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                            <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                            <div className="px-6 py-4 w-[140px] min-w-[140px]"></div>
-                            <div className="px-6 py-4 w-[150px] min-w-[150px]"></div>
-                            <div className="px-6 py-4 w-[200px] min-w-[200px]"></div>
-                            <div className="px-6 py-4 w-[160px] min-w-[160px]"></div>
-                          </div>
-                        )
-                      )}
-                  </>
-                )}
+              <div>
+                <p style={{ fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                  {search || status !== "all" || jobType !== "all"
+                    ? "No jobs match these filters."
+                    : "No jobs assigned yet."}
+                </p>
+                <p style={{ margin: 0, fontSize: 13 }}>
+                  {search || status !== "all" || jobType !== "all"
+                    ? "Try adjusting your search or filters."
+                    : "Jobs you're assigned to will appear here."}
+                </p>
               </div>
             </div>
-          </div>
-        </Card>
+          ) : (
+            <div className="cl-jobs2-list">
+              {filteredJobs.map((job) => (
+                <JobRow
+                  key={job.id}
+                  job={job}
+                  isMainEmployee={isMainEmployee(job.id)}
+                  missingEquipment={missingEquipmentByJob.get(job.id) || []}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Pagination */}
         <JobsPagination

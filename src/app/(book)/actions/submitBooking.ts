@@ -6,6 +6,7 @@ import {
   computeBookingPrice,
   nextOccurrence,
   recurrenceCount,
+  recurringDiscountPercent,
 } from "@/lib/booking-pricing";
 import {
   ensureClientReferralCode,
@@ -48,6 +49,9 @@ interface SubmitBookingInput {
   promoDiscount?: number;
   // Optional
   leadId?: string;
+  depositPaymentIntentId?: string;
+  stripeCustomerId?: string;
+  stripePaymentMethodId?: string;
 }
 
 function parseStartTime(date: string, timeSlot: string, isFlexible: boolean): Date {
@@ -111,6 +115,8 @@ export async function submitBooking(input: SubmitBookingInput) {
             phone: input.phone.trim(),
             address: input.address.trim(),
             serviceFrequency: input.frequency,
+            ...(input.stripeCustomerId && { stripeCustomerId: input.stripeCustomerId }),
+            ...(input.stripePaymentMethodId && { defaultPaymentMethodId: input.stripePaymentMethodId }),
           },
         })
       : await db.client.create({
@@ -122,6 +128,8 @@ export async function submitBooking(input: SubmitBookingInput) {
             serviceFrequency: input.frequency,
             referredByClientId,
             referralCode: newReferralCode,
+            ...(input.stripeCustomerId && { stripeCustomerId: input.stripeCustomerId }),
+            ...(input.stripePaymentMethodId && { defaultPaymentMethodId: input.stripePaymentMethodId }),
           },
         });
 
@@ -196,9 +204,8 @@ export async function submitBooking(input: SubmitBookingInput) {
 
     const primaryJob = await db.job.create({
       data: {
-        employeeId: null,
         clientName: client.name,
-        clientId: client.id,
+        client: { connect: { id: client.id } },
         location: input.address.trim(),
         description: `${input.serviceType} cleaning`,
         jobType: input.serviceType,
@@ -220,6 +227,11 @@ export async function submitBooking(input: SubmitBookingInput) {
         promoDiscountAmount: input.promoDiscount && input.promoDiscount > 0 ? input.promoDiscount : null,
         bookingSource: "web",
         notes: input.notes?.trim() || null,
+        ...(input.depositPaymentIntentId && {
+          depositPaymentIntentId: input.depositPaymentIntentId,
+          depositPaid: true,
+          depositPaidAt: new Date(),
+        }),
         addOns: {
           create: input.addOns.map((a) => ({
             name: a.name,
@@ -261,14 +273,29 @@ export async function submitBooking(input: SubmitBookingInput) {
     const recurrences = recurrenceCount(input.frequency);
     const childJobIds: string[] = [];
     if (recurrences > 0 && input.frequency !== "ONE_TIME") {
+      // Compute discounted price for 2nd+ cleanings (first cleaning is full price)
+      const discountPct = recurringDiscountPercent(input.frequency);
+      const recurringDiscount = discountPct > 0
+        ? Math.round((pricing.basePrice * discountPct / 100) * 100) / 100
+        : 0;
+      const childPricing = recurringDiscount > 0
+        ? await computeBookingPrice({
+            bedCount: input.bedCount,
+            bathCount: input.bathCount,
+            halfBathCount: input.halfBathCount ?? 0,
+            addOns: input.addOns,
+            travelFee: pricing.travelFee,
+            discountAmount: discountAmount + recurringDiscount,
+          })
+        : pricing;
+
       let cursor = startTime;
       for (let i = 0; i < recurrences; i++) {
         cursor = nextOccurrence(cursor, input.frequency);
         const child = await db.job.create({
           data: {
-            employeeId: null,
             clientName: client.name,
-            clientId: client.id,
+            client: { connect: { id: client.id } },
             location: input.address.trim(),
             description: `${input.serviceType} cleaning`,
             jobType: input.serviceType,
@@ -282,11 +309,12 @@ export async function submitBooking(input: SubmitBookingInput) {
               input.squareFootage > 0 ? input.squareFootage : null,
             isFlexible: input.isFlexible,
             requiredCleaners: 1,
-            price: pricing.total,
-            subtotalAmount: pricing.subtotal,
-            gstAmount: pricing.gstAmount,
-            qstAmount: pricing.qstAmount,
-            parentJobId: primaryJob.id,
+            price: childPricing.total,
+            subtotalAmount: childPricing.subtotal,
+            gstAmount: childPricing.gstAmount,
+            qstAmount: childPricing.qstAmount,
+            discountAmount: childPricing.discountAmount > 0 ? childPricing.discountAmount : null,
+            parentJob: { connect: { id: primaryJob.id } },
             bookingSource: "web",
             addOns: {
               create: input.addOns.map((a) => ({
@@ -359,6 +387,6 @@ export async function submitBooking(input: SubmitBookingInput) {
     };
   } catch (error) {
     console.error("Error submitting booking:", error);
-    return { success: false, error: "Failed to submit booking" };
+    return { success: false, error: "Failed to submit booking. Please try again." };
   }
 }

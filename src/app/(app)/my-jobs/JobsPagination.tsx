@@ -1,8 +1,6 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import { useJobsLoading } from "./JobsLoadingContext";
 
 interface JobsPaginationProps {
@@ -50,86 +48,27 @@ export function JobsPagination({
   const direction = searchParams.get("direction");
 
   return (
-    <Card variant="default">
-      <div className="space-y-4">
-        {/* Results Count */}
-        <div className="text-sm text-gray-600 text-center">
-          Showing{" "}
-          <span className="font-[400] text-gray-900">{currentCount}</span> job
-          {currentCount !== 1 ? "s" : ""} per page
-          {currentCursor && (
-            <span className="ml-2 text-gray-500">
-              (Page{" "}
-              {direction === "prev" ? "↑" : direction === "next" ? "↓" : "1"})
-            </span>
-          )}
-        </div>
-
-        {/* Pagination Controls */}
-        <div className="flex justify-center items-center gap-2">
-          {/* First/Previous Button */}
-          {hasPrevPage ? (
-            <div className="flex gap-2">
-              <Button
-                variant="default"
-                size="md"
-                href={buildUrl(null, "prev")}
-                submit={false}
-                title="Go to first page"
-                onClick={() => setLoading(true)}>
-                First
-              </Button>
-              <Button
-                variant="default"
-                size="md"
-                href={buildUrl(prevCursor || null, "prev")}
-                submit={false}
-                onClick={() => setLoading(true)}>
-                Previous
-              </Button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="default" size="md" disabled submit={false}>
-                First
-              </Button>
-              <Button variant="default" size="md" disabled submit={false}>
-                Previous
-              </Button>
-            </div>
-          )}
-
-          {/* Current Position Indicator */}
-          <div className="px-4 py-2 bg-gray-50 rounded-md border border-gray-200">
-            <span className="text-sm font-[400] text-gray-700">
-              {currentCursor ? "Loading..." : "Page 1"}
-            </span>
-          </div>
-
-          {/* Next Button */}
-          {hasNextPage ? (
-            <Button
-              variant="default"
-              size="md"
-              href={buildUrl(nextCursor || null, "next")}
-              submit={false}
-              onClick={() => setLoading(true)}>
-              Next
-            </Button>
-          ) : (
-            <Button variant="default" size="md" disabled submit={false}>
-              Next
-            </Button>
-          )}
-        </div>
-
-        {/* Cursor Info (for debugging/transparency) */}
-        {process.env.NODE_ENV === "development" && currentCursor && (
-          <div className="text-xs text-center text-gray-400 pt-2 border-t border-gray-100">
-            Cursor: {currentCursor}
-          </div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", gap: 12 }}>
+      <span style={{ fontSize: 13, color: "var(--primary-60)" }}>
+        Showing <strong>{currentCount}</strong> job{currentCount !== 1 ? "s" : ""}
+      </span>
+      <div style={{ display: "flex", gap: 8 }}>
+        {hasPrevPage ? (
+          <a href={buildUrl(null, "prev")} className="cl-action-btn" onClick={() => setLoading(true)}>← First</a>
+        ) : (
+          <button className="cl-action-btn" disabled>← First</button>
+        )}
+        {hasPrevPage ? (
+          <a href={buildUrl(prevCursor || null, "prev")} className="cl-action-btn" onClick={() => setLoading(true)}>Previous</a>
+        ) : (
+          <button className="cl-action-btn" disabled>Previous</button>
+        )}
+        {hasNextPage ? (
+          <a href={buildUrl(nextCursor || null, "next")} className="cl-action-btn solid" onClick={() => setLoading(true)}>Next →</a>
+        ) : (
+          <button className="cl-action-btn solid" disabled>Next →</button>
         )}
       </div>
-    </Card>
+    </div>
   );
 }

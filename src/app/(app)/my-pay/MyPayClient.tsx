@@ -1,15 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
 import {
-  Banknote,
   Calendar,
-  DollarSign,
-  TrendingUp,
-  Clock,
   ArrowUpRight,
+  Star,
+  Droplets,
+  ExternalLink,
 } from "lucide-react";
 import WithdrawModal from "./WithdrawModal";
 import PaymentHistory from "./PaymentHistory";
@@ -44,6 +41,22 @@ type Withdrawal = {
   notes: string | null;
 };
 
+interface RagWashEntry {
+  id: string;
+  washDate: string;
+  ragCount: number;
+  notes: string | null;
+}
+
+interface RagData {
+  allTimeRags: number;
+  allTimeCredit: number;
+  periodRags: number;
+  periodCredit: number;
+  creditRate: number;
+  recentWashes: RagWashEntry[];
+}
+
 interface MyPayClientProps {
   payouts: Payout[];
   withdrawals: Withdrawal[];
@@ -54,6 +67,8 @@ interface MyPayClientProps {
   availableBalance: number;
   currentPayout: Payout | null;
   year: number;
+  starRating?: number | null;
+  ragData?: RagData;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -83,6 +98,8 @@ export default function MyPayClient({
   availableBalance,
   currentPayout,
   year,
+  starRating,
+  ragData,
 }: MyPayClientProps) {
   const [tab, setTab] = useState<Tab>("current");
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -110,133 +127,81 @@ export default function MyPayClient({
   }));
 
   return (
-    <div className="h-full overflow-hidden overflow-y-auto p-8">
+    <div className="cl-page-wrap">
       <div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#005F6A] flex items-center justify-center">
-            <Banknote className="w-5 h-5 text-white" />
-          </div>
+        <div className="cl-page-head">
           <div>
-            <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-              My Pay
-            </h1>
-            <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
-              Track your earnings and payment history
-            </p>
+            <h1 className="cl-page-title">My pay</h1>
+            <p className="cl-page-sub">Track your earnings and payment history.</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <button
-            type="button"
-            onClick={() => setWithdrawOpen(true)}
-            disabled={availableBalance <= 0}
-            className="text-left disabled:cursor-not-allowed">
-            <Card
-              variant="cleano_light"
-              className="p-6 h-[7rem] hover:bg-[#005F6A]/10 transition-colors cursor-pointer disabled:cursor-not-allowed">
-              <div className="h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="app-title-small !text-[#005F6A]/70">
-                    Wallet Balance
-                  </span>
-                  <DollarSign className="w-4 h-4 text-[#005F6A]/50" />
-                </div>
-                <div className="flex items-end justify-between">
-                  <p className="h2-title text-[#005F6A]">
-                    ${walletBalance.toFixed(2)}
-                  </p>
-                  {availableBalance > 0 && (
-                    <span className="text-[10px] uppercase tracking-wider text-[#005F6A]/50">
-                      Tap to withdraw
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Card>
+        {/* Star Rating (read-only) */}
+        {starRating != null && (
+          <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3">
+            <Star className="w-5 h-5 text-amber-400 fill-amber-400 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-[600] text-amber-800">
+                Your Rating: {Math.min(5, Math.max(4, Math.round(starRating * 10) / 10)).toFixed(1)} / 5.0
+              </p>
+              <p className="text-xs text-amber-700/70">Based on customer feedback and performance</p>
+            </div>
+            <div className="flex gap-0.5 ml-auto">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star
+                  key={s}
+                  className={`w-4 h-4 ${s <= Math.round(Math.min(5, Math.max(4, starRating))) ? "text-amber-400 fill-amber-400" : "text-amber-200 fill-amber-200"}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="cl-pay-hero">
+          <div
+            className={`cl-pay-tile featured${availableBalance > 0 ? " clickable" : ""}`}
+            onClick={availableBalance > 0 ? () => setWithdrawOpen(true) : undefined}
+            style={availableBalance > 0 ? { cursor: "pointer" } : undefined}>
+            <div className="cl-pay-tile-head">
+              <span>Wallet balance</span>
+              <span>$</span>
+            </div>
+            <div className="cl-pay-tile-val">${walletBalance.toFixed(2)}</div>
+            {availableBalance > 0 && (
+              <div className="cl-pay-tile-cta">Tap to withdraw →</div>
+            )}
+          </div>
+          <div className="cl-pay-tile">
+            <div className="cl-pay-tile-head"><span>Pending</span></div>
+            <div className="cl-pay-tile-val">${pendingAmount.toFixed(2)}</div>
+          </div>
+          <div className="cl-pay-tile">
+            <div className="cl-pay-tile-head"><span>Earned {year}</span></div>
+            <div className="cl-pay-tile-val">${paidThisYear.toFixed(2)}</div>
+          </div>
+          <div className="cl-pay-tile">
+            <div className="cl-pay-tile-head"><span>Hours {year}</span></div>
+            <div className="cl-pay-tile-val">{totalHoursYear.toFixed(1)}h</div>
+          </div>
+        </div>
+
+        <div className="cl-pay-tabs">
+          <button className={`cl-pay-tab ${tab === "current" ? "active" : ""}`} onClick={() => setTab("current")}>Current period</button>
+          <button className={`cl-pay-tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>Payment history</button>
+          <button className={`cl-pay-tab ${tab === "income" ? "active" : ""}`} onClick={() => setTab("income")}>Income</button>
+          <div className="cl-pay-tabs-spacer" />
+          <button className="cl-pay-withdraw" onClick={() => setWithdrawOpen(true)}>
+            <ArrowUpRight size={12} /> Withdraw
           </button>
-
-          <Card variant="cleano_light" className="p-6 h-[7rem]">
-            <div className="h-full flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="app-title-small !text-[#005F6A]/70">
-                  Pending
-                </span>
-                <Clock className="w-4 h-4 text-[#005F6A]/50" />
-              </div>
-              <p className="h2-title text-[#005F6A]">
-                ${pendingAmount.toFixed(2)}
-              </p>
-            </div>
-          </Card>
-
-          <Card variant="cleano_light" className="p-6 h-[7rem]">
-            <div className="h-full flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="app-title-small !text-[#005F6A]/70">
-                  Earned {year}
-                </span>
-                <TrendingUp className="w-4 h-4 text-[#005F6A]/50" />
-              </div>
-              <p className="h2-title text-[#005F6A]">
-                ${paidThisYear.toFixed(2)}
-              </p>
-            </div>
-          </Card>
-
-          <Card variant="cleano_light" className="p-6 h-[7rem]">
-            <div className="h-full flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="app-title-small !text-[#005F6A]/70">
-                  Hours {year}
-                </span>
-                <Clock className="w-4 h-4 text-[#005F6A]/50" />
-              </div>
-              <p className="h2-title text-[#005F6A]">
-                {totalHoursYear.toFixed(1)}h
-              </p>
-            </div>
-          </Card>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1 bg-[#005F6A]/5 rounded-2xl p-1">
-            {[
-              { id: "current" as const, label: "Current Period" },
-              { id: "history" as const, label: "Payment History" },
-              { id: "income" as const, label: "Income" },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm transition-colors ${
-                  tab === t.id
-                    ? "bg-white text-[#005F6A] font-[500] shadow-sm"
-                    : "text-[#005F6A]/60 hover:text-[#005F6A]"
-                }`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <Button
-            variant="action"
-            submit={false}
-            size="md"
-            onClick={() => setWithdrawOpen(true)}
-            disabled={availableBalance <= 0}>
-            <ArrowUpRight className="w-4 h-4 mr-1" />
-            Withdraw
-          </Button>
         </div>
 
         {tab === "current" && (
           <>
             {currentPayout ? (
-              <Card variant="cleano_light" className="p-6 mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Calendar className="w-5 h-5 text-[#005F6A]" />
-                  <h2 className="text-lg font-[400] text-[#005F6A]">
+              <div className="cl-block">
+                <div className="cl-block-head">
+                  <h2 className="cl-block-title">
+                    <Calendar className="w-5 h-5" style={{ color: "var(--primary)" }} />
                     Current Pay Period
                   </h2>
                   <span
@@ -244,59 +209,112 @@ export default function MyPayClient({
                     {currentPayout.payPeriod.status}
                   </span>
                 </div>
-                <p className="text-sm text-[#005F6A]/70 mb-4">
-                  {formatDate(currentPayout.payPeriod.startDate)} —{" "}
-                  {formatDate(currentPayout.payPeriod.endDate)}
+                <p style={{ fontSize: 13, color: "var(--primary-60)", margin: 0 }}>
+                  {formatDate(currentPayout.payPeriod.startDate)} — {formatDate(currentPayout.payPeriod.endDate)}
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="cl-block-stats">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 font-[400]">
-                      Base
-                    </p>
-                    <p className="text-lg font-[400] text-[#005F6A]">
-                      ${currentPayout.baseAmount.toFixed(2)}
-                    </p>
+                    <div className="cl-block-stat-label">Base</div>
+                    <div className="cl-block-stat-val">${currentPayout.baseAmount.toFixed(2)}</div>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 font-[400]">
-                      Adjustments
-                    </p>
-                    <p className="text-lg font-[400] text-blue-600">
-                      ${currentPayout.adjustments.toFixed(2)}
-                    </p>
+                    <div className="cl-block-stat-label">Adjustments</div>
+                    <div className="cl-block-stat-val" style={{ color: "#2563eb" }}>${currentPayout.adjustments.toFixed(2)}</div>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 font-[400]">
-                      Deductions
-                    </p>
-                    <p className="text-lg font-[400] text-red-600">
-                      -${currentPayout.deductions.toFixed(2)}
-                    </p>
+                    <div className="cl-block-stat-label">Deductions</div>
+                    <div className="cl-block-stat-val" style={{ color: "#dc2626" }}>-${currentPayout.deductions.toFixed(2)}</div>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 font-[400]">
-                      Final
-                    </p>
-                    <p className="text-lg font-[500] text-[#005F6A]">
-                      ${currentPayout.finalAmount.toFixed(2)}
-                    </p>
+                    <div className="cl-block-stat-label">Final</div>
+                    <div className="cl-block-stat-val pos">${currentPayout.finalAmount.toFixed(2)}</div>
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-[#005F6A]/10 flex items-center gap-4 text-xs text-[#005F6A]/60">
+                <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "var(--primary-60)", paddingTop: 4, borderTop: "1px solid rgba(0,95,106,0.07)" }}>
                   <span>{currentPayout.jobCount} jobs</span>
                   <span>·</span>
                   <span>{currentPayout.totalHours.toFixed(1)} hours</span>
                 </div>
-              </Card>
+              </div>
             ) : (
-              <Card variant="cleano_light" className="p-6 mb-6">
-                <div className="text-center py-6">
-                  <Calendar className="w-8 h-8 text-[#005F6A]/30 mx-auto mb-2" />
-                  <p className="text-sm text-[#005F6A]/70">
-                    No active pay period
-                  </p>
+              <div className="cl-empty-block" style={{ marginBottom: 14 }}>
+                <div className="icon-bubble">
+                  <Calendar size={28} />
                 </div>
-              </Card>
+                <p style={{ margin: 0, color: "var(--ink-soft)" }}>No active pay period</p>
+              </div>
+            )}
+
+            {/* Rag Wash & Credits */}
+            {ragData && (
+              <div className="cl-block">
+                <div className="cl-block-head">
+                  <h2 className="cl-block-title">
+                    <Droplets className="w-5 h-5" style={{ color: "var(--primary)" }} />
+                    Rag Wash Credits
+                  </h2>
+                  <a
+                    href="/my-inventory/rag-wash"
+                    className="cl-action-btn">
+                    Log washes
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="cl-block-stats">
+                  <div>
+                    <div className="cl-block-stat-label">Rags this period</div>
+                    <div className="cl-block-stat-val">{ragData.periodRags}</div>
+                  </div>
+                  <div>
+                    <div className="cl-block-stat-label">Credits this period</div>
+                    <div className="cl-block-stat-val pos">+${ragData.periodCredit.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="cl-block-stat-label">All-time rags</div>
+                    <div className="cl-block-stat-val">{ragData.allTimeRags}</div>
+                  </div>
+                  <div>
+                    <div className="cl-block-stat-label">All-time credits</div>
+                    <div className="cl-block-stat-val pos">+${ragData.allTimeCredit.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                {ragData.recentWashes.length > 0 ? (
+                  <div style={{ borderTop: "1px solid rgba(0,95,106,0.07)", paddingTop: 12 }}>
+                    <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 8 }}>
+                      Recent Washes
+                    </p>
+                    {ragData.recentWashes.map((w) => (
+                      <div key={w.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
+                        <span style={{ color: "var(--ink-soft)" }}>
+                          {new Date(w.washDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {w.notes ? ` · ${w.notes}` : ""}
+                        </span>
+                        <span style={{ color: "var(--primary-60)" }}>
+                          {w.ragCount} rag{w.ragCount !== 1 ? "s" : ""} ·{" "}
+                          <span style={{ color: "#059669", fontWeight: 600 }}>
+                            +${(w.ragCount * ragData.creditRate).toFixed(2)}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ borderTop: "1px solid rgba(0,95,106,0.07)", paddingTop: 12, textAlign: "center" }}>
+                    <p style={{ fontSize: 13, color: "var(--primary-50)" }}>
+                      No washes logged yet.{" "}
+                      <a href="/my-inventory/rag-wash" style={{ textDecoration: "underline", color: "var(--primary)" }}>
+                        Log your first wash →
+                      </a>
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ borderTop: "1px solid rgba(0,95,106,0.07)", paddingTop: 10, fontSize: 11, color: "var(--primary-50)" }}>
+                  Rate: ${ragData.creditRate.toFixed(2)} per rag · Credits are added as adjustments by admin at period close
+                </div>
+              </div>
             )}
 
             <ProviderInvoiceView />
@@ -311,61 +329,33 @@ export default function MyPayClient({
         )}
 
         {tab === "income" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Gross Pay {year}
-              </p>
-              <p className="text-2xl font-[400] text-[#005F6A]">
-                ${grossPay.toFixed(2)}
-              </p>
-              <p className="text-xs text-[#005F6A]/60 mt-2">
-                Sum of base amounts on PAID payouts
-              </p>
-            </Card>
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Net Pay {year}
-              </p>
-              <p className="text-2xl font-[400] text-[#005F6A]">
-                ${paidThisYear.toFixed(2)}
-              </p>
-              <p className="text-xs text-[#005F6A]/60 mt-2">
-                After adjustments and deductions
-              </p>
-            </Card>
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Adjustments
-              </p>
-              <p className="text-2xl font-[400] text-blue-600">
-                ${totalAdjustments.toFixed(2)}
-              </p>
-            </Card>
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Deductions
-              </p>
-              <p className="text-2xl font-[400] text-red-600">
-                ${totalDeductions.toFixed(2)}
-              </p>
-            </Card>
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Reimbursements
-              </p>
-              <p className="text-2xl font-[400] text-[#005F6A]">
-                ${totalReimbursements.toFixed(2)}
-              </p>
-            </Card>
-            <Card variant="cleano_light" className="p-6">
-              <p className="text-xs uppercase tracking-wider text-[#005F6A]/50 mb-1">
-                Hours Worked
-              </p>
-              <p className="text-2xl font-[400] text-[#005F6A]">
-                {totalHoursYear.toFixed(1)}h
-              </p>
-            </Card>
+          <div className="cl-income-grid">
+            <div className="cl-income-tile">
+              <div className="label">Gross pay {year}</div>
+              <div className="val">${grossPay.toFixed(2)}</div>
+              <div className="hint">Sum of base amounts on PAID payouts</div>
+            </div>
+            <div className="cl-income-tile">
+              <div className="label">Net pay {year}</div>
+              <div className="val">${paidThisYear.toFixed(2)}</div>
+              <div className="hint">After adjustments and deductions</div>
+            </div>
+            <div className="cl-income-tile">
+              <div className="label">Adjustments</div>
+              <div className="val accent">${totalAdjustments.toFixed(2)}</div>
+            </div>
+            <div className="cl-income-tile">
+              <div className="label">Deductions</div>
+              <div className="val neg">-${totalDeductions.toFixed(2)}</div>
+            </div>
+            <div className="cl-income-tile">
+              <div className="label">Reimbursements</div>
+              <div className="val">${totalReimbursements.toFixed(2)}</div>
+            </div>
+            <div className="cl-income-tile">
+              <div className="label">Hours worked</div>
+              <div className="val">{totalHoursYear.toFixed(1)}h</div>
+            </div>
           </div>
         )}
       </div>

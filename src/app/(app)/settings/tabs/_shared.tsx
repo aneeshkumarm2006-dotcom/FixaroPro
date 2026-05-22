@@ -2,7 +2,6 @@
 
 import React from "react";
 import { LucideIcon } from "lucide-react";
-import Card from "@/components/ui/Card";
 
 export type Msg = { type: "success" | "error"; text: string } | null;
 
@@ -20,27 +19,23 @@ export function SectionCard({
   actions?: React.ReactNode;
 }) {
   return (
-    <Card variant="default" className="p-6">
-      <div className="space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-2">
-            {Icon && (
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <Icon className="w-4 h-4 text-[#005F6A]" />
-              </div>
-            )}
-            <div>
-              <h2 className="text-sm font-[350] text-[#005F6A]/80">{title}</h2>
-              {description && (
-                <p className="text-xs text-[#005F6A]/60 mt-1">{description}</p>
-              )}
-            </div>
+    <div className="cl-section-card">
+      <div className="cl-section-card-head" style={actions ? { justifyContent: "space-between" } : undefined}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {Icon && (
+            <span className="icon-bubble">
+              <Icon className="w-5 h-5" strokeWidth={1.9} />
+            </span>
+          )}
+          <div>
+            <h3>{title}</h3>
+            {description && <p>{description}</p>}
           </div>
-          {actions}
         </div>
-        {children}
+        {actions}
       </div>
-    </Card>
+      {children}
+    </div>
   );
 }
 
@@ -56,14 +51,10 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label
-        htmlFor={htmlFor}
-        className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
-        {label}
-      </label>
+    <div className="cl-form-row">
+      <label htmlFor={htmlFor} className="cl-form-label">{label}</label>
       {children}
-      {hint && <p className="text-[10px] text-[#005F6A]/40 mt-1">{hint}</p>}
+      {hint && <div className="cl-form-hint">{hint}</div>}
     </div>
   );
 }
@@ -71,11 +62,11 @@ export function Field({
 export function Feedback({ msg }: { msg: NonNullable<Msg> }) {
   return (
     <div
-      className={`px-4 py-3 rounded-xl text-sm font-[350] ${
-        msg.type === "success"
-          ? "bg-[#005F6A]/10 text-[#005F6A] border border-[#005F6A]/15"
-          : "bg-red-50 text-red-700 border border-red-200"
-      }`}>
+      style={{
+        padding: "12px 16px", borderRadius: 12, fontSize: 13,
+        background: msg.type === "success" ? "rgba(0,95,106,0.08)" : "#fee2e2",
+        color: msg.type === "success" ? "var(--primary)" : "#dc2626",
+      }}>
       {msg.text}
     </div>
   );

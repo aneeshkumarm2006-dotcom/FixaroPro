@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
-import Button from "@/components/ui/Button";
 import {
   getNotificationPrefs,
   updateNotificationPrefs,
@@ -152,44 +151,31 @@ export default function NotificationSection({
       description="Choose which notifications you want to receive."
       icon={Bell}>
       {loading ? (
-        <p className="text-sm text-[#005F6A]/60">Loading preferences...</p>
+        <p style={{ fontSize: 13, color: "var(--primary-60)" }}>Loading preferences...</p>
       ) : (
-        <div className="space-y-3">
+        <>
           {ROWS.map((row) => (
-            <label
-              key={row.key}
-              className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#005F6A]/5 cursor-pointer hover:bg-[#005F6A]/10 transition-colors">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-[500] text-[#005F6A]">
-                  {row.label}
-                </p>
-                <p className="text-xs text-[#005F6A]/60 mt-0.5">
-                  {row.description}
-                </p>
+            <div className="cl-notif-row" key={row.key}>
+              <div className="meta">
+                <div className="name">{row.label}</div>
+                <div className="desc">{row.description}</div>
               </div>
               <input
                 type="checkbox"
+                className="cl-checkbox"
                 checked={prefs[row.key]}
                 onChange={() => toggle(row.key)}
-                className="mt-1 accent-[#005F6A] w-4 h-4 cursor-pointer"
+                aria-label={row.label}
               />
-            </label>
+            </div>
           ))}
-
           {msg && <Feedback msg={msg} />}
-
-          <div className="flex justify-end pt-2">
-            <Button
-              type="button"
-              variant="action"
-              border={false}
-              disabled={saving}
-              onClick={handleSave}
-              className="rounded-xl px-6 py-2.5">
-              {saving ? "Saving..." : "Save Preferences"}
-            </Button>
+          <div className="cl-form-actions" style={{ marginTop: 14 }}>
+            <button type="button" className="cl-form-save" disabled={saving} onClick={handleSave}>
+              {saving ? "Saving..." : "Save preferences"}
+            </button>
           </div>
-        </div>
+        </>
       )}
     </SectionCard>
   );

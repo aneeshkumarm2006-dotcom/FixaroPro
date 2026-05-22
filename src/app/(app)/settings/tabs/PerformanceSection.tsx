@@ -158,70 +158,33 @@ export default function PerformanceSection({
         title="Current Rating"
         description="Average of ratings in the last 30 days."
         icon={Star}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl bg-[#005F6A]/5 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 mb-1">
-              30-Day Rating
-            </p>
+        <div className="cl-income-stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="cl-income-mini">
+            <div className="label">30-day rating</div>
+            <div className="val">
+              {data.rating30Day !== null ? data.rating30Day.toFixed(2) : "—"}
+            </div>
             {data.rating30Day !== null ? (
-              <>
-                <p className="text-3xl font-[300] text-[#005F6A]">
-                  {data.rating30Day.toFixed(2)}
-                </p>
-                <div className="mt-1">
-                  <StarRow value={data.rating30Day} />
-                </div>
-                <p className="text-xs text-[#005F6A]/60 mt-2">
-                  Based on {data.ratingCount30Day} rating
-                  {data.ratingCount30Day === 1 ? "" : "s"}
-                </p>
-              </>
+              <div className="cl-form-hint">Based on {data.ratingCount30Day} rating{data.ratingCount30Day === 1 ? "" : "s"}</div>
             ) : (
-              <>
-                <p className="text-3xl font-[300] text-[#005F6A]/40">—</p>
-                <p className="text-xs text-[#005F6A]/60 mt-2">
-                  No ratings in the last 30 days
-                </p>
-              </>
+              <div className="cl-form-hint">No ratings in the last 30 days</div>
             )}
           </div>
-
-          <div className="rounded-2xl bg-[#005F6A]/5 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 mb-1">
-              Pay Multiplier
-            </p>
-            <p className="text-3xl font-[300] text-[#005F6A]">
-              {data.currentMultiplier.toFixed(2)}x
-            </p>
-            <p className="text-xs text-[#005F6A]/60 mt-2">
-              Tier: <span className="font-[500]">{data.tierLabel}</span>
-            </p>
-            {data.nextTierAt !== null &&
-              data.nextTierMultiplier !== null && (
-                <p className="text-[11px] text-[#005F6A]/60 mt-1">
-                  Reach {data.nextTierAt.toFixed(1)}★ for{" "}
-                  {data.nextTierMultiplier.toFixed(2)}x
-                </p>
-              )}
+          <div className="cl-income-mini">
+            <div className="label">Pay multiplier</div>
+            <div className="val">{data.currentMultiplier.toFixed(2)}×</div>
+            <div className="cl-form-hint">Tier: <strong style={{ color: "var(--ink)" }}>{data.tierLabel}</strong></div>
+            {data.nextTierAt !== null && data.nextTierMultiplier !== null && (
+              <div className="cl-form-hint">Reach {data.nextTierAt.toFixed(1)}★ for {data.nextTierMultiplier.toFixed(2)}×</div>
+            )}
           </div>
-
-          <div className="rounded-2xl bg-[#005F6A]/5 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 mb-1 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Rating Window
-            </p>
-            <p className="text-sm text-[#005F6A] mt-2">
+          <div className="cl-income-mini">
+            <div className="label">Rating window</div>
+            <div className="val" style={{ fontSize: 15, fontFamily: "var(--font)", fontWeight: 500, lineHeight: 1.4 }}>
               Ratings count toward your average for 30 days.
-            </p>
+            </div>
             {data.expiringSoon > 0 && (
-              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-2 inline-block">
-                {data.expiringSoon} rating
-                {data.expiringSoon === 1 ? "" : "s"} expiring soon
-              </p>
-            )}
-            {data.oldestRating30DayAt && (
-              <p className="text-[11px] text-[#005F6A]/60 mt-1">
-                Oldest active: {formatDate(data.oldestRating30DayAt)}
-              </p>
+              <div className="cl-form-hint" style={{ color: "var(--amber-700)" }}>{data.expiringSoon} rating{data.expiringSoon === 1 ? "" : "s"} expiring soon</div>
             )}
           </div>
         </div>
@@ -239,33 +202,19 @@ export default function PerformanceSection({
         description="Last 10 ratings received."
         icon={Star}>
         {data.recentRatings.length === 0 ? (
-          <p className="text-sm text-[#005F6A]/60">No recent ratings.</p>
+          <p style={{ fontSize: 13.5, color: "var(--primary-60)" }}>No recent ratings.</p>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {data.recentRatings.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-start gap-3 p-3 rounded-xl bg-[#005F6A]/5">
+              <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", borderRadius: 12, background: "var(--primary-5)" }}>
                 <StarRow value={r.rating} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-[#005F6A] font-[500]">
-                      {r.rating.toFixed(1)}★
-                    </p>
-                    <p className="text-xs text-[#005F6A]/60">
-                      {formatDate(r.createdAt)}
-                    </p>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>{r.rating.toFixed(1)}&nbsp;{"★"}</span>
+                    <span style={{ fontSize: 12, color: "var(--primary-60)" }}>{formatDate(r.createdAt)}</span>
                   </div>
-                  {r.clientName && (
-                    <p className="text-xs text-[#005F6A]/70 mt-0.5">
-                      Job for {r.clientName}
-                    </p>
-                  )}
-                  {r.notes && (
-                    <p className="text-xs text-[#005F6A]/70 mt-1 italic">
-                      “{r.notes}”
-                    </p>
-                  )}
+                  {r.clientName && <p style={{ fontSize: 12, color: "var(--primary-70)", marginTop: 2 }}>Job for {r.clientName}</p>}
+                  {r.notes && <p style={{ fontSize: 12, color: "var(--primary-70)", marginTop: 4, fontStyle: "italic" }}>"{r.notes}"</p>}
                 </div>
               </div>
             ))}

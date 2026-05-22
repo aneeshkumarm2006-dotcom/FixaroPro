@@ -2,15 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import {
-  FileSignature,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  ChevronRight,
-} from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ChevronRight, FileText } from "lucide-react";
 
 type DocStatus = "PENDING" | "SIGNED" | "EXPIRED" | "REVOKED";
 
@@ -48,137 +40,74 @@ function isOverdue(dueDate: string | null) {
 }
 
 export default function DocumentsClient({ signatures }: DocumentsClientProps) {
-  const pending = useMemo(
-    () => signatures.filter((s) => s.status === "PENDING"),
-    [signatures]
-  );
-  const signed = useMemo(
-    () => signatures.filter((s) => s.status === "SIGNED"),
-    [signatures]
-  );
-  const other = useMemo(
-    () =>
-      signatures.filter(
-        (s) => s.status !== "PENDING" && s.status !== "SIGNED"
-      ),
-    [signatures]
-  );
+  const pending = useMemo(() => signatures.filter((s) => s.status === "PENDING"), [signatures]);
+  const signed = useMemo(() => signatures.filter((s) => s.status === "SIGNED"), [signatures]);
+  const other = useMemo(() => signatures.filter((s) => s.status !== "PENDING" && s.status !== "SIGNED"), [signatures]);
 
   return (
-    <div className="max-w-[80rem] mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-          Documents
-        </h1>
-        <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
-          Review and sign documents assigned to you
-        </p>
+    <>
+      <div className="cl-page-head">
+        <div>
+          <h1 className="cl-page-title">Documents</h1>
+          <p className="cl-page-sub">Review and sign documents assigned to you.</p>
+        </div>
       </div>
 
-      <Card variant="cleano_light" className="p-6">
-        <div className="grid grid-cols-3 gap-6">
-          <Stat
-            label="Pending"
-            value={pending.length}
-            icon={Clock}
-            tone="warning"
-          />
-          <Stat
-            label="Signed"
-            value={signed.length}
-            icon={CheckCircle2}
-            tone="success"
-          />
-          <Stat
-            label="Total"
-            value={signatures.length}
-            icon={FileSignature}
-            tone="default"
-          />
+      <div className="cl-doc-stats">
+        <div className="cl-doc-tile pending">
+          <span className="icon-bubble"><Clock className="w-5 h-5" /></span>
+          <div>
+            <div className="cl-doc-tile-label">Pending</div>
+            <div className="cl-doc-tile-val">{pending.length}</div>
+          </div>
         </div>
-      </Card>
+        <div className="cl-doc-tile signed">
+          <span className="icon-bubble"><CheckCircle2 className="w-5 h-5" /></span>
+          <div>
+            <div className="cl-doc-tile-label">Signed</div>
+            <div className="cl-doc-tile-val">{signed.length}</div>
+          </div>
+        </div>
+        <div className="cl-doc-tile">
+          <span className="icon-bubble"><FileText className="w-5 h-5" /></span>
+          <div>
+            <div className="cl-doc-tile-label">Total</div>
+            <div className="cl-doc-tile-val">{signatures.length}</div>
+          </div>
+        </div>
+      </div>
 
-      <Section
-        title="Pending Signature"
-        rows={pending}
-        emptyText="You have no pending documents."
-      />
+      <section className="cl-doc-section">
+        <h2>Pending signature</h2>
+        {pending.length === 0 ? (
+          <div className="cl-doc-empty">You have no pending documents.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pending.map((row) => <DocumentRow key={row.id} row={row} />)}
+          </div>
+        )}
+      </section>
 
-      <Section
-        title="Signed"
-        rows={signed}
-        emptyText="No signed documents yet."
-      />
+      <section className="cl-doc-section">
+        <h2>Signed</h2>
+        {signed.length === 0 ? (
+          <div className="cl-doc-empty">No signed documents yet.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {signed.map((row) => <DocumentRow key={row.id} row={row} />)}
+          </div>
+        )}
+      </section>
 
       {other.length > 0 && (
-        <Section
-          title="Other"
-          rows={other}
-          emptyText=""
-        />
+        <section className="cl-doc-section">
+          <h2>Other</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {other.map((row) => <DocumentRow key={row.id} row={row} />)}
+          </div>
+        </section>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: typeof FileSignature;
-  tone: "default" | "success" | "warning";
-}) {
-  const toneClasses = {
-    default: "bg-[#005F6A]/10 text-[#005F6A]",
-    success: "bg-green-50 text-green-700",
-    warning: "bg-yellow-50 text-yellow-700",
-  }[tone];
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className={`p-3 rounded-2xl ${toneClasses}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-wide text-[#005F6A]/70">
-          {label}
-        </p>
-        <p className="text-2xl font-[400] text-[#005F6A]">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  rows,
-  emptyText,
-}: {
-  title: string;
-  rows: SignatureRow[];
-  emptyText: string;
-}) {
-  return (
-    <div className="space-y-3">
-      <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
-        {title}
-      </h2>
-      {rows.length === 0 ? (
-        <Card variant="ghost" className="p-8">
-          <p className="text-sm text-[#005F6A]/60 text-center">{emptyText}</p>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <DocumentRow key={row.id} row={row} />
-          ))}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -187,64 +116,40 @@ function DocumentRow({ row }: { row: SignatureRow }) {
   const due = formatDate(row.document.dueDate);
   const signedDate = formatDate(row.signedAt);
 
+  const statusPill = () => {
+    if (row.status === "PENDING") {
+      return (
+        <span className={`cl-pill ${overdue ? "cancelled" : "pending"}`}>
+          {overdue ? <><AlertCircle className="w-3 h-3" style={{ marginRight: 4 }} /> Overdue</> : <><Clock className="w-3 h-3" style={{ marginRight: 4 }} /> Pending</>}
+        </span>
+      );
+    }
+    if (row.status === "SIGNED") return <span className="cl-pill passed"><CheckCircle2 className="w-3 h-3" style={{ marginRight: 4 }} /> Signed</span>;
+    if (row.status === "EXPIRED") return <span className="cl-pill pending">Expired</span>;
+    if (row.status === "REVOKED") return <span className="cl-pill cancelled">Revoked</span>;
+    return null;
+  };
+
   return (
     <Link
       href={`/documents/${row.document.id}`}
-      className="block p-4 border border-[#005F6A]/10 rounded-2xl bg-white hover:bg-[#005F6A]/3 transition-colors">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-[400] text-[#005F6A]">
-              {row.document.title}
-            </h3>
-            <Badge variant="default" size="sm">
-              v{row.document.version}
-            </Badge>
-            {row.status === "PENDING" && (
-              <Badge variant={overdue ? "error" : "warning"} size="sm">
-                {overdue ? (
-                  <>
-                    <AlertCircle className="w-3 h-3 mr-1" />
-                    Overdue
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-3 h-3 mr-1" />
-                    Pending
-                  </>
-                )}
-              </Badge>
-            )}
-            {row.status === "SIGNED" && (
-              <Badge variant="success" size="sm">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Signed
-              </Badge>
-            )}
-            {row.status === "EXPIRED" && (
-              <Badge variant="default" size="sm">
-                Expired
-              </Badge>
-            )}
-            {row.status === "REVOKED" && (
-              <Badge variant="error" size="sm">
-                Revoked
-              </Badge>
-            )}
-          </div>
-          {row.document.description && (
-            <p className="text-xs text-[#005F6A]/60 mt-1 line-clamp-2">
-              {row.document.description}
-            </p>
-          )}
-          <div className="flex items-center gap-4 mt-2 text-xs text-[#005F6A]/60">
-            {due && row.status === "PENDING" && (
-              <span>Due {due}</span>
-            )}
-            {signedDate && <span>Signed {signedDate}</span>}
-          </div>
+      className="cl-module">
+      <div className="cl-module-meta">
+        <div className="cl-module-head">
+          <span className="cl-module-title">{row.document.title}</span>
+          <span className="cl-pill" style={{ background: "var(--primary-5)", color: "var(--primary-60)" }}>v{row.document.version}</span>
+          {statusPill()}
         </div>
-        <ChevronRight className="w-5 h-5 text-[#005F6A]/40 flex-shrink-0" />
+        {row.document.description && (
+          <div className="cl-module-summary">{row.document.description}</div>
+        )}
+        <div style={{ fontSize: 11.5, color: "var(--primary-50)", marginTop: 6, display: "flex", gap: 12 }}>
+          {due && row.status === "PENDING" && <span>Due {due}</span>}
+          {signedDate && <span>Signed {signedDate}</span>}
+        </div>
+      </div>
+      <div className="cl-module-chev">
+        <ChevronRight className="w-5 h-5" />
       </div>
     </Link>
   );

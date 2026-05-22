@@ -130,7 +130,7 @@ export default function BookPage() {
           draft.phone.trim()
         );
       case 4:
-        return agree;
+        return agree && !!draft.stripeCardReady;
       default:
         return false;
     }
@@ -155,6 +155,27 @@ export default function BookPage() {
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
+
+    // Confirm the $20 deposit payment first
+    const confirmFn = (window as any).__stripeConfirmCard as
+      | (() => Promise<{ paymentIntentId: string; paymentMethodId: string } | null>)
+      | undefined;
+
+    let depositPaymentIntentId: string | undefined;
+    let stripePaymentMethodId: string | undefined;
+
+    if (confirmFn) {
+      const depositResult = await confirmFn();
+      if (!depositResult) {
+        setSubmitError("Payment failed. Please check your card details and try again.");
+        setSubmitting(false);
+        submittingRef.current = false;
+        return;
+      }
+      depositPaymentIntentId = depositResult.paymentIntentId;
+      stripePaymentMethodId = depositResult.paymentMethodId;
+    }
+
     const res = await submitBooking({
       postalCode: draft.postalCode,
       address: draft.address,
@@ -175,6 +196,9 @@ export default function BookPage() {
       email: draft.email,
       notes: draft.notes,
       referralCode: draft.referralCode,
+      depositPaymentIntentId,
+      stripeCustomerId: draft.stripeCustomerId,
+      stripePaymentMethodId,
     });
     setSubmitting(false);
     if (!res.success) {
@@ -282,7 +306,7 @@ export default function BookPage() {
                     }}>
                     ${confirmedTotal.toFixed(2)} CAD
                   </strong>{" "}
-                  — we'll charge after the cleaning is complete.
+                  — $20 deposit charged, remaining balance after cleaning.
                 </p>
               ) : null}
 
@@ -324,7 +348,7 @@ export default function BookPage() {
                       Set up my account
                     </Link>
                     <Link
-                      href="/book"
+                      href="/portal/login"
                       className="cl-btn cl-btn-secondary cl-btn-lg">
                       Back to home
                     </Link>
@@ -476,7 +500,7 @@ export default function BookPage() {
               lineHeight: 1.55,
               marginTop: "auto",
             }}>
-            You won't be charged until after your cleaning is complete.
+            A $20 deposit is charged at booking. The remaining balance is due after your cleaning.
           </p>
         </aside>
 

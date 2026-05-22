@@ -68,7 +68,7 @@ export default function Step3Schedule({ draft, onChange }: Props) {
           large
           active={draft.isFlexible}
           title="I'm flexible"
-          sub="Our team picks the best time for the day — usually $10 less."
+          sub="Our team picks the best time for the day (9AM–7PM) — usually $10 less."
           onClick={() => onChange({ isFlexible: true, timeSlot: "" })}
         />
         <ChoiceButton
@@ -79,6 +79,19 @@ export default function Step3Schedule({ draft, onChange }: Props) {
           onClick={() => onChange({ isFlexible: false })}
         />
       </div>
+
+      {draft.isFlexible && (
+        <div style={{
+          background: "rgba(0,95,106,0.06)",
+          borderRadius: 12,
+          padding: "12px 16px",
+          fontSize: 14,
+          color: "var(--primary)",
+          fontWeight: 500,
+        }}>
+          Time window: <strong>9AM – 7PM</strong> · Our team will confirm your exact slot the day before.
+        </div>
+      )}
 
       {!draft.isFlexible ? (
         <div className="cl-stack-12">

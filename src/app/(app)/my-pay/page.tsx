@@ -1,12 +1,13 @@
 import { db } from "@/db";
 import { requireCleaner } from "@/lib/page-guards";
 import MyPayClient from "./MyPayClient";
+import { getEmployeeAvgRating } from "../actions/setEmployeeRating";
 
 export default async function MyPayPage() {
   const session = await requireCleaner();
   const userId = session.user.id;
 
-  const [payouts, withdrawals] = await Promise.all([
+  const [payouts, withdrawals, starRating, ragWashes, ragCreditSetting] = await Promise.all([
     db.payout.findMany({
       where: { employeeId: userId },
       include: { payPeriod: true },
@@ -16,6 +17,12 @@ export default async function MyPayPage() {
       where: { employeeId: userId },
       orderBy: { createdAt: "desc" },
     }),
+    getEmployeeAvgRating(userId),
+    db.ragWash.findMany({
+      where: { employeeId: userId },
+      orderBy: { washDate: "desc" },
+    }),
+    db.appSetting.findUnique({ where: { key: "payroll.ragCreditPerRag" } }),
   ]);
 
   const currentPayout =
@@ -52,6 +59,44 @@ export default async function MyPayPage() {
   const totalHoursYear = paidPayouts
     .filter((p) => p.payPeriod.paidAt && p.payPeriod.paidAt >= yearStart)
     .reduce((sum, p) => sum + p.totalHours, 0);
+
+  // Rag credit rate (default $0.50 per rag)
+  const ragCreditRate =
+    typeof (ragCreditSetting?.value as Record<string, unknown> | null)?.rate === "number"
+      ? (ragCreditSetting!.value as Record<string, unknown>).rate as number
+      : 0.5;
+
+  const allTimeRags = ragWashes.reduce((s, w) => s + w.ragCount, 0);
+  const allTimeCredit = Math.round(allTimeRags * ragCreditRate * 100) / 100;
+
+  // Rag washes during the current pay period
+  const currentPeriodStart = currentPayout
+    ? new Date(currentPayout.payPeriod.startDate)
+    : null;
+  const currentPeriodEnd = currentPayout
+    ? new Date(currentPayout.payPeriod.endDate)
+    : null;
+
+  const periodRagWashes = ragWashes.filter((w) => {
+    if (!currentPeriodStart || !currentPeriodEnd) return false;
+    return w.washDate >= currentPeriodStart && w.washDate <= currentPeriodEnd;
+  });
+  const periodRags = periodRagWashes.reduce((s, w) => s + w.ragCount, 0);
+  const periodCredit = Math.round(periodRags * ragCreditRate * 100) / 100;
+
+  const ragData = {
+    allTimeRags,
+    allTimeCredit,
+    periodRags,
+    periodCredit,
+    creditRate: ragCreditRate,
+    recentWashes: ragWashes.slice(0, 5).map((w) => ({
+      id: w.id,
+      washDate: w.washDate.toISOString(),
+      ragCount: w.ragCount,
+      notes: w.notes,
+    })),
+  };
 
   // Serialize Dates to strings for client component
   const serializePayout = (p: (typeof payouts)[number]) => ({
@@ -90,6 +135,8 @@ export default async function MyPayPage() {
       availableBalance={availableBalance}
       currentPayout={currentPayout ? serializePayout(currentPayout) : null}
       year={now.getFullYear()}
+      starRating={starRating}
+      ragData={ragData}
     />
   );
 }

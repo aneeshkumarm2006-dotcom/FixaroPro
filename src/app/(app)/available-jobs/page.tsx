@@ -1,7 +1,6 @@
 import { requireCleaner } from "@/lib/page-guards";
 import { db } from "@/db";
 import AvailableJobsClient from "./AvailableJobsClient";
-import { Briefcase } from "lucide-react";
 
 export default async function AvailableJobsPage() {
   const session = await requireCleaner();
@@ -41,14 +40,17 @@ export default async function AvailableJobsPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A] flex items-center gap-3">
-          <Briefcase className="w-7 h-7" /> Available Jobs
-        </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
-          Open shifts you can claim. Jobs disappear once they&apos;re fully staffed.
-        </p>
+    <div className="cl-page-wrap">
+      <div className="cl-page-head">
+        <div>
+          <h1 className="cl-page-title">
+            <span className="cl-page-title-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+            </span>
+            Available jobs
+          </h1>
+          <p className="cl-page-sub">Open shifts you can claim. Jobs disappear once they&apos;re fully staffed.</p>
+        </div>
       </div>
 
       <AvailableJobsClient jobs={serialized} />

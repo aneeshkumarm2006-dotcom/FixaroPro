@@ -4,22 +4,19 @@ import { useEffect, useState } from "react";
 import {
   User as UserIcon,
   KeyRound,
-  Star,
   TrendingUp,
   DollarSign,
   Bell,
   Eye,
   EyeOff,
 } from "lucide-react";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
 import {
   updateUserSettings,
   updateUserPassword,
 } from "../../actions/updateUserSettings";
 import { getPerformanceData } from "../../actions/getPerformanceData";
 import { SettingsUser } from "../types";
-import { SectionCard, Field, Feedback, Msg } from "./_shared";
+import { SectionCard, Feedback, Msg } from "./_shared";
 import PerformanceSection from "./PerformanceSection";
 import IncomeSection from "./IncomeSection";
 import NotificationSection from "./NotificationSection";
@@ -37,23 +34,6 @@ const SUB_TABS: { id: SubTab; label: string; icon: typeof UserIcon }[] = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
-function StarRow({ value }: { value: number }) {
-  const filled = Math.round(value);
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          className={`w-4 h-4 ${
-            i < filled
-              ? "fill-[#77C8CC] text-[#77C8CC]"
-              : "text-white/30"
-          }`}
-        />
-      ))}
-    </div>
-  );
-}
 
 function PerformanceHeader({ employeeId }: { employeeId?: string }) {
   const [rating, setRating] = useState<number | null>(null);
@@ -82,35 +62,18 @@ function PerformanceHeader({ employeeId }: { employeeId?: string }) {
   if (loading) return null;
 
   return (
-    <div className="rounded-2xl bg-gradient-to-r from-[#005F6A] to-[#077B86] p-5 text-white">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/60">
-            30-Day Rating
-          </p>
-          {rating !== null ? (
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-2xl font-[300]">{rating.toFixed(2)}</p>
-              <StarRow value={rating} />
-            </div>
-          ) : (
-            <p className="text-2xl font-[300] mt-1 text-white/50">—</p>
-          )}
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/60">
-            Pay Multiplier
-          </p>
-          <p className="text-2xl font-[300] mt-1">
-            {multiplier !== null ? `${multiplier.toFixed(2)}x` : "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/60">
-            Tier
-          </p>
-          <p className="text-2xl font-[300] mt-1">{tier ?? "—"}</p>
-        </div>
+    <div className="cl-perf-hero">
+      <div className="cl-perf-hero-tile">
+        <div className="label">30-day rating</div>
+        <div className="val">{rating !== null ? rating.toFixed(2) : "—"}</div>
+      </div>
+      <div className="cl-perf-hero-tile">
+        <div className="label">Pay multiplier</div>
+        <div className="val">{multiplier !== null ? `${multiplier.toFixed(2)}×` : "—"}</div>
+      </div>
+      <div className="cl-perf-hero-tile">
+        <div className="label">Tier</div>
+        <div className="val">{tier ?? "—"}</div>
       </div>
     </div>
   );
@@ -197,143 +160,80 @@ function ProfileForms({ user }: { user: SettingsUser }) {
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <SectionCard
-        title="Profile Information"
+        title="Profile information"
         description="Update your name, email, and contact details."
         icon={UserIcon}>
-        <form onSubmit={handleProfileUpdate} className="space-y-4">
-          <Field label="Full Name">
-            <Input
-              variant="form"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your full name"
-              required
-            />
-          </Field>
-          <Field label="Email Address">
-            <Input
-              variant="form"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-            />
-          </Field>
-          <Field label="Phone Number">
-            <Input
-              variant="form"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter your phone number"
-            />
-          </Field>
-          <Field
-            label="Role"
-            hint="Contact an administrator to change your role.">
-            <div className="px-4 py-2.5 bg-[#005F6A]/5 rounded-2xl text-sm text-[#005F6A]">
-              {user.role}
-            </div>
-          </Field>
-
+        <form onSubmit={handleProfileUpdate}>
+          <div className="cl-form-row">
+            <label className="cl-form-label">Full name</label>
+            <input className="cl-form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" required />
+          </div>
+          <div className="cl-form-row">
+            <label className="cl-form-label">Email address</label>
+            <input className="cl-form-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" required />
+          </div>
+          <div className="cl-form-row">
+            <label className="cl-form-label">Phone number</label>
+            <input className="cl-form-input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter your phone number" />
+          </div>
+          <div className="cl-form-row" style={{ marginBottom: 4 }}>
+            <label className="cl-form-label">Role</label>
+            <input className="cl-form-input" value={user.role} readOnly />
+            <div className="cl-form-hint">Contact an administrator to change your role.</div>
+          </div>
           {profileMsg && <Feedback msg={profileMsg} />}
-
-          <div className="flex justify-end">
-            <Button
-              type="submit"
-              variant="action"
-              border={false}
-              disabled={updatingProfile}
-              className="rounded-xl px-6 py-2.5">
-              {updatingProfile ? "Updating..." : "Update Profile"}
-            </Button>
+          <div className="cl-form-actions">
+            <button type="submit" className="cl-form-save" disabled={updatingProfile}>
+              {updatingProfile ? "Updating..." : "Update profile"}
+            </button>
           </div>
         </form>
       </SectionCard>
 
       <SectionCard
-        title="Change Password"
+        title="Change password"
         description="Use a strong password you don't reuse elsewhere."
         icon={KeyRound}>
-        <form onSubmit={handlePasswordUpdate} className="space-y-4">
-          <Field label="Current Password">
-            <div className="relative">
-              <Input
-                variant="form"
-                type={showCurrent ? "text" : "password"}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-                className="pr-9"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowCurrent((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+        <form onSubmit={handlePasswordUpdate}>
+          <div className="cl-form-row">
+            <label className="cl-form-label">Current password</label>
+            <div style={{ position: "relative" }}>
+              <input className="cl-form-input" type={showCurrent ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" required style={{ paddingRight: 40 }} />
+              <button type="button" onClick={() => setShowCurrent((v) => !v)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: 0, cursor: "pointer", color: "var(--primary-50)" }}>
                 {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-          </Field>
-          <Field
-            label="New Password"
-            hint="Must be at least 8 characters.">
-            <div className="relative">
-              <Input
-                variant="form"
-                type={showNew ? "text" : "password"}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-                className="pr-9"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowNew((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+          </div>
+          <div className="cl-form-row">
+            <label className="cl-form-label">New password</label>
+            <div style={{ position: "relative" }}>
+              <input className="cl-form-input" type={showNew ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password" required style={{ paddingRight: 40 }} />
+              <button type="button" onClick={() => setShowNew((v) => !v)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: 0, cursor: "pointer", color: "var(--primary-50)" }}>
                 {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-          </Field>
-          <Field label="Confirm New Password">
-            <div className="relative">
-              <Input
-                variant="form"
-                type={showConfirm ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className="pr-9"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors">
+            <div className="cl-form-hint">Must be at least 8 characters.</div>
+          </div>
+          <div className="cl-form-row">
+            <label className="cl-form-label">Confirm new password</label>
+            <div style={{ position: "relative" }}>
+              <input className="cl-form-input" type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required style={{ paddingRight: 40 }} />
+              <button type="button" onClick={() => setShowConfirm((v) => !v)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: 0, cursor: "pointer", color: "var(--primary-50)" }}>
                 {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-          </Field>
-
+          </div>
           {passwordMsg && <Feedback msg={passwordMsg} />}
-
-          <div className="flex justify-end">
-            <Button
-              type="submit"
-              variant="action"
-              border={false}
-              disabled={updatingPassword}
-              className="rounded-xl px-6 py-2.5">
-              {updatingPassword ? "Updating..." : "Update Password"}
-            </Button>
+          <div className="cl-form-actions">
+            <button type="submit" className="cl-form-save" disabled={updatingPassword}>
+              {updatingPassword ? "Updating..." : "Update password"}
+            </button>
           </div>
         </form>
       </SectionCard>
-    </div>
+    </>
   );
 }
 
@@ -346,10 +246,10 @@ export default function ProfileTab({ user }: ProfileTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       <PerformanceHeader />
 
-      <div className="flex items-center gap-1 bg-[#005F6A]/5 rounded-2xl p-1 w-fit flex-wrap">
+      <div className="cl-settings-tabs">
         {SUB_TABS.map((t) => {
           const Icon = t.icon;
           const active = subTab === t.id;
@@ -358,12 +258,8 @@ export default function ProfileTab({ user }: ProfileTabProps) {
               key={t.id}
               type="button"
               onClick={() => setSubTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-colors ${
-                active
-                  ? "bg-white text-[#005F6A] font-[500] shadow-sm"
-                  : "text-[#005F6A]/60 hover:text-[#005F6A]"
-              }`}>
-              <Icon className="w-4 h-4" />
+              className={active ? "active" : ""}>
+              <Icon className="w-[14px] h-[14px]" />
               {t.label}
             </button>
           );

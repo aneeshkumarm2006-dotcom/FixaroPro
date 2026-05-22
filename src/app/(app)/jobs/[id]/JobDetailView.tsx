@@ -55,6 +55,8 @@ interface Job {
   bedCount?: number | null;
   bathCount?: number | null;
   payRateMultiplier?: number | null;
+  depositPaid?: boolean;
+  depositPaymentIntentId?: string | null;
   addOns?: Array<{ id: string; name: string; price: number }>;
   employee: { id: string; name: string };
   cleaners: Array<{ id: string; name: string }>;
@@ -508,6 +510,20 @@ export default function JobDetailView({
               {payTypeLabel(job.paymentType)}
             </span>
           </div>
+
+          {job.depositPaid && (
+            <div className="pay-toggle" style={{ background: 'rgba(0,95,106,0.06)', borderRadius: 10, marginBottom: 4 }}>
+              <div className="pay-toggle-info">
+                <div className="icon-bubble" style={{ background: 'rgba(22,163,74,0.12)' }}>
+                  <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                </div>
+                <div className="label-stack">
+                  <span className="top">Deposit paid</span>
+                  <span className="bottom">$20.00 collected at booking{job.depositPaymentIntentId ? ` · ${job.depositPaymentIntentId}` : ''}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="pay-toggle">
             <div className="pay-toggle-info">

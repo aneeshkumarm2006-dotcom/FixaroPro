@@ -1,0 +1,193 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface Props {
+  user: { name: string; email: string; role: string };
+  signOutAction: () => Promise<void>;
+}
+
+function Svg({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block", flexShrink: 0 }}>
+      {children}
+    </svg>
+  );
+}
+
+const ICONS = {
+  dashboard: (
+    <Svg>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </Svg>
+  ),
+  jobs: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="14" x2="14" y2="14" />
+      <line x1="8" y1="18" x2="12" y2="18" />
+    </Svg>
+  ),
+  avail: (
+    <Svg>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </Svg>
+  ),
+  calendar: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </Svg>
+  ),
+  pay: (
+    <Svg>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </Svg>
+  ),
+  inventory: (
+    <Svg>
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </Svg>
+  ),
+  training: (
+    <Svg>
+      <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+      <path d="M6 12v5c3 3 9 3 12 0v-5" />
+    </Svg>
+  ),
+  docs: (
+    <Svg>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </Svg>
+  ),
+  chat: (
+    <Svg>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </Svg>
+  ),
+  settings: (
+    <Svg>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </Svg>
+  ),
+};
+
+const NAV = [
+  {
+    label: "Workspace",
+    items: [
+      { href: "/dashboard",      label: "Dashboard",      icon: ICONS.dashboard },
+      { href: "/my-jobs",        label: "My jobs",        icon: ICONS.jobs },
+      { href: "/available-jobs", label: "Available jobs", icon: ICONS.avail },
+      { href: "/calendar",       label: "Calendar",       icon: ICONS.calendar },
+    ],
+  },
+  {
+    label: "Earnings",
+    items: [
+      { href: "/my-pay",       label: "My pay",       icon: ICONS.pay },
+      { href: "/my-inventory", label: "My inventory", icon: ICONS.inventory },
+    ],
+  },
+  {
+    label: "Personal",
+    items: [
+      { href: "/training",   label: "Training",  icon: ICONS.training },
+      { href: "/documents",  label: "Documents", icon: ICONS.docs },
+      { href: "/chat",       label: "Messages",  icon: ICONS.chat },
+    ],
+  },
+];
+
+export default function CleanerSidebar({ user, signOutAction }: Props) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const words = (user.name || "").split(" ");
+  const firstName = words[0] ?? "";
+  const lastInitial = words[1]?.[0] ?? "";
+  const displayName = lastInitial ? `${firstName} ${lastInitial}.` : firstName;
+
+  const initials = (firstName[0] ?? "") + (lastInitial ?? "");
+
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(href);
+  };
+
+  return (
+    <aside className="cl-sidebar-dark">
+      {/* Logo */}
+      <div className="cl-snav-logo" style={{ marginBottom: 8 }}>
+        <div className="cl-snav-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <span className="cl-snav-wordmark">cleano</span>
+        <span className="cl-snav-badge">Crew</span>
+      </div>
+
+      {/* Nav sections */}
+      {NAV.map((section) => (
+        <div key={section.label} className="cl-snav-section">
+          <div className="cl-snav-section-label">{section.label}</div>
+          {section.items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`cl-snav-item${isActive(item.href) ? " active" : ""}`}>
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      ))}
+
+      {/* User card */}
+      <div style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="cl-snav-user">
+          <div className="cl-snav-avatar">{initials.toUpperCase()}</div>
+          <div className="cl-snav-user-meta">
+            <div className="cl-snav-user-name">{displayName}</div>
+            <div className="cl-snav-user-role">Cleaner</div>
+          </div>
+          <button
+            className="cl-snav-settings"
+            onClick={() => router.push("/settings")}
+            aria-label="Settings">
+            {ICONS.settings}
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}

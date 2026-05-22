@@ -7,6 +7,8 @@ interface ClientOption {
   id: string;
   name: string;
   address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 interface ClientLinkSelectorProps {
@@ -32,7 +34,12 @@ export default function ClientLinkSelector({
 
   const options = [
     { value: "", label: "— None —" },
-    ...clients.map((c) => ({ value: c.id, label: c.name })),
+    ...clients.map((c) => ({
+      value: c.id,
+      label: c.name,
+      description: [c.email, c.phone].filter(Boolean).join(" · ") || undefined,
+      keywords: [c.email, c.phone].filter(Boolean).join(" "),
+    })),
   ];
 
   return (
@@ -47,7 +54,7 @@ export default function ClientLinkSelector({
         setInputValue("location", c.address || "");
       }}
       options={options}
-      placeholder="— None —"
+      placeholder="Search by name, email or phone…"
       searchable
       size="md"
     />

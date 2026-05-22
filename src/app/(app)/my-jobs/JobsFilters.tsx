@@ -2,7 +2,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import CustomDropdown from "@/components/ui/custom-dropdown";
 import Button from "@/components/ui/Button";
@@ -107,181 +106,97 @@ export function JobsFilters() {
   ];
 
   return (
-    <Card variant="ghost" className="!p-0">
-      <div className="flex items-end gap-4 flex-wrap">
-        {/* Search */}
-        <div className="flex-1 min-w-[250px]">
-          <label
-            htmlFor="search"
-            className="block text-sm font-[400] text-gray-700 mb-1.5">
-            Search
-          </label>
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <Input
-                type="text"
-                id="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by client name or location..."
-                variant="default"
-                size="md"
-                className="pr-10"
-              />
-              <button
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Status Filter */}
-        <div className="w-48">
-          <label
-            htmlFor="status"
-            className="block text-sm font-[400] text-gray-700 mb-1.5">
-            Status
-          </label>
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="outline"
-                size="md"
-                submit={false}
-                className="w-full flex items-center !justify-between bg-white">
-                <span>
-                  {statusOptions.find((opt) => opt.value === status)?.label}
-                </span>
-                <svg
-                  className="w-4 h-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </Button>
-            }
-            options={statusOptions.map((opt) => ({
-              label: opt.label,
-              onClick: () => handleStatusChange(opt.value),
-            }))}
-            variant="default"
-            size="md"
-          />
-        </div>
-
-        {/* Job Type Filter */}
-        <div className="w-48">
-          <label
-            htmlFor="jobType"
-            className="block text-sm font-[400] text-gray-700 mb-1.5">
-            Job Type
-          </label>
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="outline"
-                size="md"
-                submit={false}
-                className="w-full flex items-center !justify-between bg-white">
-                <span>
-                  {jobTypeOptions.find((opt) => opt.value === jobType)?.label}
-                </span>
-                <svg
-                  className="w-4 h-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </Button>
-            }
-            options={jobTypeOptions.map((opt) => ({
-              label: opt.label,
-              onClick: () => handleJobTypeChange(opt.value),
-            }))}
-            variant="default"
-            size="md"
-          />
-        </div>
-
-        {/* Per Page */}
-        <div className="w-32">
-          <label
-            htmlFor="perPage"
-            className="block text-sm font-[400] text-gray-700 mb-1.5">
-            Per Page
-          </label>
-          <CustomDropdown
-            trigger={
-              <Button
-                variant="outline"
-                size="md"
-                submit={false}
-                className="w-full flex items-center !justify-between bg-white">
-                <span>
-                  {perPageOptions.find((opt) => opt.value === perPage)?.label}
-                </span>
-                <svg
-                  className="w-4 h-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </Button>
-            }
-            options={perPageOptions.map((opt) => ({
-              label: opt.label,
-              onClick: () => handlePerPageChange(opt.value),
-            }))}
-            variant="default"
-            size="md"
-          />
-        </div>
-
-        {/* Clear Filters Button */}
-        {hasActiveFilters && (
-          <div className="pb-[2px]">
-            <Button
-              onClick={handleClearFilters}
-              disabled={isPending}
-              variant="outline"
+    <div className="cl-toolbar">
+      {/* Search */}
+      <div style={{ flex: "1", minWidth: 220 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 6 }}>
+          Search
+        </label>
+        <form onSubmit={handleSearch}>
+          <div style={{ position: "relative" }}>
+            <Input
+              type="text"
+              id="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Client name or location…"
+              variant="default"
               size="md"
-              submit={false}>
-              Clear Filters
-            </Button>
+              className="pr-10"
+            />
+            <button type="submit" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--primary-50)" }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
           </div>
-        )}
+        </form>
       </div>
-    </Card>
+
+      {/* Status */}
+      <div style={{ minWidth: 160 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 6 }}>
+          Status
+        </label>
+        <CustomDropdown
+          trigger={
+            <Button variant="outline" size="md" submit={false} className="w-full flex items-center !justify-between bg-white">
+              <span>{statusOptions.find((o) => o.value === status)?.label}</span>
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+          }
+          options={statusOptions.map((opt) => ({ label: opt.label, onClick: () => handleStatusChange(opt.value) }))}
+          variant="default" size="md"
+        />
+      </div>
+
+      {/* Job Type */}
+      <div style={{ minWidth: 160 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 6 }}>
+          Job type
+        </label>
+        <CustomDropdown
+          trigger={
+            <Button variant="outline" size="md" submit={false} className="w-full flex items-center !justify-between bg-white">
+              <span>{jobTypeOptions.find((o) => o.value === jobType)?.label}</span>
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+          }
+          options={jobTypeOptions.map((opt) => ({ label: opt.label, onClick: () => handleJobTypeChange(opt.value) }))}
+          variant="default" size="md"
+        />
+      </div>
+
+      {/* Per Page */}
+      <div style={{ minWidth: 100 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 6 }}>
+          Per page
+        </label>
+        <CustomDropdown
+          trigger={
+            <Button variant="outline" size="md" submit={false} className="w-full flex items-center !justify-between bg-white">
+              <span>{perPageOptions.find((o) => o.value === perPage)?.label}</span>
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+          }
+          options={perPageOptions.map((opt) => ({ label: opt.label, onClick: () => handlePerPageChange(opt.value) }))}
+          variant="default" size="md"
+        />
+      </div>
+
+      {hasActiveFilters && (
+        <div style={{ alignSelf: "flex-end" }}>
+          <button type="button" className="cl-action-btn" onClick={handleClearFilters} disabled={isPending}>
+            Clear filters
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

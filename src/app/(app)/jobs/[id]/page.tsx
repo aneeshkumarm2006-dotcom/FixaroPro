@@ -143,6 +143,8 @@ export default async function JobPage({
     bedCount: job.bedCount,
     bathCount: job.bathCount,
     payRateMultiplier: job.payRateMultiplier,
+    depositPaid: job.depositPaid,
+    depositPaymentIntentId: job.depositPaymentIntentId,
     addOns: job.addOns.map((a) => ({
       id: a.id,
       name: a.name,

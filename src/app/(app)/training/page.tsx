@@ -114,7 +114,7 @@ export default async function TrainingPage() {
     : null;
 
   return (
-    <div className="h-full overflow-hidden overflow-y-auto p-8">
+    <div className="cl-page-wrap">
       <TrainingClient
         isAdmin={isAdmin}
         modules={moduleData}

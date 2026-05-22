@@ -51,7 +51,7 @@ function CalendarUrlSync() {
   return null;
 }
 
-export default function CalendarPageClient() {
+export default function CalendarPageClient({ isEmployee = false }: { isEmployee?: boolean }) {
   const calendarRef = useRef<CalendarRef>(null);
   const searchParams = useSearchParams();
 
@@ -118,7 +118,7 @@ export default function CalendarPageClient() {
       initialView={initialView}>
       <CalendarUrlSync />
       <div className="h-full overflow-hidden">
-        <Calendar ref={calendarRef} />
+        <Calendar ref={calendarRef} hideNewJobButton={isEmployee} />
       </div>
       <CalendarJobActions />
     </CalendarProvider>

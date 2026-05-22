@@ -259,6 +259,9 @@ model Job {
   totalAmount             Float             @default(0)
   stripeSetupIntentId     String?
   stripePaymentIntentId   String?
+  depositPaymentIntentId  String?
+  depositPaid             Boolean           @default(false)
+  depositPaidAt           DateTime?
   paymentFailedAt         DateTime?
   paymentFailureReason    String?
   paidAt                  DateTime?

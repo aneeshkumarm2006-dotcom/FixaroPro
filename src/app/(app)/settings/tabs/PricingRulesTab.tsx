@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, DollarSign, Sparkles } from "lucide-react";
+import { Plus, Trash2, DollarSign, Sparkles, BedDouble, Bath } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
@@ -13,10 +13,10 @@ interface PricingRulesTabProps {
   settings: AppSettingRecord[];
 }
 
-interface BaseTier {
-  beds: number;
-  baths: number;
-  price: number;
+interface PerUnitRates {
+  perBedroom: number;
+  perFullBath: number;
+  perHalfBath: number;
 }
 
 interface AddOn {
@@ -25,48 +25,35 @@ interface AddOn {
   price: number;
 }
 
-interface PricingConfig {
-  baseTiers: BaseTier[];
-  addOns: AddOn[];
-}
-
-const KEY = "pricing.rules";
+const PER_UNIT_KEY = "pricing.perUnit";
+const ADDONS_KEY = "pricing.addOns";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
 export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
-  const initial = getSetting<PricingConfig>(settings, KEY, {
-    baseTiers: [
-      { beds: 1, baths: 1, price: 120 },
-      { beds: 2, baths: 1, price: 150 },
-      { beds: 3, baths: 2, price: 200 },
-    ],
-    addOns: [
-      { id: uid(), name: "Inside Fridge", price: 25 },
-      { id: uid(), name: "Inside Oven", price: 30 },
-    ],
+  const initialRates = getSetting<PerUnitRates>(settings, PER_UNIT_KEY, {
+    perBedroom: 19,
+    perFullBath: 19,
+    perHalfBath: 10,
   });
 
-  const [baseTiers, setBaseTiers] = useState<BaseTier[]>(initial.baseTiers);
-  const [addOns, setAddOns] = useState<AddOn[]>(initial.addOns);
+  // Legacy key still used by add-ons fallback
+  const legacyConfig = getSetting<{ addOns?: AddOn[] }>(settings, "pricing.rules", {});
+  const initialAddOns = getSetting<AddOn[]>(
+    settings,
+    ADDONS_KEY,
+    legacyConfig.addOns ?? [
+      { id: uid(), name: "Inside Fridge", price: 25 },
+      { id: uid(), name: "Inside Oven", price: 30 },
+    ]
+  );
+
+  const [rates, setRates] = useState<PerUnitRates>(initialRates);
+  const [addOns, setAddOns] = useState<AddOn[]>(initialAddOns);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
-
-  function updateTier(idx: number, patch: Partial<BaseTier>) {
-    setBaseTiers((prev) =>
-      prev.map((t, i) => (i === idx ? { ...t, ...patch } : t))
-    );
-  }
-
-  function addTier() {
-    setBaseTiers((prev) => [...prev, { beds: 1, baths: 1, price: 0 }]);
-  }
-
-  function removeTier(idx: number) {
-    setBaseTiers((prev) => prev.filter((_, i) => i !== idx));
-  }
 
   function updateAddOn(id: string, patch: Partial<AddOn>) {
     setAddOns((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
@@ -83,95 +70,77 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   async function handleSave() {
     setSaving(true);
     setMsg(null);
-    const res = await updateAppSetting({
-      key: KEY,
-      category: "pricing",
-      value: { baseTiers, addOns },
-    });
-    if (res.success) setMsg({ type: "success", text: "Pricing rules saved." });
-    else setMsg({ type: "error", text: res.error || "Failed to save." });
+
+    const [r1, r2] = await Promise.all([
+      updateAppSetting({ key: PER_UNIT_KEY, category: "pricing", value: rates }),
+      updateAppSetting({ key: ADDONS_KEY, category: "pricing", value: addOns }),
+    ]);
+
+    if (r1.success && r2.success) {
+      setMsg({ type: "success", text: "Pricing rules saved." });
+    } else {
+      setMsg({ type: "error", text: r1.error ?? r2.error ?? "Failed to save." });
+    }
     setSaving(false);
   }
 
+  const examplePrice =
+    2 * rates.perBedroom + 1 * rates.perFullBath + 0 * rates.perHalfBath;
+
   return (
     <div className="space-y-6">
+      {/* Per-Unit Rates */}
       <SectionCard
-        title="Base Pricing Tiers"
-        description="Set base prices by bedroom and bathroom count."
-        icon={DollarSign}
-        actions={
-          <Button
-            type="button"
-            variant="default"
-            border={false}
-            size="sm"
-            onClick={addTier}
-            className="rounded-xl">
-            <Plus className="w-4 h-4 mr-1" /> Add Tier
-          </Button>
-        }>
-        <div className="space-y-3">
-          {baseTiers.length === 0 && (
-            <p className="text-sm text-[#005F6A]/60">No base tiers configured.</p>
-          )}
-          {baseTiers.map((tier, idx) => (
-            <div
-              key={idx}
-              className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
-              <Field label="Beds">
-                <Input
-                  variant="form"
-                  type="number"
-                  min="0"
-                  value={tier.beds}
-                  onChange={(e) =>
-                    updateTier(idx, { beds: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </Field>
-              <Field label="Baths">
-                <Input
-                  variant="form"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={tier.baths}
-                  onChange={(e) =>
-                    updateTier(idx, {
-                      baths: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Price ($)">
-                <Input
-                  variant="form"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={tier.price}
-                  onChange={(e) =>
-                    updateTier(idx, {
-                      price: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-              </Field>
-              <IconButton
-                icon={Trash2}
-                variant="ghost"
-                size="sm"
-                onClick={() => removeTier(idx)}
-                className="text-red-500"
-              />
-            </div>
-          ))}
+        title="Per-Unit Pricing"
+        description="Base price is calculated as: (bedrooms × rate) + (full baths × rate) + (half baths × rate)."
+        icon={BedDouble}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Field label="Per Bedroom ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.perBedroom}
+              onChange={(e) =>
+                setRates((r) => ({ ...r, perBedroom: parseFloat(e.target.value) || 0 }))
+              }
+            />
+          </Field>
+          <Field label="Per Full Bathroom ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.perFullBath}
+              onChange={(e) =>
+                setRates((r) => ({ ...r, perFullBath: parseFloat(e.target.value) || 0 }))
+              }
+            />
+          </Field>
+          <Field label="Per Half Bathroom ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.perHalfBath}
+              onChange={(e) =>
+                setRates((r) => ({ ...r, perHalfBath: parseFloat(e.target.value) || 0 }))
+              }
+            />
+          </Field>
         </div>
+        <p className="text-sm text-[#005F6A]/60 mt-3">
+          Example: 2 bed + 1 full bath = <strong>${examplePrice.toFixed(2)}</strong>
+        </p>
       </SectionCard>
 
+      {/* Add-Ons */}
       <SectionCard
         title="Add-Ons"
-        description="Optional services that can be added to a job."
+        description="Optional services that can be added to a booking."
         icon={Sparkles}
         actions={
           <Button
@@ -189,16 +158,12 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
             <p className="text-sm text-[#005F6A]/60">No add-ons configured.</p>
           )}
           {addOns.map((addon) => (
-            <div
-              key={addon.id}
-              className="grid grid-cols-[2fr_1fr_auto] gap-3 items-end">
+            <div key={addon.id} className="grid grid-cols-[2fr_1fr_auto] gap-3 items-end">
               <Field label="Name">
                 <Input
                   variant="form"
                   value={addon.name}
-                  onChange={(e) =>
-                    updateAddOn(addon.id, { name: e.target.value })
-                  }
+                  onChange={(e) => updateAddOn(addon.id, { name: e.target.value })}
                   placeholder="e.g. Inside Fridge"
                 />
               </Field>
@@ -210,9 +175,7 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
                   step="0.01"
                   value={addon.price}
                   onChange={(e) =>
-                    updateAddOn(addon.id, {
-                      price: parseFloat(e.target.value) || 0,
-                    })
+                    updateAddOn(addon.id, { price: parseFloat(e.target.value) || 0 })
                   }
                 />
               </Field>

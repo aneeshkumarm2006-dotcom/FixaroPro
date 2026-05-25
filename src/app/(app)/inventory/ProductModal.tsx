@@ -47,7 +47,8 @@ const formSchema = z.object({
   minStock: z.coerce.number().min(0, "Minimum stock must be 0 or greater"),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormInput = z.input<typeof formSchema>;
+type FormValues = z.output<typeof formSchema>;
 
 export function ProductModal({
   isOpen,
@@ -66,7 +67,7 @@ export function ProductModal({
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<FormValues>({
+  } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
     defaultValues: {

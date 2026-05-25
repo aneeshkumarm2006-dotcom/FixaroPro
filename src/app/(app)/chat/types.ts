@@ -9,6 +9,9 @@ export interface ChatMessageDTO {
   senderName: string;
   senderRole: SenderRole;
   body: string;
+  attachmentUrl: string | null;
+  attachmentType: string | null;
+  attachmentName: string | null;
   createdAt: string;
   readByAdminAt: string | null;
   readByEmployeeAt: string | null;

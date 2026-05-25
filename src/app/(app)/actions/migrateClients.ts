@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/db";
 
 /**
  * One-time migration: deduplicates existing clientName strings into Client
@@ -12,7 +12,7 @@ export async function migrateClients(): Promise<{
   updated: number;
 }> {
   // Gather all distinct clientName values from Job rows that have no clientId
-  const unmigrated = await prisma.job.findMany({
+  const unmigrated = await db.job.findMany({
     where: { clientId: null },
     select: { clientName: true },
     distinct: ["clientName"],
@@ -25,7 +25,7 @@ export async function migrateClients(): Promise<{
   let created = 0;
   let updated = 0;
 
-  await prisma.$transaction(async (tx) => {
+  await db.$transaction(async (tx) => {
     for (const { clientName } of unmigrated) {
       const trimmed = clientName.trim();
       if (!trimmed) continue;

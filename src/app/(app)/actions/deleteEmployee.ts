@@ -1,6 +1,8 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 export async function deleteEmployee(employeeId: string): Promise<{
@@ -8,6 +10,12 @@ export async function deleteEmployee(employeeId: string): Promise<{
   error?: string;
 }> {
   try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    const actorRole = (session?.user as { role?: string } | undefined)?.role;
+    if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
+      return { success: false, error: "Not authorized." };
+    }
+
     // Check if employee has any jobs
     const employee = await db.user.findUnique({
       where: { id: employeeId },

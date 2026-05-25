@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { multiplierForRating } from "@/lib/pay-multiplier";
+import { getRatingMultiplierMap } from "@/lib/pay-multiplier-config";
 
 interface RecalculateInput {
   employeeId?: string;
@@ -19,11 +20,10 @@ export async function recalculateMultiplier(input: RecalculateInput = {}) {
 
     const role = (session.user as { role?: string }).role;
     const isAdmin = role === "OWNER" || role === "ADMIN";
-    const targetEmployeeId = input.employeeId || session.user.id;
-
-    if (!isAdmin && targetEmployeeId !== session.user.id) {
+    if (!isAdmin) {
       return { success: false, error: "Not authorized" };
     }
+    const targetEmployeeId = input.employeeId || session.user.id;
 
     const employee = await db.user.findUnique({
       where: { id: targetEmployeeId },
@@ -57,7 +57,8 @@ export async function recalculateMultiplier(input: RecalculateInput = {}) {
 
     const sum = ratings.reduce((acc, r) => acc + r.rating, 0);
     const avg = sum / ratings.length;
-    const { multiplier, label } = multiplierForRating(avg);
+    const ratingMap = await getRatingMultiplierMap();
+    const { multiplier, label } = multiplierForRating(avg, ratingMap);
 
     const oldMultiplier = employee.payMultiplier;
     const changed = Math.abs(oldMultiplier - multiplier) > 0.001;

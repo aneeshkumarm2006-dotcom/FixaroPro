@@ -39,7 +39,13 @@ export type PayPeriodRow = {
   id: string;
   startDate: string;
   endDate: string;
-  status: "DRAFT" | "APPROVED" | "PAID" | "CANCELLED";
+  status:
+    | "DRAFT"
+    | "PENDING_APPROVAL"
+    | "APPROVED"
+    | "PAID"
+    | "CANCELLED"
+    | "REJECTED";
   notes: string | null;
   approvedAt: string | null;
   approvedBy: { id: string; name: string } | null;
@@ -55,9 +61,11 @@ interface Props {
 
 const STATUS_STYLES: Record<PayPeriodRow["status"], string> = {
   DRAFT: "bg-gray-100 text-gray-700",
+  PENDING_APPROVAL: "bg-amber-50 text-amber-700",
   APPROVED: "bg-blue-50 text-blue-700",
   PAID: "bg-green-50 text-green-700",
   CANCELLED: "bg-red-50 text-red-700",
+  REJECTED: "bg-red-50 text-red-700",
 };
 
 function formatDate(iso: string) {

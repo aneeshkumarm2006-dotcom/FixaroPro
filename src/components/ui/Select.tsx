@@ -8,7 +8,10 @@ interface SelectOption {
 }
 
 interface SelectProps
-  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "onChange"> {
+  extends Omit<
+    React.SelectHTMLAttributes<HTMLSelectElement>,
+    "onChange" | "size"
+  > {
   options: SelectOption[];
   variant?: "default" | "minimal" | "ghost" | "outline";
   error?: boolean;

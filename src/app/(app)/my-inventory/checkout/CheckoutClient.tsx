@@ -452,10 +452,10 @@ function Stepper({ step }: { step: Step }) {
                   {s.n}
                 </span>
               )}
-              {s.label}
+              <span className="hidden sm:inline">{s.label}</span>
             </div>
             {idx < steps.length - 1 && (
-              <div className="w-6 h-px bg-gray-200" />
+              <div className="w-4 sm:w-6 h-px bg-gray-200" />
             )}
           </div>
         );

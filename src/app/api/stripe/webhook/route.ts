@@ -64,9 +64,8 @@ async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {
-  // charge.refunds.data contains the individual refunds
-  const latestRefund = charge.refunds?.data?.[0];
-  if (!latestRefund) return;
+  const refunds = charge.refunds?.data ?? [];
+  if (refunds.length === 0) return;
 
   // Look up the job by the payment intent
   const job = await db.job.findFirst({
@@ -74,36 +73,52 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   });
   if (!job) return;
 
-  const refundAmount = latestRefund.amount / 100;
-  const alreadyRefunded = job.refundedAmount ?? 0;
+  // Process each refund independently and idempotently. A refund is keyed by
+  // its Stripe id (re_...) embedded in the transaction description, so a refund
+  // already recorded — either by issueRefund or a prior webhook delivery — is
+  // skipped. This prevents double-counting refundedAmount and duplicate
+  // negative transactions on Stripe retries.
+  for (const refund of refunds) {
+    const existing = await db.transaction.findFirst({
+      where: { jobId: job.id, description: { contains: refund.id } },
+    });
+    if (existing) continue;
 
-  await db.$transaction([
-    db.job.update({
+    const refundAmount = refund.amount / 100;
+    const current = await db.job.findUnique({
       where: { id: job.id },
-      data: { refundedAmount: alreadyRefunded + refundAmount },
-    }),
-    db.transaction.create({
-      data: {
-        date: new Date(),
-        category: "REVENUE",
-        amount: -refundAmount,
-        description: `Stripe refund — Job #${job.jobNumber}`,
-        jobId: job.id,
-        source: "refund",
-        isAuto: true,
-      },
-    }),
-    db.jobLog.create({
-      data: {
-        jobId: job.id,
-        action: "UPDATED",
-        field: "refundedAmount",
-        oldValue: String(alreadyRefunded),
-        newValue: String(alreadyRefunded + refundAmount),
-        description: `Refund of $${refundAmount.toFixed(2)} confirmed via Stripe webhook (refund: ${latestRefund.id})`,
-      },
-    }),
-  ]);
+      select: { refundedAmount: true },
+    });
+    const alreadyRefunded = current?.refundedAmount ?? 0;
+
+    await db.$transaction([
+      db.job.update({
+        where: { id: job.id },
+        data: { refundedAmount: alreadyRefunded + refundAmount },
+      }),
+      db.transaction.create({
+        data: {
+          date: new Date(),
+          category: "REVENUE",
+          amount: -refundAmount,
+          description: `Stripe refund — Job #${job.jobNumber} (refund: ${refund.id})`,
+          jobId: job.id,
+          source: "refund",
+          isAuto: true,
+        },
+      }),
+      db.jobLog.create({
+        data: {
+          jobId: job.id,
+          action: "UPDATED",
+          field: "refundedAmount",
+          oldValue: String(alreadyRefunded),
+          newValue: String(alreadyRefunded + refundAmount),
+          description: `Refund of $${refundAmount.toFixed(2)} confirmed via Stripe webhook (refund: ${refund.id})`,
+        },
+      }),
+    ]);
+  }
 }
 
 async function handleSetupIntentSucceeded(si: Stripe.SetupIntent) {

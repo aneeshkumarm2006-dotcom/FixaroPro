@@ -7,6 +7,8 @@ import { setAvailability } from "../../actions/setAvailability";
 import type { AvailabilitySlotInput } from "../../actions/setAvailability.types";
 import type { AvailabilityDay } from "@prisma/client";
 import { SectionCard, Feedback, Msg } from "./_shared";
+import TimePicker from "@/components/ui/TimePicker";
+import DatePicker from "@/components/ui/DatePicker";
 
 const DAYS: { key: AvailabilityDay; label: string }[] = [
   { key: "MONDAY", label: "Monday" },
@@ -153,20 +155,18 @@ export default function AvailabilityTab({ employeeId }: AvailabilityTabProps) {
                   />
                   <span>Available</span>
                 </label>
-                <input
-                  className="cl-form-input"
-                  type="time"
+                <TimePicker
+                  size="sm"
                   value={row.startTime}
                   disabled={!row.isAvailable}
-                  onChange={(e) => updateRow(row.day, { startTime: e.target.value })}
+                  onChange={(v) => updateRow(row.day, { startTime: v })}
                 />
                 <span className="sep">to</span>
-                <input
-                  className="cl-form-input"
-                  type="time"
+                <TimePicker
+                  size="sm"
                   value={row.endTime}
                   disabled={!row.isAvailable}
-                  onChange={(e) => updateRow(row.day, { endTime: e.target.value })}
+                  onChange={(v) => updateRow(row.day, { endTime: v })}
                 />
               </div>
             );
@@ -180,11 +180,11 @@ export default function AvailabilityTab({ employeeId }: AvailabilityTabProps) {
             <div className="cl-avail-eff">
               <div>
                 <label className="cl-form-label">Effective from</label>
-                <input className="cl-form-input" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+                <DatePicker size="sm" value={effectiveFrom} onChange={setEffectiveFrom} placeholder="Any time" />
               </div>
               <div>
                 <label className="cl-form-label">Effective to</label>
-                <input className="cl-form-input" type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} />
+                <DatePicker size="sm" value={effectiveTo} onChange={setEffectiveTo} placeholder="Ongoing" />
               </div>
             </div>
           </div>

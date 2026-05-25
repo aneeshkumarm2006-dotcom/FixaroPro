@@ -102,6 +102,8 @@ export async function cancelShift(jobId: string): Promise<{ success: true; penal
 
     revalidatePath("/my-jobs");
     revalidatePath(`/my-jobs/${jobId}`);
+    // Reposts the now-open shift so other cleaners see it in the available pool.
+    revalidatePath("/available-jobs");
     return { success: true, penaltyApplied: isLateCancel };
   } catch (err) {
     console.error("cancelShift error:", err);

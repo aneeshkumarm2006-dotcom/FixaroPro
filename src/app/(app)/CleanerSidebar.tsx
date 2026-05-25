@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -127,16 +128,32 @@ const NAV = [
   },
 ];
 
-export default function CleanerSidebar({ user, signOutAction }: Props) {
+export default function CleanerSidebar({ user, signOutAction: _signOutAction }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  // Close the drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll while the drawer is open on mobile.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const words = (user.name || "").split(" ");
   const firstName = words[0] ?? "";
   const lastInitial = words[1]?.[0] ?? "";
   const displayName = lastInitial ? `${firstName} ${lastInitial}.` : firstName;
 
-  const initials = (firstName[0] ?? "") + (lastInitial ?? "");
+  const initials = ((firstName[0] ?? "") + (lastInitial ?? "")).toUpperCase();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -144,50 +161,86 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
   };
 
   return (
-    <aside className="cl-sidebar-dark">
-      {/* Logo */}
-      <div className="cl-snav-logo" style={{ marginBottom: 8 }}>
-        <div className="cl-snav-mark">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <>
+      {/* Mobile top bar (hidden on desktop via CSS) */}
+      <header className="cl-mobile-topbar">
+        <button
+          className="cl-mobile-burger"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
-        </div>
-        <span className="cl-snav-wordmark">cleano</span>
-        <span className="cl-snav-badge">Crew</span>
-      </div>
+        </button>
+        <span className="cl-mobile-title">cleano</span>
+        <span className="cl-mobile-spacer" />
+        <div className="cl-mobile-avatar">{initials}</div>
+      </header>
 
-      {/* Nav sections */}
-      {NAV.map((section) => (
-        <div key={section.label} className="cl-snav-section">
-          <div className="cl-snav-section-label">{section.label}</div>
-          {section.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`cl-snav-item${isActive(item.href) ? " active" : ""}`}>
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </div>
-      ))}
+      {/* Backdrop (mobile only) */}
+      <div
+        className={`cl-drawer-backdrop${open ? " cl-drawer-open" : ""}`}
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+      />
 
-      {/* User card */}
-      <div style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="cl-snav-user">
-          <div className="cl-snav-avatar">{initials.toUpperCase()}</div>
-          <div className="cl-snav-user-meta">
-            <div className="cl-snav-user-name">{displayName}</div>
-            <div className="cl-snav-user-role">Cleaner</div>
+      <aside className={`cl-sidebar-dark${open ? " cl-drawer-open" : ""}`}>
+        {/* Logo */}
+        <div className="cl-snav-logo" style={{ marginBottom: 8 }}>
+          <div className="cl-snav-mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
           </div>
+          <span className="cl-snav-wordmark">cleano</span>
+          <span className="cl-snav-badge">Crew</span>
           <button
-            className="cl-snav-settings"
-            onClick={() => router.push("/settings")}
-            aria-label="Settings">
-            {ICONS.settings}
+            className="cl-drawer-close"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
           </button>
         </div>
-      </div>
-    </aside>
+
+        {/* Nav sections */}
+        {NAV.map((section) => (
+          <div key={section.label} className="cl-snav-section">
+            <div className="cl-snav-section-label">{section.label}</div>
+            {section.items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`cl-snav-item${isActive(item.href) ? " active" : ""}`}>
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        ))}
+
+        {/* User card */}
+        <div style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="cl-snav-user">
+            <div className="cl-snav-avatar">{initials}</div>
+            <div className="cl-snav-user-meta">
+              <div className="cl-snav-user-name">{displayName}</div>
+              <div className="cl-snav-user-role">Cleaner</div>
+            </div>
+            <button
+              className="cl-snav-settings"
+              onClick={() => router.push("/settings")}
+              aria-label="Settings">
+              {ICONS.settings}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

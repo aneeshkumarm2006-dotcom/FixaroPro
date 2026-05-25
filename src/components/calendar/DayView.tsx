@@ -284,7 +284,7 @@ export const DayView: React.FC = () => {
     yToMinutes: yPositionToMinutes,
     snapMinutes: 15,
     dragThreshold: DRAG_THRESHOLD,
-    onPreviewChange: setCurrentDragRoomIndex,
+    onPreviewChange: (idx: number | null) => setCurrentDragRoomIndex(idx ?? -1),
     state: {
       dragSelectionStart,
       setDragSelectionStart,

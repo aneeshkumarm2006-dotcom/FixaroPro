@@ -192,7 +192,7 @@ export default function ClockPageClient({
           <span className="avatar">{initials}</span>
           <strong>{clientName}</strong>
         </div>
-        <div style={{ width: 100 }} aria-hidden="true" />
+        <div className="clk-top-spacer" aria-hidden="true" />
       </header>
 
       <main className="clk-body">

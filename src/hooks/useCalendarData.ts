@@ -3,7 +3,7 @@
 import useSWR, { mutate as globalMutate } from "swr";
 import { useEffect, useRef, useState } from "react";
 
-type CalendarEventDTO = {
+export type CalendarEventDTO = {
   id: string;
   title: string;
   description?: string;

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { multiplierForRating } from "@/lib/pay-multiplier";
+import { getRatingMultiplierMap } from "@/lib/pay-multiplier-config";
 import type {
   PerformanceData,
   RecentRating,
@@ -63,25 +64,24 @@ export async function getPerformanceData(
 
     const ratings30 = ratings90.filter((r) => r.createdAt >= thirtyDaysAgo);
 
+    const ratingMap = await getRatingMultiplierMap();
+
     let rating30Day: number | null = null;
     let tierLabel = "Standard";
     if (ratings30.length > 0) {
       const sum = ratings30.reduce((acc, r) => acc + r.rating, 0);
       rating30Day = sum / ratings30.length;
-      tierLabel = multiplierForRating(rating30Day).label;
+      tierLabel = multiplierForRating(rating30Day, ratingMap).label;
     }
 
-    const TIER_BOUNDARIES = [4.0, 4.5, 4.7, 5.0];
+    // Next 0.1 rating step (capped at 5.0).
     let nextTierAt: number | null = null;
     let nextTierMultiplier: number | null = null;
-    if (rating30Day !== null) {
-      for (const boundary of TIER_BOUNDARIES) {
-        if (rating30Day < boundary) {
-          nextTierAt = boundary;
-          nextTierMultiplier = multiplierForRating(boundary).multiplier;
-          break;
-        }
-      }
+    if (rating30Day !== null && rating30Day < 5.0) {
+      const current = Math.floor(Math.max(4, rating30Day) * 10) / 10;
+      const next = Math.min(5, Math.round((current + 0.1) * 10) / 10);
+      nextTierAt = next;
+      nextTierMultiplier = multiplierForRating(next, ratingMap).multiplier;
     }
 
     const buckets = new Map<string, { sum: number; count: number }>();

@@ -117,7 +117,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           href={href}
           className={combinedClasses}
           {...(disabled && { "aria-disabled": true, tabIndex: -1 })}
-          {...props}>
+          {...(props as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>
           {children}
         </Link>
       );

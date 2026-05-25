@@ -3,6 +3,8 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
+import { cloudinary } from "@/lib/cloudinary";
+import type { UploadApiResponse } from "cloudinary";
 import type {
   AdminChatPayload,
   AdminConversationSummary,
@@ -43,6 +45,9 @@ type RawMessage = {
   senderId: string;
   senderRole: "EMPLOYEE" | "ADMIN";
   body: string;
+  attachmentUrl: string | null;
+  attachmentType: string | null;
+  attachmentName: string | null;
   createdAt: Date;
   readByAdminAt: Date | null;
   readByEmployeeAt: Date | null;
@@ -57,6 +62,9 @@ function toMessageDTO(m: RawMessage): ChatMessageDTO {
     senderName: m.sender.name,
     senderRole: m.senderRole,
     body: m.body,
+    attachmentUrl: m.attachmentUrl,
+    attachmentType: m.attachmentType,
+    attachmentName: m.attachmentName,
     createdAt: m.createdAt.toISOString(),
     readByAdminAt: m.readByAdminAt ? m.readByAdminAt.toISOString() : null,
     readByEmployeeAt: m.readByEmployeeAt ? m.readByEmployeeAt.toISOString() : null,
@@ -238,15 +246,25 @@ export async function getAdminChat(
   };
 }
 
+interface ChatAttachmentInput {
+  url: string;
+  type: string;
+  name: string;
+}
+
 export async function sendChatMessage(
   conversationId: string,
-  body: string
+  body: string,
+  attachment?: ChatAttachmentInput | null
 ): Promise<{ success: true; data: ChatMessageDTO } | { success: false; error: string }> {
   const a = await requireUser();
   if ("error" in a) return { success: false, error: a.error };
 
   const trimmed = body.trim();
-  if (!trimmed) return { success: false, error: "Message cannot be empty" };
+  // A message must have text or an attachment.
+  if (!trimmed && !attachment) {
+    return { success: false, error: "Message cannot be empty" };
+  }
   if (trimmed.length > 4000) {
     return { success: false, error: "Message is too long (max 4000 characters)" };
   }
@@ -271,6 +289,9 @@ export async function sendChatMessage(
       senderId: a.user.id,
       senderRole,
       body: trimmed,
+      attachmentUrl: attachment?.url ?? null,
+      attachmentType: attachment?.type ?? null,
+      attachmentName: attachment?.name ?? null,
       // Auto-mark the sender's own side as read.
       readByAdminAt: senderRole === "ADMIN" ? now : null,
       readByEmployeeAt: senderRole === "EMPLOYEE" ? now : null,
@@ -381,4 +402,89 @@ export async function markChatRead(
   }
 
   return { success: true };
+}
+
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_ATTACHMENT_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+];
+
+function streamUploadAttachment(
+  buffer: Buffer,
+  folder: string,
+  publicId: string
+): Promise<UploadApiResponse> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: publicId,
+        resource_type: "auto", // allow images and documents (PDF)
+        overwrite: false,
+      },
+      (error, result) => {
+        if (error || !result) reject(error || new Error("Upload failed"));
+        else resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+}
+
+export async function uploadChatAttachment(formData: FormData): Promise<
+  | { success: true; url: string; type: "image" | "file"; name: string }
+  | { success: false; error: string }
+> {
+  const a = await requireUser();
+  if ("error" in a) return { success: false, error: a.error };
+
+  const file = formData.get("file") as File | null;
+  if (!file || typeof file === "string") {
+    return { success: false, error: "No file provided" };
+  }
+  if (file.size === 0) return { success: false, error: "Empty file" };
+  if (file.size > MAX_ATTACHMENT_SIZE) {
+    return { success: false, error: "File exceeds 10MB limit" };
+  }
+  if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type.toLowerCase())) {
+    return {
+      success: false,
+      error: "Unsupported file type. Use an image or PDF.",
+    };
+  }
+
+  if (
+    !process.env.CLOUDINARY_CLOUD_NAME ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_API_SECRET
+  ) {
+    return { success: false, error: "Cloudinary is not configured on the server" };
+  }
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const folder = `cleano/chat/${a.user.id}`;
+    const publicId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const result = await streamUploadAttachment(buffer, folder, publicId);
+    const isImage = file.type.toLowerCase().startsWith("image/");
+
+    return {
+      success: true,
+      url: result.secure_url,
+      type: isImage ? "image" : "file",
+      name: file.name,
+    };
+  } catch (error) {
+    console.error("Error uploading chat attachment:", error);
+    return { success: false, error: "Failed to upload attachment" };
+  }
 }

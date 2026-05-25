@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Search, Phone, MoreHorizontal, Paperclip, Smile, User as UserIcon, MessageCircle } from "lucide-react";
 import useSWR from "swr";
-import { getAdminChat, getAdminChatList, sendChatMessage } from "./actions";
+import imageCompression from "browser-image-compression";
+import { getAdminChat, getAdminChatList, sendChatMessage, uploadChatAttachment } from "./actions";
 import type { AdminChatPayload, AdminConversationSummary } from "./types";
-import MessageBubble from "./MessageBubble";
 
 interface AdminChatClientProps {
   initialList: AdminConversationSummary[];
@@ -75,9 +75,11 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: list, mutate: mutateList } = useSWR<AdminConversationSummary[]>(
     "admin-chat-list",
@@ -130,6 +132,9 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
       senderName: "You",
       senderRole: "ADMIN" as const,
       body,
+      attachmentUrl: null,
+      attachmentType: null,
+      attachmentName: null,
       createdAt: new Date().toISOString(),
       readByAdminAt: new Date().toISOString(),
       readByEmployeeAt: null,
@@ -150,6 +155,47 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
       return;
     }
     await Promise.all([mutateChat(), mutateList()]);
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file || !chat?.conversationId || uploading || sending) return;
+    setSendError(null);
+    setUploading(true);
+    try {
+      let toUpload: File = file;
+      if (file.type.startsWith("image/")) {
+        try {
+          toUpload = await imageCompression(file, {
+            maxSizeMB: 1.5,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          });
+        } catch {
+          toUpload = file; // fall back to original if compression fails
+        }
+      }
+      const fd = new FormData();
+      fd.append("file", toUpload, file.name);
+      const up = await uploadChatAttachment(fd);
+      if (!up.success) {
+        setSendError(up.error);
+        return;
+      }
+      const res = await sendChatMessage(chat.conversationId, "", {
+        url: up.url,
+        type: up.type,
+        name: up.name,
+      });
+      if (!res.success) {
+        setSendError(res.error);
+        return;
+      }
+      await Promise.all([mutateChat(), mutateList()]);
+    } finally {
+      setUploading(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -310,7 +356,26 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                           return (
                             <div key={m.id} className={`chat-msg ${mine ? "mine" : "theirs"}`} style={{ marginTop: 4 }}>
                               <div className="chat-msg-bubble">
-                                <div>{m.body}</div>
+                                {m.attachmentUrl && m.attachmentType === "image" && (
+                                  <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                      src={m.attachmentUrl}
+                                      alt={m.attachmentName ?? "image"}
+                                      style={{ maxWidth: 220, maxHeight: 220, borderRadius: 10, display: "block", marginBottom: m.body ? 6 : 0 }}
+                                    />
+                                  </a>
+                                )}
+                                {m.attachmentUrl && m.attachmentType !== "image" && (
+                                  <a
+                                    href={m.attachmentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.06)", color: "inherit", textDecoration: "none", marginBottom: m.body ? 6 : 0 }}>
+                                    <Paperclip size={14} />
+                                    <span style={{ fontSize: 13, wordBreak: "break-all" }}>{m.attachmentName ?? "Attachment"}</span>
+                                  </a>
+                                )}
+                                {m.body && <div>{m.body}</div>}
                                 <div className="chat-msg-time">
                                   {timeOnly(m.createdAt)}
                                   {mine && (
@@ -340,7 +405,19 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                     </div>
                   )}
                   <div className="chat-composer-row">
-                    <button className="chat-icon-btn" aria-label="Attach file" style={{ padding: "6px" }}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      style={{ display: "none" }}
+                      onChange={handleFile}
+                    />
+                    <button
+                      className="chat-icon-btn"
+                      aria-label="Attach file"
+                      style={{ padding: "6px" }}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || sending}>
                       <Paperclip size={17} />
                     </button>
                     <textarea
@@ -362,7 +439,9 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                       <Send size={14} />
                     </button>
                   </div>
-                  <div className="chat-composer-hint">⏎ to send · ⇧⏎ for new line</div>
+                  <div className="chat-composer-hint">
+                    {uploading ? "Uploading attachment…" : "⏎ to send · ⇧⏎ for new line"}
+                  </div>
                 </div>
               </>
             )}

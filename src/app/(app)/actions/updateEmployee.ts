@@ -1,6 +1,8 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 type State = {
@@ -13,6 +15,12 @@ export async function updateEmployee(
   prevState: State,
   formData: FormData
 ): Promise<State> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const actorRole = (session?.user as { role?: string } | undefined)?.role;
+  if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
+    return { message: "", error: "Not authorized." };
+  }
+
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const phone = formData.get("phone") as string;

@@ -1487,7 +1487,7 @@ body {
 /* Available jobs grid */
 .cl-jobs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: 16px;
   align-items: stretch;
 }
@@ -1914,6 +1914,12 @@ body {
   display: flex; flex-direction: column; gap: 6px; background: #fff;
 }
 .cl-cal-cell:last-child { border-right: 0; }
+/* Month grid: shrink the 7 columns so they stay usable on a phone. */
+@media (max-width: 600px) {
+  .cl-cal-cell { min-height: 72px; padding: 5px 4px; gap: 3px; }
+  .cl-cal-week-row.header > div { padding: 8px 4px; font-size: 9px; letter-spacing: 0.04em; }
+  .cl-cal-cell .day-num { font-size: 12px; }
+}
 .cl-cal-cell.dim { background: rgba(0,0,0,0.015); }
 .cl-cal-cell.dim .day-num { color: var(--primary-30); }
 .cl-cal-cell .day-num {
@@ -2159,6 +2165,12 @@ body {
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary-60);
 }
 .cl-rag-table-row { display: grid; grid-template-columns: 1.2fr 1fr 1.5fr; padding: 16px 22px; align-items: center; }
+/* Stack the rag-wash table on phones (drop the column header, notes wrap below). */
+@media (max-width: 560px) {
+  .cl-rag-table-head { display: none; }
+  .cl-rag-table-row { grid-template-columns: 1fr auto; row-gap: 6px; padding: 14px 16px; }
+  .cl-rag-table-row > *:nth-child(3) { grid-column: 1 / -1; }
+}
 .cl-rag-table-row + .cl-rag-table-row { border-top: 1px solid var(--primary-10); }
 .cl-rag-table-row .date { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); font-weight: 500; }
 .cl-rag-table-row .date .icon-bubble {
@@ -2731,6 +2743,13 @@ body {
   transition: border-color .15s, transform .15s, box-shadow .15s;
   text-decoration: none; color: inherit;
 }
+@media (max-width: 600px) {
+  .cl-jobs2-card { grid-template-columns: 56px 1fr; gap: 12px 14px; padding: 16px; }
+  .cl-jobs2-side {
+    grid-column: 1 / -1; flex-direction: row;
+    align-items: center; justify-content: space-between;
+  }
+}
 .cl-jobs2-card:hover {
   border-color: var(--primary-20); transform: translateY(-2px);
   box-shadow: 0 8px 28px rgba(0,60,70,0.09);
@@ -2865,10 +2884,12 @@ body {
 }
 .cl-dash-empty-hero h3 { font-family: var(--font-serif); font-size: 24px; font-weight: 400; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.01em; }
 .cl-dash-empty-hero p { color: var(--primary-60); font-size: 14px; margin: 0; }
-@media (max-width: 800px) { .cl-dash-hero { grid-template-columns: 1fr; padding: 28px; } }
-@media (max-width: 900px) { .cl-dash-stats { grid-template-columns: 1fr; } }
-@media (max-width: 900px) { .cl-dash-row { grid-template-columns: 1fr; } }
-@media (max-width: 800px) { .cl-dash-quick-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Scoped with .cl-dash-shell so these collapse rules win over the base grid
+   definitions, which appear LATER in this file (equal specificity otherwise). */
+@media (max-width: 800px) { .cl-dash-shell .cl-dash-hero { grid-template-columns: 1fr; padding: 28px; } }
+@media (max-width: 900px) { .cl-dash-shell .cl-dash-stats { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .cl-dash-shell .cl-dash-row { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .cl-dash-shell .cl-dash-quick-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .cl-dash-today { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px; margin: -4px -2px; }
 .cl-dash-today-card {
@@ -2889,6 +2910,7 @@ body {
   letter-spacing: -0.005em; display: inline-flex; align-items: center; gap: 8px;
 }
 .cl-dash-earn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 600px) { .cl-dash-earn-grid { grid-template-columns: 1fr 1fr; } }
 .cl-dash-earn-tile { background: var(--cream); border-radius: 14px; padding: 16px 18px; }
 .cl-dash-earn-tile .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--primary-60); font-weight: 700; }
 .cl-dash-earn-tile .val { font-family: var(--font-serif); font-size: 24px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); margin-top: 6px; line-height: 1; }
@@ -3008,9 +3030,59 @@ body {
 .cl-app-shell { min-height: 100vh; display: flex; background: var(--cream); }
 .cl-app-main { flex: 1; min-width: 0; padding: 40px 48px 80px; overflow-y: auto; background: var(--cream); }
 .cl-app-main-inner { max-width: 1280px; margin: 0 auto; width: 100%; }
+
+/* Mobile top bar + slide-in drawer (cleaner app). Hidden on desktop. */
+.cl-mobile-topbar { display: none; }
+.cl-drawer-backdrop { display: none; }
+.cl-drawer-close { display: none; align-items: center; justify-content: center;
+  margin-left: auto; width: 34px; height: 34px; border-radius: 9px; border: 0;
+  background: rgba(255,255,255,0.10); color: #fff; cursor: pointer; }
+
 @media (max-width: 900px) {
   .cl-app-shell { flex-direction: column; }
-  .cl-app-main { padding: 24px; }
+  .cl-app-main { padding: 72px 18px 64px; }
+
+  .cl-mobile-topbar {
+    display: flex; align-items: center; gap: 12px;
+    position: fixed; inset: 0 0 auto 0; z-index: 60;
+    height: 56px; padding: 0 14px;
+    background: var(--primary-deep); color: #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.16);
+  }
+  .cl-mobile-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 9px; border: 0; flex-shrink: 0;
+    background: rgba(255,255,255,0.10); color: #fff; cursor: pointer;
+  }
+  .cl-mobile-burger:active { background: rgba(255,255,255,0.18); }
+  .cl-mobile-title { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
+  .cl-mobile-spacer { flex: 1; }
+  .cl-mobile-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #b9e8ed 0%, #7fcdd4 100%);
+    color: var(--primary-deep); display: inline-flex; align-items: center;
+    justify-content: center; font-weight: 600; font-size: 12px;
+  }
+
+  /* Scoped with .cl-app-shell so these win over the base .cl-sidebar-dark
+     rule that is defined later in the file (equal specificity otherwise). */
+  .cl-app-shell .cl-sidebar-dark {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    height: 100vh; width: 270px; flex-basis: 270px; flex: 0 0 270px;
+    z-index: 80; transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 0 50px rgba(0,0,0,0.30);
+  }
+  .cl-app-shell .cl-sidebar-dark.cl-drawer-open { transform: translateX(0); }
+
+  .cl-drawer-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 70;
+    background: rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  }
+  .cl-drawer-backdrop.cl-drawer-open { opacity: 1; pointer-events: auto; }
+
+  .cl-drawer-close { display: inline-flex; }
 }
 
 /* Cleaner sidebar (dark teal) */
@@ -3137,6 +3209,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   margin: 8px 0 14px; gap: 16px;
 }
+@media (max-width: 480px) { .cl-inv-section { flex-wrap: wrap; } }
 .cl-inv-section h2 {
   font-family: var(--font-serif); font-size: 22px; font-weight: 400;
   color: var(--ink); margin: 0; letter-spacing: -0.01em;
@@ -3172,7 +3245,10 @@ body {
 .cl-inv-row:hover { border-color: var(--primary-20); box-shadow: 0 4px 14px rgba(0,60,70,0.06); }
 .cl-inv-row.low { border-color: rgba(217,119,6,0.3); background: #fffdf7; }
 .cl-inv-row.empty { border-color: rgba(220,38,38,0.25); background: #fff8f8; }
-@media (max-width: 640px) { .cl-inv-row { grid-template-columns: 44px 1fr; } }
+@media (max-width: 640px) {
+  .cl-inv-row { grid-template-columns: 44px 1fr; }
+  .cl-inv-row .ir-actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
 
 .cl-inv-row .ir-icon {
   width: 44px; height: 44px; border-radius: 12px;
@@ -3297,6 +3373,9 @@ body {
   background: var(--cream);
   position: sticky; top: 0; z-index: 5;
 }
+.clk-top-spacer { width: 100px; }
+@media (max-width: 600px) { .clk-top { padding: 16px 18px; } }
+@media (max-width: 480px) { .clk-top-spacer { display: none; } }
 .clk-back {
   display: inline-flex; align-items: center; gap: 8px; color: var(--primary);
   background: none; border: 0; cursor: pointer; font-family: inherit;
@@ -3615,6 +3694,11 @@ body {
 .cl-cal-time-shell {
   background: #fff; border: 1px solid var(--primary-10);
   border-radius: 16px; overflow: hidden;
+}
+/* Week grid would crush 7 columns on a phone — let it scroll horizontally. */
+@media (max-width: 700px) {
+  .cl-cal-time-shell { overflow-x: auto; }
+  .cl-cal-time-head, .cl-cal-time-body { min-width: 680px; }
 }
 .cl-cal-time-head {
   display: grid; border-bottom: 1px solid var(--primary-10); background: var(--cream);

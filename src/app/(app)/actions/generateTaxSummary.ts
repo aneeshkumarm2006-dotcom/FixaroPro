@@ -63,7 +63,6 @@ export async function generateTaxSummary(
       orderBy: { payPeriod: { startDate: "asc" } },
     });
 
-    const grossIncome = payouts.reduce((s, p) => s + p.baseAmount, 0);
     const netIncome = payouts.reduce((s, p) => s + p.finalAmount, 0);
     const totalDeductions = payouts.reduce((s, p) => s + p.deductions, 0);
     const totalAdjustments = payouts.reduce((s, p) => s + p.adjustments, 0);
@@ -71,6 +70,10 @@ export async function generateTaxSummary(
       (s, p) => s + p.reimbursements,
       0
     );
+    // Gross is earnings before deductions: finalAmount already nets out
+    // deductions, so add them back. Keeps gross/net consistent (gross −
+    // deductions = net) and reflects adjustments/reimbursements.
+    const grossIncome = netIncome + totalDeductions;
     const totalHours = payouts.reduce((s, p) => s + p.totalHours, 0);
     const jobsCompleted = payouts.reduce((s, p) => s + p.jobCount, 0);
     const estimatedTaxes = Math.max(0, netIncome * taxRate);

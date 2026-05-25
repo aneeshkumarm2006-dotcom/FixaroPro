@@ -101,6 +101,12 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
           data: { quantity: { decrement: item.quantity } },
         });
 
+        // Keep the global stockLevel admins see in sync with pickups.
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockLevel: { decrement: item.quantity } },
+        });
+
         await tx.employeeProduct.upsert({
           where: {
             employeeId_productId: {

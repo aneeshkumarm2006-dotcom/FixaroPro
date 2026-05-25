@@ -1,7 +1,9 @@
 "use server";
 
 import { db } from "@/db";
-import bcrypt from "bcryptjs";
+import { auth } from "@/lib/auth";
+import { hashPassword } from "better-auth/crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 type State = {
@@ -13,6 +15,12 @@ export default async function createEmployee(
   prevState: State,
   formData: FormData
 ): Promise<State> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const actorRole = (session?.user as { role?: string } | undefined)?.role;
+  if (actorRole !== "OWNER" && actorRole !== "ADMIN") {
+    return { message: "", error: "Not authorized." };
+  }
+
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const phone = formData.get("phone") as string;
@@ -57,8 +65,8 @@ export default async function createEmployee(
       };
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash the password with better-auth's scrypt hasher so sign-in verifies.
+    const hashedPassword = await hashPassword(password);
 
     // Create the user
     const user = await db.user.create({

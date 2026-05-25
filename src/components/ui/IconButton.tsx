@@ -8,6 +8,7 @@ interface IconButtonProps
   icon: LucideIcon;
   size?: "xs" | "sm" | "md" | "lg";
   variant?: "ghost" | "outline";
+  strokeWidth?: number;
 }
 
 export default function IconButton({
@@ -15,6 +16,7 @@ export default function IconButton({
   size = "md",
   variant = "outline",
   className = "",
+  strokeWidth,
   ...rest
 }: IconButtonProps) {
   const sizeClasses = {
@@ -40,7 +42,10 @@ export default function IconButton({
     <button
       {...rest}
       className={`rounded-sm flex items-center justify-center transition-colors cursor-pointer ${sizeClasses} ${variantClasses} ${className}`.trim()}>
-      <Icon className={`${iconSizeClasses} text-neutral-950`} />
+      <Icon
+        className={`${iconSizeClasses} text-neutral-950`}
+        strokeWidth={strokeWidth}
+      />
     </button>
   );
 }

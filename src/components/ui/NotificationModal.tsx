@@ -4,7 +4,6 @@ import React from "react";
 import { X, CheckCircle, XCircle, Loader } from "lucide-react";
 import Button from "./Button";
 import Modal from "./Modal";
-import { useTranslations } from "next-intl";
 
 interface NotificationModalProps {
   isOpen: boolean;
@@ -21,8 +20,6 @@ export default function NotificationModal({
   title,
   message,
 }: NotificationModalProps) {
-  const t = useTranslations("reporting.notification");
-
   const getIconAndColors = () => {
     switch (type) {
       case "success":
@@ -64,7 +61,7 @@ export default function NotificationModal({
       {type !== "loading" && (
         <div className="flex justify-end mt-6">
           <Button type="button" variant="primary" onClick={onClose}>
-            {t("okay")}
+            Okay
           </Button>
         </div>
       )}

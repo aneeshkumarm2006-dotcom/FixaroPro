@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { syncDefaultLocationStock } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 
 type State = {
@@ -49,7 +50,7 @@ export default async function createProduct(
     }
 
     // Create the product
-    await db.product.create({
+    const product = await db.product.create({
       data: {
         name,
         description: description || null,
@@ -59,6 +60,10 @@ export default async function createProduct(
         minStock,
       },
     });
+
+    // Mirror the initial stock into the default location so cleaners can see
+    // and pick it up (cleaner pickup reads per-location stock, not stockLevel).
+    await syncDefaultLocationStock(product.id, stockLevel);
 
     revalidatePath("/inventory");
     return {

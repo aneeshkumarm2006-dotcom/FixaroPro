@@ -303,13 +303,21 @@ export const CalendarProvider = ({
     // Keep SWR sync from overriding in-flight drag/resize state; only sync on data changes.
     if (movingEvent || resizingEvent) return;
 
-    const normalize = (list: CalendarEvent[]) =>
+    type NormalizableEvent = Omit<CalendarEvent, "start" | "end"> & {
+      start: string | Date;
+      end?: string | Date | null;
+    };
+    const normalize = (list: NormalizableEvent[]): CalendarEvent[] =>
       list.map((e) => ({
         ...e,
         // Parse ISO strings as local times (no 'Z' suffix means local time)
-        start: e.start instanceof Date ? e.start : new Date(e.start),
+        start: typeof e.start === "string" ? new Date(e.start) : e.start,
         end:
-          e.end instanceof Date ? e.end : e.end ? new Date(e.end) : undefined,
+          e.end == null
+            ? undefined
+            : typeof e.end === "string"
+            ? new Date(e.end)
+            : e.end,
       }));
 
     const signatureFor = (list: CalendarEvent[]) =>

@@ -1131,6 +1131,9 @@ model ChatMessage {
   senderId         String
   senderRole       ChatSenderRole
   body             String           @db.Text
+  attachmentUrl    String?
+  attachmentType   String?
+  attachmentName   String?
   readByAdminAt    DateTime?
   readByEmployeeAt DateTime?
   createdAt        DateTime         @default(now())

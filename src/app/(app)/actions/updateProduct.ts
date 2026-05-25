@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { syncDefaultLocationStock } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 
 type State = {
@@ -54,6 +55,13 @@ export async function updateProduct(
       };
     }
 
+    // Capture the previous stock so we can apply the change as a delta to the
+    // default location (preserves stock manually distributed to other locations).
+    const previous = await db.product.findUnique({
+      where: { id: productId },
+      select: { stockLevel: true },
+    });
+
     // Update the product
     await db.product.update({
       where: { id: productId },
@@ -66,6 +74,12 @@ export async function updateProduct(
         minStock,
       },
     });
+
+    // Keep the cleaner-facing per-location stock in sync with the admin edit.
+    await syncDefaultLocationStock(
+      productId,
+      stockLevel - (previous?.stockLevel ?? 0)
+    );
 
     revalidatePath("/inventory");
     return {

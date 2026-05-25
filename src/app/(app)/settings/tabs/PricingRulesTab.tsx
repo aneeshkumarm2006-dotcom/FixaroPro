@@ -14,6 +14,7 @@ interface PricingRulesTabProps {
 }
 
 interface PerUnitRates {
+  baseServicePrice: number;
   perBedroom: number;
   perFullBath: number;
   perHalfBath: number;
@@ -34,6 +35,7 @@ function uid() {
 
 export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   const initialRates = getSetting<PerUnitRates>(settings, PER_UNIT_KEY, {
+    baseServicePrice: 100,
     perBedroom: 19,
     perFullBath: 19,
     perHalfBath: 10,
@@ -50,7 +52,11 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
     ]
   );
 
-  const [rates, setRates] = useState<PerUnitRates>(initialRates);
+  // Default baseServicePrice to 100 for settings saved before it existed.
+  const [rates, setRates] = useState<PerUnitRates>({
+    ...initialRates,
+    baseServicePrice: initialRates.baseServicePrice ?? 100,
+  });
   const [addOns, setAddOns] = useState<AddOn[]>(initialAddOns);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
@@ -85,15 +91,35 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   }
 
   const examplePrice =
-    2 * rates.perBedroom + 1 * rates.perFullBath + 0 * rates.perHalfBath;
+    rates.baseServicePrice +
+    2 * rates.perBedroom +
+    1 * rates.perFullBath +
+    0 * rates.perHalfBath;
 
   return (
     <div className="space-y-6">
       {/* Per-Unit Rates */}
       <SectionCard
         title="Per-Unit Pricing"
-        description="Base price is calculated as: (bedrooms × rate) + (full baths × rate) + (half baths × rate)."
+        description="Base price = base service price + (bedrooms × rate) + (full baths × rate) + (half baths × rate)."
         icon={BedDouble}>
+        <div className="mb-4">
+          <Field label="Base service price ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.baseServicePrice}
+              onChange={(e) =>
+                setRates((r) => ({
+                  ...r,
+                  baseServicePrice: parseFloat(e.target.value) || 0,
+                }))
+              }
+            />
+          </Field>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Per Bedroom ($)">
             <Input

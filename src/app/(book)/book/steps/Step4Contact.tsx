@@ -2,13 +2,24 @@
 
 import { BookingDraft } from "../types";
 import { Field, Input, Textarea } from "@/components/customer/Field";
+import { isValidEmail, isValidPhone } from "@/lib/validation";
 
 interface Props {
   draft: BookingDraft;
   onChange: (patch: Partial<BookingDraft>) => void;
 }
 
+const errorStyle: React.CSSProperties = {
+  color: "#dc2626",
+  fontSize: 13,
+  marginTop: 4,
+  display: "block",
+};
+
 export default function Step4Contact({ draft, onChange }: Props) {
+  const emailError = draft.email.trim() !== "" && !isValidEmail(draft.email);
+  const phoneError = draft.phone.trim() !== "" && !isValidPhone(draft.phone);
+
   return (
     <div className="cl-stack-32">
       <header className="cl-stack-8">
@@ -43,7 +54,11 @@ export default function Step4Contact({ draft, onChange }: Props) {
             value={draft.email}
             onChange={(e) => onChange({ email: e.target.value })}
             placeholder="you@email.com"
+            aria-invalid={emailError}
           />
+          {emailError && (
+            <span style={errorStyle}>Enter a valid email address.</span>
+          )}
         </Field>
         <Field label="Phone" htmlFor="c-phone">
           <Input
@@ -52,7 +67,11 @@ export default function Step4Contact({ draft, onChange }: Props) {
             value={draft.phone}
             onChange={(e) => onChange({ phone: e.target.value })}
             placeholder="(514) 555-0142"
+            aria-invalid={phoneError}
           />
+          {phoneError && (
+            <span style={errorStyle}>Enter a valid 10-digit phone number.</span>
+          )}
         </Field>
       </div>
 

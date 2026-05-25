@@ -13,6 +13,7 @@ import { saveLead } from "../actions/saveLead";
 import { getQuote } from "../actions/getQuote";
 import { submitBooking } from "../actions/submitBooking";
 import { calculateTax } from "@/lib/tax";
+import { isValidEmail, isValidPhone } from "@/lib/validation";
 import CustomerLogo from "@/components/customer/Logo";
 import { Button, Banner } from "@/components/customer/Field";
 import { authClient } from "@/lib/auth-client";
@@ -126,8 +127,8 @@ export default function BookPage() {
       case 3:
         return !!(
           draft.name.trim() &&
-          draft.email.includes("@") &&
-          draft.phone.trim()
+          isValidEmail(draft.email) &&
+          isValidPhone(draft.phone)
         );
       case 4:
         return agree && !!draft.stripeCardReady;

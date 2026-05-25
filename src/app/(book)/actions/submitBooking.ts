@@ -15,6 +15,7 @@ import {
   REFERRER_CREDIT,
 } from "@/lib/referral";
 import { sendBookingConfirmation } from "@/lib/email";
+import { isValidEmail, isValidPhone } from "@/lib/validation";
 
 type Frequency =
   | "ONE_TIME"
@@ -64,11 +65,14 @@ export async function submitBooking(input: SubmitBookingInput) {
   try {
     // 1. Validate basics
     const email = input.email?.trim().toLowerCase();
-    if (!email || !email.includes("@")) {
+    if (!email || !isValidEmail(email)) {
       return { success: false, error: "Valid email is required" };
     }
-    if (!input.name?.trim() || !input.phone?.trim()) {
-      return { success: false, error: "Name and phone are required" };
+    if (!input.name?.trim()) {
+      return { success: false, error: "Name is required" };
+    }
+    if (!input.phone?.trim() || !isValidPhone(input.phone)) {
+      return { success: false, error: "Valid phone number is required" };
     }
     if (!input.address?.trim()) {
       return { success: false, error: "Address is required" };

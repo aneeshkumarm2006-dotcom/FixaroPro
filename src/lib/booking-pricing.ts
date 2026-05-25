@@ -44,11 +44,15 @@ async function resolveBasePrice(
   const setting = await db.appSetting.findUnique({ where: { key: "pricing.perUnit" } });
   if (setting?.value && typeof setting.value === "object") {
     const v = setting.value as Record<string, unknown>;
+    // Flat base service price applied to every booking (default $100).
+    const baseServicePrice =
+      typeof v.baseServicePrice === "number" ? v.baseServicePrice : 100;
     const perBedroom = typeof v.perBedroom === "number" ? v.perBedroom : null;
     const perFullBath = typeof v.perFullBath === "number" ? v.perFullBath : null;
     const perHalfBath = typeof v.perHalfBath === "number" ? v.perHalfBath : null;
     if (perBedroom !== null && perFullBath !== null && perHalfBath !== null) {
       return (
+        baseServicePrice +
         bedCount * perBedroom +
         bathCount * perFullBath +
         halfBathCount * perHalfBath

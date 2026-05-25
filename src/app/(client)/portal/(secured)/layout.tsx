@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import signOut from "../../../(app)/actions/signOut";
+import signOut from "../actions/portalSignOut";
 import PortalShell from "@/components/customer/PortalShell";
 import RatingPopup from "../RatingPopup";
 import { getPendingClientRating } from "../actions/ratingActions";

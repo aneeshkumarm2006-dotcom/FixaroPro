@@ -6,7 +6,7 @@ import BookingsClient from "./BookingsClient";
 
 export default async function BookingsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/sign-in?callbackUrl=/portal/bookings");
+  if (!session) redirect("/portal/login");
 
   const email = session.user.email?.toLowerCase();
   const client = email

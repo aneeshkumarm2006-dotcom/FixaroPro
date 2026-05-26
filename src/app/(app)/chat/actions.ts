@@ -483,8 +483,10 @@ export async function uploadChatAttachment(formData: FormData): Promise<
       type: isImage ? "image" : "file",
       name: file.name,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error uploading chat attachment:", error);
-    return { success: false, error: "Failed to upload attachment" };
+    const detail =
+      error?.message ?? error?.error?.message ?? String(error ?? "unknown");
+    return { success: false, error: `Upload failed: ${detail}` };
   }
 }

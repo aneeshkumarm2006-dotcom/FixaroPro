@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { LogOut } from "lucide-react";
 
 interface Props {
   user: { name: string; email: string; role: string };
@@ -128,7 +129,7 @@ const NAV = [
   },
 ];
 
-export default function CleanerSidebar({ user, signOutAction: _signOutAction }: Props) {
+export default function CleanerSidebar({ user, signOutAction }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -238,6 +239,15 @@ export default function CleanerSidebar({ user, signOutAction: _signOutAction }: 
               aria-label="Settings">
               {ICONS.settings}
             </button>
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="cl-snav-settings"
+                aria-label="Sign out"
+                title="Sign out">
+                <LogOut size={14} />
+              </button>
+            </form>
           </div>
         </div>
       </aside>

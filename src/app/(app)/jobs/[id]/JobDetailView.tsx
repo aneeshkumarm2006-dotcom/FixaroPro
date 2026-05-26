@@ -1088,15 +1088,20 @@ export default function JobDetailView({
 
 function ChargeButton({ jobId, amount, compact }: { jobId: string; amount: number; compact?: boolean }) {
   const [busy,   setBusy]   = useState(false);
+  const [open,   setOpen]   = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   async function handleCharge() {
-    if (!confirm(`Charge $${amount.toFixed(2)} to the client's saved card?`)) return;
     setBusy(true);
     setResult(null);
     const res = await chargeJob(jobId);
     setBusy(false);
-    setResult({ ok: res.success, msg: res.success ? `Charged $${(res as any).amount?.toFixed(2)}` : ((res as any).error ?? 'Failed') });
+    if (res.success) {
+      setOpen(false);
+      setResult({ ok: true, msg: `Charged $${(res as any).amount?.toFixed(2)}` });
+    } else {
+      setResult({ ok: false, msg: (res as any).error ?? "Failed to charge" });
+    }
   }
 
   if (result?.ok) {
@@ -1104,16 +1109,42 @@ function ChargeButton({ jobId, amount, compact }: { jobId: string; amount: numbe
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {result && <span style={{ fontSize: 12, color: 'var(--error)' }}>{result.msg}</span>}
-      <button
-        type="button"
-        onClick={handleCharge}
-        disabled={busy}
-        style={{ fontSize: compact ? 12 : 13, fontWeight: 600, background: '#d97706', color: '#fff', border: 0, borderRadius: 8, padding: compact ? '4px 12px' : '8px 16px', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
-      >
-        {busy ? 'Charging…' : `Charge · $${amount.toFixed(2)}`}
-      </button>
-    </div>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => { setResult(null); setOpen(true); }}
+          disabled={busy}
+          style={{ fontSize: compact ? 12 : 13, fontWeight: 600, background: '#d97706', color: '#fff', border: 0, borderRadius: 8, padding: compact ? '4px 12px' : '8px 16px', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
+        >
+          {busy ? 'Charging…' : `Charge · $${amount.toFixed(2)}`}
+        </button>
+      </div>
+
+      <Modal isOpen={open} onClose={() => !busy && setOpen(false)} title="Charge client?">
+        <div className="space-y-4">
+          <p className="text-sm text-[#005F6A]/70">
+            This will charge the client&apos;s saved card via Stripe. The customer will receive a receipt email automatically.
+          </p>
+          <div className="rounded-xl bg-[#005F6A]/5 px-4 py-3 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#005F6A]/70">Amount</span>
+            <span className="text-lg font-semibold text-[#005F6A]">${amount.toFixed(2)}</span>
+          </div>
+          {result && !result.ok && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {result.msg}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="cancel" border={false} onClick={() => setOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="action" border={false} onClick={handleCharge} disabled={busy}>
+              {busy ? "Charging…" : `Charge · $${amount.toFixed(2)}`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }

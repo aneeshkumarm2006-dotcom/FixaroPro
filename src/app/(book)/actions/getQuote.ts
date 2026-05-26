@@ -12,11 +12,13 @@ async function getPerUnitRates() {
   const setting = await db.appSetting.findUnique({ where: { key: "pricing.perUnit" } });
   if (setting?.value && typeof setting.value === "object") {
     const v = setting.value as Record<string, unknown>;
+    const baseServicePrice =
+      typeof v.baseServicePrice === "number" ? v.baseServicePrice : 100;
     const perBedroom = typeof v.perBedroom === "number" ? v.perBedroom : null;
     const perFullBath = typeof v.perFullBath === "number" ? v.perFullBath : null;
     const perHalfBath = typeof v.perHalfBath === "number" ? v.perHalfBath : null;
     if (perBedroom !== null && perFullBath !== null && perHalfBath !== null) {
-      return { perBedroom, perFullBath, perHalfBath };
+      return { baseServicePrice, perBedroom, perFullBath, perHalfBath };
     }
   }
   return null;
@@ -28,6 +30,7 @@ export async function getQuote({ bedCount, bathCount, halfBathCount = 0 }: GetQu
     const rates = await getPerUnitRates();
     if (rates) {
       const basePrice =
+        rates.baseServicePrice +
         bedCount * rates.perBedroom +
         bathCount * rates.perFullBath +
         halfBathCount * rates.perHalfBath;

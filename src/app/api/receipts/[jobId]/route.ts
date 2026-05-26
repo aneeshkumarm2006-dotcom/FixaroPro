@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   // Customers may download the receipt for a job that belongs to them.
   if (!isStaff) {
     const userEmail = session.user.email?.toLowerCase();
-    const ownerEmail = data.client?.email?.toLowerCase();
+    const ownerEmail = data.clientEmail?.toLowerCase();
     if (!userEmail || !ownerEmail || userEmail !== ownerEmail) {
       return new NextResponse("Forbidden", { status: 403 });
     }

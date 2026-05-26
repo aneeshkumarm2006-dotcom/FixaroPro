@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarClock, UserCircle, LogOut, Sparkles } from "lucide-react";
+import { Home, CalendarClock, UserCircle, LogOut, Sparkles, Menu, X } from "lucide-react";
 
 interface PortalShellProps {
   user: { name: string; email: string };
@@ -16,8 +17,22 @@ export default function PortalShell({
   children,
 }: PortalShellProps) {
   const pathname = usePathname();
-  const isActive = (href: string) =>
-    href === "/portal" ? pathname === "/portal" : pathname.startsWith(href);
+  const [open, setOpen] = useState(false);
+
+  // Close the drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll while the drawer is open on mobile.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const initials = user.name
     .split(/\s+/)
@@ -31,8 +46,28 @@ export default function PortalShell({
 
   return (
     <div className="cl-customer">
+      {/* Mobile top bar (hidden on desktop via CSS) */}
+      <header className="cl-portal-topbar">
+        <button
+          className="cl-portal-burger"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu">
+          <Menu size={20} />
+        </button>
+        <span className="cl-portal-topbar-title">cleano</span>
+        <span style={{ flex: 1 }} />
+        <span className="cl-portal-topbar-avatar">{initials || "C"}</span>
+      </header>
+
+      {/* Backdrop (mobile only) */}
+      <div
+        className={`cl-portal-backdrop${open ? " cl-portal-open" : ""}`}
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+      />
+
       <div className="cl-portal">
-        <aside className="cl-psidebar">
+        <aside className={`cl-psidebar${open ? " cl-portal-open" : ""}`}>
           <div className="cl-psidebar-logo">
             <span
               className="cl-logo-mark"
@@ -40,6 +75,12 @@ export default function PortalShell({
               <Sparkles size={18} strokeWidth={1.8} />
             </span>
             <span>cleano</span>
+            <button
+              className="cl-portal-drawer-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close menu">
+              <X size={18} />
+            </button>
           </div>
 
           <nav>
@@ -47,7 +88,8 @@ export default function PortalShell({
               <li>
                 <Link
                   href="/portal"
-                  className={isActive("/portal") && pathname === "/portal" ? "active" : ""}>
+                  onClick={() => setOpen(false)}
+                  className={isActive("/portal", pathname) && pathname === "/portal" ? "active" : ""}>
                   <Home size={16} />
                   <span>Overview</span>
                 </Link>
@@ -55,6 +97,7 @@ export default function PortalShell({
               <li>
                 <Link
                   href="/portal/bookings"
+                  onClick={() => setOpen(false)}
                   className={pathname.startsWith("/portal/bookings") ? "active" : ""}>
                   <CalendarClock size={16} />
                   <span>Bookings</span>
@@ -63,6 +106,7 @@ export default function PortalShell({
               <li>
                 <Link
                   href="/portal/account"
+                  onClick={() => setOpen(false)}
                   className={pathname.startsWith("/portal/account") ? "active" : ""}>
                   <UserCircle size={16} />
                   <span>Account</span>
@@ -74,6 +118,7 @@ export default function PortalShell({
           <div style={{ marginTop: "auto" }}>
             <Link
               href="/book"
+              onClick={() => setOpen(false)}
               className="cl-btn"
               style={{
                 background: "#fff",
@@ -114,4 +159,8 @@ export default function PortalShell({
       </div>
     </div>
   );
+}
+
+function isActive(href: string, pathname: string) {
+  return href === "/portal" ? pathname === "/portal" : pathname.startsWith(href);
 }

@@ -33,9 +33,26 @@ export async function issueRefund(input: IssueRefundInput) {
     if (!job) return { success: false, error: "Job not found" };
 
     const totalCharged = job.price ?? 0;
+    const depositAmount = job.depositPaid ? 20 : 0;
     const alreadyRefunded = job.refundedAmount ?? 0;
-    const refundableRemaining = Math.max(0, totalCharged - alreadyRefunded);
 
+    // Pick the Stripe PI to refund against and the matching ceiling.
+    // Prefer the full charge if it exists; otherwise fall back to the deposit.
+    let targetPI: string | null = null;
+    let cap: number;
+    let isDepositRefund = false;
+    if (job.stripePaymentIntentId) {
+      targetPI = job.stripePaymentIntentId;
+      cap = totalCharged - alreadyRefunded;
+    } else if (job.depositPaymentIntentId) {
+      targetPI = job.depositPaymentIntentId;
+      cap = depositAmount - alreadyRefunded;
+      isDepositRefund = true;
+    } else {
+      cap = totalCharged - alreadyRefunded; // manual / cash-only refund record
+    }
+
+    const refundableRemaining = Math.max(0, cap);
     if (input.amount > refundableRemaining + 0.001) {
       return {
         success: false,
@@ -44,15 +61,17 @@ export async function issueRefund(input: IssueRefundInput) {
     }
 
     let stripeRefundId: string | null = null;
-
-    // If this job was paid via Stripe, issue the refund through Stripe too
-    if (job.stripePaymentIntentId) {
+    if (targetPI) {
       try {
         const refund = await stripe.refunds.create({
-          payment_intent: job.stripePaymentIntentId,
+          payment_intent: targetPI,
           amount: Math.round(input.amount * 100),
           reason: "requested_by_customer",
-          metadata: { jobId: job.id, jobNumber: String(job.jobNumber) },
+          metadata: {
+            jobId: job.id,
+            jobNumber: String(job.jobNumber),
+            kind: isDepositRefund ? "deposit" : "charge",
+          },
         });
         stripeRefundId = refund.id;
       } catch (stripeErr: any) {
@@ -61,8 +80,9 @@ export async function issueRefund(input: IssueRefundInput) {
       }
     }
 
+    const refundLabel = isDepositRefund ? "Stripe refund (deposit)" : "Stripe refund";
     const description = stripeRefundId
-      ? `Stripe refund — Job #${job.jobNumber} (refund: ${stripeRefundId})`
+      ? `${refundLabel} — Job #${job.jobNumber} (refund: ${stripeRefundId})`
       : `Refund — Job #${job.jobNumber}`;
 
     await db.$transaction([

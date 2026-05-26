@@ -19,6 +19,9 @@ import {
   Star, Copy, Check,
 } from "lucide-react";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
+import Modal from "@/components/ui/Modal";
+import { cancelJobByAdmin } from "../../actions/cancelJobByAdmin";
+import { issueRefund } from "../../actions/issueRefund";
 
 type TabView = "details" | "financials" | "products" | "logs";
 
@@ -57,6 +60,8 @@ interface Job {
   payRateMultiplier?: number | null;
   depositPaid?: boolean;
   depositPaymentIntentId?: string | null;
+  refundedAmount?: number | null;
+  stripePaymentIntentId?: string | null;
   addOns?: Array<{ id: string; name: string; price: number }>;
   employee: { id: string; name: string };
   cleaners: Array<{ id: string; name: string }>;
@@ -207,6 +212,66 @@ export default function JobDetailView({
   const [isSendingReview, setIsSendingReview] = useState(false);
   const [reviewCopied, setReviewCopied] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job.status);
+  // Cancel-with-prompt and Refund modals.
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [refundDepositOnCancel, setRefundDepositOnCancel] = useState(true);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const refundedSoFar = job.refundedAmount ?? 0;
+  const depositRemaining = job.depositPaid ? Math.max(0, 20 - refundedSoFar) : 0;
+  const refundCap = job.stripePaymentIntentId
+    ? Math.max(0, (job.price ?? 0) - refundedSoFar)
+    : depositRemaining;
+
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<string>(
+    String(refundCap.toFixed(2))
+  );
+  const [refundReason, setRefundReason] = useState("");
+  const [refundError, setRefundError] = useState<string | null>(null);
+
+  const handleCancelJob = async () => {
+    setCancelError(null);
+    setIsCancelling(true);
+    const res = await cancelJobByAdmin({
+      jobId: job.id,
+      refundDeposit: refundDepositOnCancel && depositRemaining > 0,
+      reason: cancelReason.trim() || undefined,
+    });
+    setIsCancelling(false);
+    if (!res.success) {
+      setCancelError(res.error || "Failed to cancel");
+      return;
+    }
+    setShowCancelModal(false);
+    setCurrentStatus("CANCELLED");
+    router.refresh();
+  };
+
+  const handleIssueRefund = async () => {
+    setRefundError(null);
+    const amt = parseFloat(refundAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setRefundError("Enter a positive amount");
+      return;
+    }
+    setIsRefunding(true);
+    const res = await issueRefund({
+      jobId: job.id,
+      amount: amt,
+      reason: refundReason.trim() || undefined,
+    });
+    setIsRefunding(false);
+    if (!res.success) {
+      setRefundError(res.error || "Failed to refund");
+      return;
+    }
+    setShowRefundModal(false);
+    router.refresh();
+  };
 
   // Lightbox keyboard nav
   useEffect(() => {
@@ -772,6 +837,34 @@ export default function JobDetailView({
             >
               <Pencil size={14} className="mr-2" /> Edit
             </Button>
+            {isAdmin && (paymentReceived || depositRemaining > 0) && (
+              <Button
+                variant="default" border={false}
+                onClick={() => {
+                  setRefundError(null);
+                  setRefundAmount(String(refundCap.toFixed(2)));
+                  setRefundReason("");
+                  setShowRefundModal(true);
+                }}
+                className="rounded-xl px-4 py-2"
+              >
+                <DollarSign size={14} className="mr-2" /> Refund
+              </Button>
+            )}
+            {isAdmin && !["COMPLETED", "CANCELLED"].includes(currentStatus) && (
+              <Button
+                variant="cancel" border={false}
+                onClick={() => {
+                  setCancelError(null);
+                  setCancelReason("");
+                  setRefundDepositOnCancel(depositRemaining > 0);
+                  setShowCancelModal(true);
+                }}
+                className="rounded-xl px-4 py-2"
+              >
+                <X size={14} className="mr-2" /> Cancel
+              </Button>
+            )}
             {isAdmin && (
               <Button
                 variant="destructive" border={false}
@@ -862,6 +955,96 @@ export default function JobDetailView({
           message="This action cannot be undone. All job data will be permanently removed."
         />
       )}
+
+      {/* Cancel cleaning */}
+      <Modal isOpen={showCancelModal} onClose={() => !isCancelling && setShowCancelModal(false)} title="Cancel cleaning?">
+        <div className="space-y-4">
+          <p className="text-sm text-[#005F6A]/70">
+            This sets the job status to <strong>Cancelled</strong> and logs the change. The customer&apos;s saved card is not charged.
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Reason (optional)</label>
+            <textarea
+              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+              rows={2}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="e.g. Customer requested, weather, scheduling conflict…"
+            />
+          </div>
+          {depositRemaining > 0 && (
+            <label className="flex items-center gap-2 text-sm text-[#005F6A] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={refundDepositOnCancel}
+                onChange={(e) => setRefundDepositOnCancel(e.target.checked)}
+              />
+              <span>Also refund the ${depositRemaining.toFixed(2)} deposit</span>
+            </label>
+          )}
+          {cancelError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {cancelError}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="cancel" border={false} onClick={() => setShowCancelModal(false)} disabled={isCancelling}>
+              Keep booking
+            </Button>
+            <Button variant="destructive" border={false} onClick={handleCancelJob} disabled={isCancelling}>
+              {isCancelling ? "Cancelling…" : "Cancel cleaning"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Refund modal */}
+      <Modal isOpen={showRefundModal} onClose={() => !isRefunding && setShowRefundModal(false)} title="Issue refund">
+        <div className="space-y-4">
+          <p className="text-sm text-[#005F6A]/70">
+            {job.stripePaymentIntentId
+              ? `Refundable: $${refundCap.toFixed(2)} (already refunded $${refundedSoFar.toFixed(2)}).`
+              : depositRemaining > 0
+              ? `Deposit refundable: $${depositRemaining.toFixed(2)} of $20.00.`
+              : "Nothing left to refund."}
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Amount ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max={refundCap}
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Reason (optional)</label>
+            <textarea
+              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+              rows={2}
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              placeholder="Reason shown to customer in their refund email."
+            />
+          </div>
+          {refundError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {refundError}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="cancel" border={false} onClick={() => setShowRefundModal(false)} disabled={isRefunding}>
+              Cancel
+            </Button>
+            <Button variant="action" border={false} onClick={handleIssueRefund} disabled={isRefunding || refundCap <= 0}>
+              {isRefunding ? "Refunding…" : "Issue refund"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Photo lightbox */}
       {lightboxIdx !== null && photos[lightboxIdx] && (

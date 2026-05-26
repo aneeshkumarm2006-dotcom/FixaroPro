@@ -271,6 +271,12 @@ export default async function BookingDetailPage({
                 <dt>Total</dt>
                 <dd>{formatPrice(job.price)}</dd>
               </div>
+              {job.depositPaid ? (
+                <DetailRow
+                  dt="Deposit paid"
+                  dd={`−${formatPrice(20)}`}
+                />
+              ) : null}
               {job.refundedAmount > 0 ? (
                 <DetailRow
                   dt="Refunded"
@@ -297,7 +303,9 @@ export default async function BookingDetailPage({
                   style={{ marginTop: 2, flex: "0 0 auto" }}
                 />
                 <span>
-                  You won't be charged until after your cleaning is complete.
+                  {job.depositPaid
+                    ? "$20 deposit collected at booking. The remaining balance will be charged after your cleaning is complete."
+                    : "You won't be charged until after your cleaning is complete."}
                 </span>
               </div>
             ) : null}

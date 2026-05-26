@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react";
 
 export default function CustomerLogo({
   onDark,
-  href = "/",
+  href = "/book",
 }: {
   onDark?: boolean;
   href?: string;

@@ -29,6 +29,8 @@ interface Booking {
   paidAt: string | null;
   paymentReceived: boolean;
   refundedAmount: number;
+  depositPaid: boolean;
+  depositPaidAt: string | null;
   cancellationRequestedAt: string | null;
   rescheduleRequestedAt: string | null;
   cleaners: { id: string; name: string }[];
@@ -123,12 +125,23 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
     (b) => new Date(b.startTime) >= now && b.status !== "CANCELLED"
   );
   const past = bookings.filter(
-    (b) => new Date(b.startTime) < now || b.status === "CANCELLED"
+    (b) => new Date(b.startTime) < now && b.status !== "CANCELLED"
   );
+  const cancelled = bookings.filter((b) => b.status === "CANCELLED");
+
+  type Tab = "upcoming" | "past" | "cancelled";
+  const [tab, setTab] = useState<Tab>("upcoming");
+  const tabs: { id: Tab; label: string; count: number; empty: string }[] = [
+    { id: "upcoming", label: "Upcoming", count: upcoming.length, empty: "No upcoming bookings." },
+    { id: "past", label: "Past", count: past.length, empty: "No past bookings yet." },
+    { id: "cancelled", label: "Cancelled", count: cancelled.length, empty: "No cancelled bookings." },
+  ];
+  const list = tab === "upcoming" ? upcoming : tab === "past" ? past : cancelled;
+  const isPast = tab !== "upcoming";
 
   return (
     <>
-      <header className="cl-row-between" style={{ marginBottom: 36, alignItems: "flex-end" }}>
+      <header className="cl-row-between" style={{ marginBottom: 36, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div className="cl-stack-8">
           <p className="cl-eyebrow">Your bookings</p>
           <h1 className="cl-display" style={{ fontSize: "clamp(34px, 4.2vw, 48px)" }}>All cleanings.</h1>
@@ -153,38 +166,73 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
         </div>
       ) : null}
 
-      <section className="cl-stack-12" style={{ marginBottom: 36 }}>
-        <h2 className="cl-label" style={{ marginBottom: 6, fontSize: 12 }}>Upcoming · {upcoming.length}</h2>
-        {upcoming.length === 0 ? (
-          <div className="cl-tile cl-tile-pad-sm" style={{ color: "var(--primary-60)", fontSize: 14, textAlign: "center", padding: 24 }}>
-            No upcoming bookings.
-          </div>
-        ) : (
-          upcoming.map((b) => (
-            <BookingCard
-              key={b.id}
-              b={b}
-              busy={busyId === b.id}
-              onReschedule={() => handleReschedule(b.id)}
-              onCancel={() => handleCancel(b.id)}
-              onOpen={() => openBooking(b.id)}
-            />
-          ))
-        )}
-      </section>
+      <div
+        role="tablist"
+        style={{
+          display: "flex",
+          gap: 6,
+          flexWrap: "wrap",
+          padding: 4,
+          marginBottom: 20,
+          background: "var(--primary-5)",
+          borderRadius: 14,
+          width: "fit-content",
+          maxWidth: "100%",
+        }}>
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: 0,
+                cursor: "pointer",
+                fontSize: 13.5,
+                fontWeight: active ? 600 : 500,
+                fontFamily: "inherit",
+                color: active ? "#fff" : "var(--primary)",
+                background: active ? "var(--primary)" : "transparent",
+                transition: "background .15s, color .15s",
+              }}>
+              <span>{t.label}</span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  background: active ? "rgba(255,255,255,0.18)" : "var(--primary-10)",
+                  color: active ? "#fff" : "var(--primary-70)",
+                }}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       <section className="cl-stack-12">
-        <h2 className="cl-label" style={{ marginBottom: 6, fontSize: 12 }}>Past · {past.length}</h2>
-        {past.length === 0 ? (
+        {list.length === 0 ? (
           <div className="cl-tile cl-tile-pad-sm" style={{ color: "var(--primary-60)", fontSize: 14, textAlign: "center", padding: 24 }}>
-            No past bookings yet.
+            {tabs.find((t) => t.id === tab)?.empty}
           </div>
         ) : (
-          past.map((b) => (
+          list.map((b) => (
             <BookingCard
               key={b.id}
               b={b}
-              past
+              past={isPast}
+              busy={busyId === b.id}
+              onReschedule={tab === "upcoming" ? () => handleReschedule(b.id) : undefined}
+              onCancel={tab === "upcoming" ? () => handleCancel(b.id) : undefined}
               onOpen={() => openBooking(b.id)}
             />
           ))
@@ -303,9 +351,9 @@ function BookingCard({
         }
       }}>
       <div className="cl-bcard-top">
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 18, minWidth: 0, flex: 1 }}>
           <DateBadge iso={b.startTime} />
-          <div className="cl-stack-4">
+          <div className="cl-stack-4" style={{ minWidth: 0 }}>
             <span className="cl-bcard-id">Job #{b.jobNumber}</span>
             <h3 className="cl-bcard-date">
               {formatTime(b.startTime)}
@@ -338,6 +386,21 @@ function BookingCard({
           </span>
         ) : null}
         <span className="cl-bcard-price">{formatPrice(b.price)}</span>
+        {b.depositPaid ? (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: "rgba(5,150,105,0.12)",
+              color: "#047857",
+              letterSpacing: "0.04em",
+            }}
+            title="A $20 deposit was charged at booking.">
+            $20 deposit collected
+          </span>
+        ) : null}
       </div>
 
       {b.addOns.length ? (

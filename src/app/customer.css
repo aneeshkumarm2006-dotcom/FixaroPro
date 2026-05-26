@@ -361,6 +361,11 @@
 @media (max-width: 960px) {
   .cl-split-brand { min-height: 36vh; padding: 28px 24px 32px; }
 }
+/* On phones, hide the marketing brand panel so the form is the first thing seen. */
+@media (max-width: 600px) {
+  .cl-split-brand { display: none; }
+  .cl-split-form { min-height: 100vh; }
+}
 .cl-split-brand::before {
   content: '';
   position: absolute; inset: 0;
@@ -451,6 +456,11 @@
 }
 @media (max-width: 980px) {
   .cl-book-aside { position: relative; height: auto; padding: 28px 24px; }
+}
+/* Phones: hide the wizard aside entirely. Each step renders its own "Step X" header
+   and the price summary is visible on the review step, so the aside is redundant. */
+@media (max-width: 700px) {
+  .cl-book-aside { display: none; }
 }
 .cl-book-aside-logo { display: flex; align-items: center; gap: 10px; color: #fff; }
 .cl-book-main { display: flex; flex-direction: column; min-width: 0; }
@@ -634,6 +644,58 @@
 .cl-pmain { padding: 48px 64px 80px; min-width: 0; }
 @media (max-width: 900px) { .cl-pmain { padding: 32px 24px 56px; } }
 .cl-pmain-inner { max-width: 1080px; margin: 0 auto; width: 100%; }
+
+/* ── Portal mobile top bar + slide-in drawer (hidden on desktop) ── */
+.cl-portal-topbar { display: none; }
+.cl-portal-backdrop { display: none; }
+.cl-portal-drawer-close { display: none; align-items: center; justify-content: center;
+  margin-left: auto; width: 32px; height: 32px; border-radius: 8px; border: 0;
+  background: rgba(255,255,255,0.10); color: #fff; cursor: pointer; }
+
+@media (max-width: 900px) {
+  /* Pin sidebar off-canvas instead of stacking it above content. */
+  .cl-customer .cl-psidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    height: 100vh; width: 270px;
+    z-index: 80; transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 0 50px rgba(0,0,0,0.30);
+    padding: 24px 18px;
+  }
+  .cl-customer .cl-psidebar.cl-portal-open { transform: translateX(0); }
+
+  /* Make room for the fixed top bar. */
+  .cl-pmain { padding: 72px 18px 56px; }
+
+  .cl-portal-topbar {
+    display: flex; align-items: center; gap: 12px;
+    position: fixed; inset: 0 0 auto 0; z-index: 60;
+    height: 56px; padding: 0 14px;
+    background: var(--primary-deep); color: #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.16);
+  }
+  .cl-portal-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 9px; border: 0; flex-shrink: 0;
+    background: rgba(255,255,255,0.10); color: #fff; cursor: pointer;
+  }
+  .cl-portal-topbar-title { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
+  .cl-portal-topbar-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #b9e8ed 0%, #7fcdd4 100%);
+    color: var(--primary-deep); display: inline-flex; align-items: center;
+    justify-content: center; font-weight: 600; font-size: 12px;
+  }
+
+  .cl-portal-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 70;
+    background: rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  }
+  .cl-portal-backdrop.cl-portal-open { opacity: 1; pointer-events: auto; }
+
+  .cl-portal-drawer-close { display: inline-flex; }
+}
 
 /* ── Logo ── */
 .cl-logo {
@@ -1133,6 +1195,10 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .cl-modal-actions .cl-btn { flex: 1 1 auto; }
 }
 @keyframes cl-fadein {
   from { opacity: 0; }

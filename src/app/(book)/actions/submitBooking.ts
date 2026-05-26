@@ -371,6 +371,7 @@ export async function submitBooking(input: SubmitBookingInput) {
       gst: pricing.gstAmount,
       qst: pricing.qstAmount,
       total: pricing.total,
+      depositPaid: !!input.depositPaymentIntentId,
       logId: emailLog.id,
     });
 

@@ -48,7 +48,7 @@ export default function SplitShell({
             } as React.CSSProperties
           }>
           <div className="cl-split-brand-top">
-            <CustomerLogo onDark href="/" />
+            <CustomerLogo onDark />
             {badge ? (
               <span
                 style={{

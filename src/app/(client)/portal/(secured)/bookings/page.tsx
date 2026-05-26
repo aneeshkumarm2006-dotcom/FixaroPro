@@ -60,6 +60,8 @@ export default async function BookingsPage() {
       paidAt: j.paidAt?.toISOString() ?? null,
       paymentReceived: j.paymentReceived,
       refundedAmount: j.refundedAmount,
+      depositPaid: j.depositPaid,
+      depositPaidAt: j.depositPaidAt?.toISOString() ?? null,
       cancellationRequestedAt:
         j.cancellationRequestedAt?.toISOString() ?? null,
       rescheduleRequestedAt: j.rescheduleRequestedAt?.toISOString() ?? null,

@@ -134,26 +134,40 @@ export async function sendBookingConfirmation(opts: {
   gst: number | null;
   qst: number | null;
   total: number | null;
+  depositPaid?: boolean;
   logId?: string;
 }) {
   const timeLine = opts.isFlexible
     ? "Flexible — our team will confirm the time"
     : fmtTime(opts.startTime);
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const sectionRows: [string, string][] = [
+    ["Booking #", String(opts.jobNumber)],
+    ["Date", fmtDate(opts.startTime)],
+    ["Time", timeLine],
+    ["Address", opts.address],
+    ["Subtotal", fmt(opts.subtotal)],
+    ["GST (5%)", fmt(opts.gst)],
+    ["QST (9.975%)", fmt(opts.qst)],
+    ["Total", fmt(opts.total)],
+  ];
+  if (opts.depositPaid) {
+    sectionRows.push(["Deposit paid today", fmt(20)]);
+  }
+
+  const chargeNote = opts.depositPaid
+    ? "A $20 deposit was collected at booking. The remaining balance is charged only after your cleaning is complete."
+    : "Your card will be charged only after your cleaning is complete. You'll receive a receipt by email.";
+
   const html = layout(
     h1(`Booking confirmed, ${opts.clientName.split(" ")[0]}!`) +
       p(`We've got you down for a ${opts.serviceType ?? "cleaning"} on <strong>${fmtDate(opts.startTime)}</strong>.`) +
-      section([
-        ["Date", fmtDate(opts.startTime)],
-        ["Time", timeLine],
-        ["Address", opts.address],
-        ["Subtotal", fmt(opts.subtotal)],
-        ["GST (5%)", fmt(opts.gst)],
-        ["QST (9.975%)", fmt(opts.qst)],
-        ["Total", fmt(opts.total)],
-      ]) +
-      p("Your card will be charged only after your cleaning is complete. You'll receive a receipt by email.") +
-      btn("View booking", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings/${opts.jobId}`)
+      section(sectionRows) +
+      p(chargeNote) +
+      btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`) +
+      btn("Manage all my bookings", `${appUrl}/portal/bookings`)
   );
 
   return deliver({ to: opts.to, subject: `Cleano booking confirmed — ${fmtDate(opts.startTime)}`, html, logId: opts.logId });
@@ -184,7 +198,8 @@ export async function sendReminder24h(opts: {
       ]) +
       p(cleanerLine) +
       p("Please ensure access to your home and any parking instructions are noted. See you tomorrow!") +
-      btn("View booking", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings/${opts.jobId}`)
+      btn("View this booking", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings/${opts.jobId}`) +
+      btn("Manage all my bookings", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings`)
   );
 
   return deliver({ to: opts.to, subject: `Reminder: your Cleano cleaning is tomorrow`, html, logId: opts.logId });
@@ -223,6 +238,7 @@ export async function sendReceipt(opts: {
       ]) +
       p("You can also download a PDF receipt from your client portal.") +
       btn("Download receipt", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/receipts/${opts.jobId}`) +
+      btn("Manage all my bookings", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings`) +
       (ratingSection ? `<div style="margin-top:24px">${p("How did we do? A quick rating helps our team a lot.")}</div>${ratingSection}` : "")
   );
 
@@ -243,7 +259,8 @@ export async function sendRefundConfirmation(opts: {
       p(`Hi ${opts.clientName.split(" ")[0]}, we've issued a refund of <strong>${fmt(opts.refundAmount)}</strong> for job #${opts.jobNumber}.`) +
       (opts.reason ? p(`Reason: ${opts.reason}`) : "") +
       p("The amount will appear on your original payment method within 5–10 business days, depending on your bank.") +
-      p("If you have any questions, reply to this email or text us at (514) 555-CLEAN.")
+      p("If you have any questions, reply to this email or text us at (514) 555-CLEAN.") +
+      btn("View your bookings", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings`)
   );
 
   return deliver({ to: opts.to, subject: `Cleano refund — job #${opts.jobNumber}`, html, logId: opts.logId });

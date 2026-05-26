@@ -12,14 +12,21 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   const role = (session.user as { role?: string }).role;
-  if (role !== "OWNER" && role !== "ADMIN") {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+  const isStaff = role === "OWNER" || role === "ADMIN";
 
   const { jobId } = await ctx.params;
   const data = await loadReceiptData(jobId);
   if (!data) {
     return new NextResponse("Job not found", { status: 404 });
+  }
+
+  // Customers may download the receipt for a job that belongs to them.
+  if (!isStaff) {
+    const userEmail = session.user.email?.toLowerCase();
+    const ownerEmail = data.client?.email?.toLowerCase();
+    if (!userEmail || !ownerEmail || userEmail !== ownerEmail) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
   }
 
   const buffer = await buildReceiptPdfBuffer(data);

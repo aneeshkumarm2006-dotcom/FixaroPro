@@ -17,6 +17,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import DatePicker from "@/components/ui/DatePicker";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createTransaction } from "../../actions/createTransaction";
 import { updateTransaction } from "../../actions/updateTransaction";
 import { deleteTransaction } from "../../actions/deleteTransaction";
@@ -180,11 +181,17 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
     router.refresh();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this transaction?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
+    setDeleteError(null);
     const res = await deleteTransaction(id);
     if (!res.success) {
-      alert(res.error || "Failed to delete");
+      setDeleteError(res.error || "Failed to delete");
       return;
     }
     router.refresh();
@@ -552,6 +559,21 @@ export default function BookkeepingTab({ transactions, jobOptions }: Props) {
           </div>
         </div>
       )}
+
+      {deleteError && (
+        <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {deleteError}
+        </div>
+      )}
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this transaction"
+        title="Delete transaction?"
+        message="This action cannot be undone."
+      />
     </Card>
   );
 }

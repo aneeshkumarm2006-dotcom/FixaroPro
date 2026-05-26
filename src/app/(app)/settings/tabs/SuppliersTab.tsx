@@ -13,6 +13,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import {
   createSupplier,
   updateSupplier,
@@ -130,8 +131,12 @@ export default function SuppliersTab({
     setSaving(false);
   }
 
-  async function handleDeleteSupplier(id: string) {
-    if (!confirm("Delete this supplier and all its prices?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDeleteSupplier(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteSupplier(id);
     if (res.success) setMsg({ type: "success", text: "Supplier deleted." });
@@ -460,6 +465,15 @@ export default function SuppliersTab({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this supplier"
+        title="Delete supplier?"
+        message="All associated prices will be removed."
+      />
     </SectionCard>
   );
 }

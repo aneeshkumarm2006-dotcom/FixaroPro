@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import ClientModal from "./ClientModal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { deleteClient } from "../actions/deleteClient";
 
 interface Client {
@@ -144,15 +145,22 @@ export default function ClientsPageClient({
   const handleCreate = () => { setSelectedClient(null); setModalMode("create"); setIsModalOpen(true); };
   const handleEdit = (c: Client) => { setSelectedClient(c); setModalMode("edit"); setIsModalOpen(true); };
 
-  const handleDelete = async (c: Client) => {
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+
+  const handleDelete = (c: Client) => {
     if (c.totalJobs > 0) {
       setErrorMsg(`Cannot delete "${c.name}" — ${c.totalJobs} job${c.totalJobs === 1 ? "" : "s"} linked.`);
       return;
     }
-    if (!confirm(`Delete "${c.name}"?`)) return;
-    setDeletingId(c.id);
-    const result = await deleteClient(c.id);
+    setClientToDelete(c);
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+    setDeletingId(clientToDelete.id);
+    const result = await deleteClient(clientToDelete.id);
     setDeletingId(null);
+    setClientToDelete(null);
     if (result.error) setErrorMsg(result.error);
     else router.refresh();
   };
@@ -410,6 +418,15 @@ export default function ClientsPageClient({
         onClose={() => setIsModalOpen(false)}
         mode={modalMode}
         client={selectedClient}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={!!clientToDelete}
+        onClose={() => setClientToDelete(null)}
+        onConfirm={confirmDeleteClient}
+        fileName={clientToDelete?.name ?? "this client"}
+        title="Delete client?"
+        message="This action cannot be undone."
       />
     </div>
   );

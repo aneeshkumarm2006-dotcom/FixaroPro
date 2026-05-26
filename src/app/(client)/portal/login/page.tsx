@@ -34,6 +34,7 @@ function PortalLoginInner() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(Boolean(initialEmail));
   const [error, setError] = useState<string | null>(initialError);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -144,7 +145,7 @@ function PortalLoginInner() {
             className="cl-link-muted"
             onClick={(e) => {
               e.preventDefault();
-              alert("Forgot password flow — coming soon.");
+              setNotice("Forgot password flow — coming soon.");
             }}
             style={{ fontSize: 13 }}>
             Forgot password?
@@ -152,6 +153,7 @@ function PortalLoginInner() {
         </div>
 
         {error ? <Banner kind="error">{error}</Banner> : null}
+        {notice ? <Banner kind="amber">{notice}</Banner> : null}
 
         <Button type="submit" size="lg" block loading={loading}>
           {loading ? "Signing in…" : "Sign in →"}

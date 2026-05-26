@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, Loader2 } from "lucide-react";
 import DatePicker from "@/components/customer/DatePicker";
 import PremiumSelect from "@/components/ui/PremiumSelect";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createPromoCode, togglePromoCode, deletePromoCode } from "./actions";
 
 interface PromoCode {
@@ -61,8 +62,12 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
     setBusyId(null);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this promo code?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setBusyId(id);
     await deletePromoCode(id);
     setList((l) => l.filter((c) => c.id !== id));
@@ -243,6 +248,15 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
           </table>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this promo code"
+        title="Delete promo code?"
+        message="This action cannot be undone."
+      />
     </div>
   );
 }

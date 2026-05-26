@@ -14,6 +14,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import DatePicker from "@/components/ui/DatePicker";
 import { createDocument } from "../../actions/createDocument";
@@ -216,8 +217,12 @@ export default function DocumentsTab({ documents, users }: DocumentsTabProps) {
     setSaving(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this document and all signature records?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteDocument(id);
     if (res.success) {
@@ -713,6 +718,15 @@ export default function DocumentsTab({ documents, users }: DocumentsTabProps) {
           </div>
         )}
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this document"
+        title="Delete document?"
+        message="All signature records for this document will also be removed."
+      />
     </SectionCard>
   );
 }

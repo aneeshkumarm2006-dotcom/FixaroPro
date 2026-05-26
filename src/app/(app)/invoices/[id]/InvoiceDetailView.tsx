@@ -18,6 +18,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import InvoicePreview from "../InvoicePreview";
+import { ConfirmActionModal } from "@/components/common/ConfirmActionModal";
 import { sendInvoice } from "../../actions/sendInvoice";
 import { updateInvoice } from "../../actions/updateInvoice";
 
@@ -111,8 +112,12 @@ export default function InvoiceDetailView({
     }
   };
 
-  const handleCancel = async () => {
-    if (!confirm("Cancel this invoice? This action cannot be undone.")) return;
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  const handleCancel = () => setShowCancelConfirm(true);
+
+  const confirmCancelInvoice = async () => {
+    setShowCancelConfirm(false);
     setIsCancelling(true);
     setErrorMsg(null);
     const result = await updateInvoice({ id: invoice.id, status: "CANCELLED" });
@@ -330,6 +335,16 @@ export default function InvoiceDetailView({
       <div ref={printRef}>
         <InvoicePreview invoice={invoice} taxConfig={taxConfig} />
       </div>
+
+      <ConfirmActionModal
+        isOpen={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        onConfirm={confirmCancelInvoice}
+        title="Cancel invoice?"
+        message="This sets the invoice status to Cancelled. This action cannot be undone."
+        confirmLabel="Cancel invoice"
+        cancelLabel="Keep invoice"
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createTrainingModule } from "../../actions/createTrainingModule";
 import { updateTrainingModule } from "../../actions/updateTrainingModule";
 import { deleteTrainingModule } from "../../actions/deleteTrainingModule";
@@ -321,8 +322,12 @@ export default function TrainingTab({ modules }: TrainingTabProps) {
     setSaving(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this training module?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteTrainingModule(id);
     if (res.success) {
@@ -720,6 +725,15 @@ export default function TrainingTab({ modules }: TrainingTabProps) {
           </div>
         )}
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this training module"
+        title="Delete training module?"
+        message="This action cannot be undone."
+      />
     </SectionCard>
   );
 }

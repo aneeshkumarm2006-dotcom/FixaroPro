@@ -5,6 +5,7 @@ import { Plus, Trash2, Pencil, MapPinned } from "lucide-react";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createServiceArea } from "../../actions/createServiceArea";
 import { updateServiceArea } from "../../actions/updateServiceArea";
 import { deleteServiceArea } from "../../actions/deleteServiceArea";
@@ -99,14 +100,14 @@ export default function ServiceAreasTab({
     });
   }
 
-  async function handleDelete(id: string, prefix: string) {
-    if (
-      !confirm(
-        `Delete service area ${prefix}? Bookings from this area will start failing the postal-code check.`
-      )
-    ) {
-      return;
-    }
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; prefix: string } | null>(null);
+  function handleDelete(id: string, prefix: string) {
+    setDeleteTarget({ id, prefix });
+  }
+  async function runDelete() {
+    if (!deleteTarget) return;
+    const { id, prefix } = deleteTarget;
+    setDeleteTarget(null);
     const res = await deleteServiceArea(id);
     if (!res.success) {
       setMsg({ type: "error", text: res.error || "Failed to delete" });
@@ -296,6 +297,15 @@ export default function ServiceAreasTab({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={runDelete}
+        fileName={deleteTarget ? `service area ${deleteTarget.prefix}` : "this area"}
+        title="Delete service area?"
+        message="Bookings from this area will start failing the postal-code check."
+      />
     </div>
   );
 }

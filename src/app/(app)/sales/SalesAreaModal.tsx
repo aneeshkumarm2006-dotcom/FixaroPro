@@ -7,6 +7,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import DatePicker from "@/components/ui/DatePicker";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createSalesArea } from "@/app/(app)/actions/createSalesArea";
 import { updateSalesArea, deleteSalesArea } from "@/app/(app)/actions/updateSalesArea";
 
@@ -70,9 +71,16 @@ export default function SalesAreaModal({
     }
   };
 
-  const handleDelete = async () => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
     if (!editingArea) return;
-    if (!confirm("Are you sure you want to delete this sales area?")) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!editingArea) return;
+    setShowDeleteConfirm(false);
     setLoading(true);
     const result = await deleteSalesArea(editingArea.id);
     if (result.error) {
@@ -221,6 +229,15 @@ export default function SalesAreaModal({
           </div>
         </div>
       </form>
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        fileName="this sales area"
+        title="Delete sales area?"
+        message="This action cannot be undone."
+      />
     </Modal>
   );
 }

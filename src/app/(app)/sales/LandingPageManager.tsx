@@ -8,6 +8,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import PremiumSelect from "@/components/ui/PremiumSelect";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createLandingPage, updateLandingPage, deleteLandingPage } from "@/app/(app)/actions/createLandingPage";
 import {
   Globe,
@@ -73,12 +74,18 @@ export default function LandingPageManager({
     setLoading(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this landing page?")) return;
+  const [pageToDelete, setPageToDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => setPageToDelete(id);
+
+  const confirmDeletePage = async () => {
+    if (!pageToDelete) return;
+    const id = pageToDelete;
+    setPageToDelete(null);
+    setDeleteError(null);
     const result = await deleteLandingPage(id);
-    if (result.error) {
-      alert(result.error);
-    }
+    if (result.error) setDeleteError(result.error);
   };
 
   return (
@@ -323,6 +330,21 @@ export default function LandingPageManager({
           </div>
         </form>
       </Modal>
+
+      {deleteError && (
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {deleteError}
+        </div>
+      )}
+
+      <ConfirmDeleteModal
+        isOpen={!!pageToDelete}
+        onClose={() => setPageToDelete(null)}
+        onConfirm={confirmDeletePage}
+        fileName="this landing page"
+        title="Delete landing page?"
+        message="This action cannot be undone."
+      />
     </div>
   );
 }

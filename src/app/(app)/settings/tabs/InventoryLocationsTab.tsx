@@ -6,6 +6,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createInventoryLocation } from "../../actions/createInventoryLocation";
 import { updateInventoryLocation } from "../../actions/updateInventoryLocation";
 import { deleteInventoryLocation } from "../../actions/deleteInventoryLocation";
@@ -107,8 +108,12 @@ export default function InventoryLocationsTab({
     setSaving(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this location? Stock entries will also be removed.")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteInventoryLocation(id);
     if (res.success) {
@@ -349,6 +354,15 @@ export default function InventoryLocationsTab({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this location"
+        title="Delete location?"
+        message="Stock entries will also be removed."
+      />
     </SectionCard>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader, Check, X, DollarSign } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { ConfirmActionModal } from "@/components/common/ConfirmActionModal";
 import PayoutEditor from "./PayoutEditor";
 import { approvePayPeriod } from "../actions/approvePayPeriod";
 import { completePayPeriod } from "../actions/completePayPeriod";
@@ -24,11 +25,26 @@ export default function PayPeriodDetail({ period, onError }: Props) {
   const canComplete = period.status === "APPROVED";
   const canCancel = period.status !== "PAID" && period.status !== "CANCELLED";
 
-  const run = async (
+  const [pending, setPending] = useState<{
+    fn: (id: string) => Promise<{ error?: string; success?: boolean }>;
+    msg: string;
+    title: string;
+    confirmLabel: string;
+  } | null>(null);
+
+  const run = (
     fn: (id: string) => Promise<{ error?: string; success?: boolean }>,
-    confirmText: string
+    confirmText: string,
+    title = "Confirm action?",
+    confirmLabel = "Confirm"
   ) => {
-    if (!confirm(confirmText)) return;
+    setPending({ fn, msg: confirmText, title, confirmLabel });
+  };
+
+  const confirmRun = async () => {
+    if (!pending) return;
+    const fn = pending.fn;
+    setPending(null);
     setActionLoading(true);
     const result = await fn(period.id);
     setActionLoading(false);
@@ -117,6 +133,15 @@ export default function PayPeriodDetail({ period, onError }: Props) {
           )}
         </div>
       )}
+
+      <ConfirmActionModal
+        isOpen={!!pending}
+        onClose={() => setPending(null)}
+        onConfirm={confirmRun}
+        title={pending?.title ?? "Confirm action?"}
+        message={pending?.msg ?? ""}
+        confirmLabel={pending?.confirmLabel ?? "Confirm"}
+      />
     </div>
   );
 }

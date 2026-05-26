@@ -348,7 +348,7 @@ export default function ExportButton({ filters }: ExportButtonProps) {
         format: pendingFormat,
       });
       if ("error" in result) {
-        alert(result.error);
+        setError(result.error);
         return;
       }
       if (result.format === "csv") {
@@ -361,7 +361,7 @@ export default function ExportButton({ filters }: ExportButtonProps) {
       setPickerOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to export jobs");
+      setError("Failed to export jobs");
     } finally {
       setBusy(false);
     }

@@ -14,6 +14,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import { createChecklistTemplate } from "../../actions/createChecklistTemplate";
 import { updateChecklistTemplate } from "../../actions/updateChecklistTemplate";
@@ -183,8 +184,12 @@ export default function ChecklistTemplatesTab({
     setSaving(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this checklist template?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteChecklistTemplate(id);
     if (res.success) {
@@ -465,6 +470,15 @@ export default function ChecklistTemplatesTab({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this checklist template"
+        title="Delete checklist template?"
+        message="This action cannot be undone."
+      />
     </SectionCard>
   );
 }

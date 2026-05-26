@@ -5,6 +5,7 @@ import { Trash2, X, Loader, ChevronLeft, ChevronRight } from "lucide-react";
 import { getJobPhotos } from "@/app/(app)/actions/getJobPhotos";
 import type { JobPhotoDTO } from "@/app/(app)/actions/getJobPhotos.types";
 import { deleteJobPhoto } from "@/app/(app)/actions/deleteJobPhoto";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import PhotoUpload from "./PhotoUpload";
 
 interface PhotoGalleryProps {
@@ -35,25 +36,30 @@ export default function PhotoGallery({ jobId, canUpload }: PhotoGalleryProps) {
     load();
   }, [load]);
 
+  const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+
   const handleDelete = useCallback(
-    async (photoId: string) => {
+    (photoId: string) => {
       if (deletingId) return;
-      const ok = window.confirm(
-        "Delete this photo? This cannot be undone."
-      );
-      if (!ok) return;
-      setDeletingId(photoId);
-      const result = await deleteJobPhoto(photoId);
-      setDeletingId(null);
-      if (result.success) {
-        setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-        setLightboxIndex(null);
-      } else {
-        setError(result.error ?? "Failed to delete photo");
-      }
+      setPhotoToDelete(photoId);
     },
     [deletingId]
   );
+
+  const confirmDeletePhoto = useCallback(async () => {
+    if (!photoToDelete) return;
+    const id = photoToDelete;
+    setPhotoToDelete(null);
+    setDeletingId(id);
+    const result = await deleteJobPhoto(id);
+    setDeletingId(null);
+    if (result.success) {
+      setPhotos((prev) => prev.filter((p) => p.id !== id));
+      setLightboxIndex(null);
+    } else {
+      setError(result.error ?? "Failed to delete photo");
+    }
+  }, [photoToDelete]);
 
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const showPrev = useCallback(() => {
@@ -247,6 +253,15 @@ export default function PhotoGallery({ jobId, canUpload }: PhotoGalleryProps) {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={!!photoToDelete}
+        onClose={() => setPhotoToDelete(null)}
+        onConfirm={confirmDeletePhoto}
+        fileName="this photo"
+        title="Delete photo?"
+        message="This cannot be undone."
+      />
     </div>
   );
 }

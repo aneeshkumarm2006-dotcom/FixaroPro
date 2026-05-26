@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Inbox, Check, X, ExternalLink } from "lucide-react";
 import Card from "@/components/ui/Card";
+import { ConfirmActionModal } from "@/components/common/ConfirmActionModal";
 import { resolveJobRequest } from "../actions/resolveJobRequest";
 
 interface JobRow {
@@ -46,16 +47,29 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
     reschedule: jobs.filter((j) => j.rescheduleRequestedAt).length,
   };
 
-  async function handle(
+  const [pending, setPending] = useState<{
+    jobId: string;
+    kind: "cancellation" | "reschedule";
+    decision: "approve" | "deny";
+    msg: string;
+  } | null>(null);
+
+  function handle(
     jobId: string,
     kind: "cancellation" | "reschedule",
     decision: "approve" | "deny"
   ) {
-    const confirmMsg =
+    const msg =
       kind === "cancellation" && decision === "approve"
         ? "Approve this cancellation? The job will be marked as CANCELLED."
         : `Mark this ${kind} request as ${decision === "approve" ? "approved" : "denied"}?`;
-    if (!confirm(confirmMsg)) return;
+    setPending({ jobId, kind, decision, msg });
+  }
+
+  async function confirmHandle() {
+    if (!pending) return;
+    const { jobId, kind, decision } = pending;
+    setPending(null);
     setBusyId(jobId);
     setError(null);
     const res = await resolveJobRequest({ jobId, kind, decision });
@@ -221,6 +235,19 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
           </div>
         )}
       </Card>
+
+      <ConfirmActionModal
+        isOpen={!!pending}
+        onClose={() => setPending(null)}
+        onConfirm={confirmHandle}
+        title={
+          pending?.decision === "approve"
+            ? `Approve ${pending?.kind}?`
+            : `Deny ${pending?.kind}?`
+        }
+        message={pending?.msg ?? ""}
+        confirmLabel={pending?.decision === "approve" ? "Approve" : "Deny"}
+      />
     </div>
   );
 }

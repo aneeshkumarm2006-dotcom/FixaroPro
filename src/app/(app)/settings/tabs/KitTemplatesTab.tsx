@@ -6,6 +6,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
+import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import { createKitTemplate } from "../../actions/createKitTemplate";
 import { updateKitTemplate } from "../../actions/updateKitTemplate";
@@ -121,8 +122,12 @@ export default function KitTemplatesTab({
     setSaving(false);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this kit template?")) return;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) { setDeleteId(id); }
+  async function runDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setMsg(null);
     const res = await deleteKitTemplate(id);
     if (res.success) {
@@ -324,6 +329,15 @@ export default function KitTemplatesTab({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={runDelete}
+        fileName="this kit template"
+        title="Delete kit template?"
+        message="This action cannot be undone."
+      />
     </SectionCard>
   );
 }

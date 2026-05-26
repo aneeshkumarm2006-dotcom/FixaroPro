@@ -33,6 +33,7 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
   const [inventories, setInventories] = useState<Record<string, string>>({});
   const [refillingId, setRefillingId] = useState<string | null>(null);
   const [refillDone, setRefillDone] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
   function handleOpen() {
     const init: Record<string, string> = {};
@@ -44,6 +45,7 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
 
   async function handleConfirm() {
     setLoading(true);
+    setError(null);
     try {
       const productInventories = employeeProducts
         .map((ep) => ({
@@ -56,10 +58,10 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
       if (result.success) {
         setOpen(false);
       } else {
-        alert(result.error || "Failed to clock out");
+        setError(result.error || "Failed to clock out");
       }
     } catch {
-      alert("Failed to clock out");
+      setError("Failed to clock out");
     } finally {
       setLoading(false);
     }
@@ -67,6 +69,7 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
 
   async function handleRefill(ep: EmployeeProduct) {
     setRefillingId(ep.productId);
+    setError(null);
     try {
       const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
       const qty = usagePerJob > 0 ? Math.max(usagePerJob * 5, 1) : 1;
@@ -78,10 +81,10 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
       if (result.success) {
         setRefillDone((prev) => ({ ...prev, [ep.productId]: true }));
       } else {
-        alert(result.error || "Failed to request refill");
+        setError(result.error || "Failed to request refill");
       }
     } catch {
-      alert("Failed to request refill");
+      setError("Failed to request refill");
     } finally {
       setRefillingId(null);
     }
@@ -203,6 +206,20 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
             })
           )}
         </div>
+
+        {error && (
+          <div style={{
+            margin: "0 16px 12px",
+            fontSize: 13,
+            color: "#dc2626",
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 10,
+            padding: "10px 12px",
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="co-footer">

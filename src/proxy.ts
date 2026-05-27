@@ -9,6 +9,7 @@ const PUBLIC_EXACT = new Set<string>([
   '/portal/login',
   '/portal/setup',
   '/book',
+  '/apple-icon', // PWA icon for iOS home screen
 ])
 
 // Public path prefixes (anything under these is public)
@@ -18,6 +19,7 @@ const PUBLIC_PREFIXES = [
   '/p/', // existing landing pages
   '/api/auth/', // Better Auth endpoints
   '/api/post-signin', // role-aware redirect endpoint
+  '/icon/', // PWA install icons (32/192/512) — Chrome fetches without a session
 ]
 
 function isPublic(pathname: string): boolean {

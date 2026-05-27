@@ -4,6 +4,7 @@ import { isAdminRole, isClientRole } from "@/lib/role-routing";
 import signOut from "./actions/signOut";
 import Sidebar from "./Sidebar";
 import CleanerSidebar from "./CleanerSidebar";
+import InstallPrompt from "@/components/InstallPrompt";
 
 export default async function DashboardLayout({
   children,
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
             {children}
           </div>
         </main>
+        <InstallPrompt />
       </div>
     );
   }

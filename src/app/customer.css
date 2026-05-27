@@ -656,11 +656,13 @@
   /* Pin sidebar off-canvas instead of stacking it above content. */
   .cl-customer .cl-psidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
-    height: 100vh; width: 270px;
+    /* dvh accounts for the iOS URL bar so the user card stays reachable */
+    height: 100dvh; width: 270px;
     z-index: 80; transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: 0 0 50px rgba(0,0,0,0.30);
-    padding: 24px 18px;
+    padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
+    overflow-y: auto;
   }
   .cl-customer .cl-psidebar.cl-portal-open { transform: translateX(0); }
 

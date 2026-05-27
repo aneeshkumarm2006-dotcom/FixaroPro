@@ -2,108 +2,71 @@
 
 import { useEffect, useState } from "react";
 import { X, Download, Share } from "lucide-react";
+import { useInstall } from "./InstallContext";
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-const DISMISS_KEY = "cleano:install-dismissed";
+// Bumped from -dismissed → -dismissed-v2 so previously-dismissed users see the
+// banner again after this change. Re-show 14 days after a fresh dismiss.
+const DISMISS_KEY = "cleano:install-dismissed-v2";
+const DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * Shows a small floating card prompting the user to install the PWA.
- * - Chrome / Android: captures `beforeinstallprompt` and triggers the native prompt.
- * - iOS Safari: shows manual "Add to Home Screen" instructions (no native event there).
- * - Hidden once dismissed (localStorage) or when already installed (standalone display mode).
- * - Mobile only; hidden on desktop via CSS.
+ * Floating "Install Cleano" card. Renders if Chrome captured a
+ * beforeinstallprompt or if the user is on iOS Safari (where we show
+ * manual Add-to-Home-Screen instructions). Dismissible — but the user
+ * can always re-install from the drawer's "Install app" entry.
  */
 export default function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [iosPrompt, setIosPrompt] = useState(false);
-  const [hidden, setHidden] = useState(true);
+  const { canInstall, isStandalone, isIOSSafari, install } = useInstall();
+  const [dismissed, setDismissed] = useState(true); // start hidden until we read storage
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    // Already installed → nothing to do.
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari (typed loosely)
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    if (isStandalone) return;
-
-    // Previously dismissed.
-    if (localStorage.getItem(DISMISS_KEY)) return;
-
-    setHidden(false);
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-
-    // iOS Safari never fires beforeinstallprompt — detect and show our own card.
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isInWebView = /CriOS|FxiOS|EdgiOS/.test(ua);
-    if (isIOS && !isInWebView) {
-      const t = setTimeout(() => setIosPrompt(true), 1500);
-      return () => {
-        clearTimeout(t);
-        window.removeEventListener("beforeinstallprompt", handler);
-      };
+    const ts = localStorage.getItem(DISMISS_KEY);
+    if (!ts) {
+      setDismissed(false);
+      return;
     }
-
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    const elapsed = Date.now() - Number(ts);
+    setDismissed(Number.isFinite(elapsed) && elapsed < DISMISS_COOLDOWN_MS);
   }, []);
 
-  function dismiss() {
-    localStorage.setItem(DISMISS_KEY, "1");
-    setDeferred(null);
-    setIosPrompt(false);
-    setHidden(true);
-  }
+  if (isStandalone) return null;
+  if (dismissed) return null;
+  if (!canInstall && !isIOSSafari) return null;
 
-  async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    try {
-      await deferred.userChoice;
-    } catch {
-      /* user dismissed */
-    }
-    setDeferred(null);
-    localStorage.setItem(DISMISS_KEY, "1");
-    setHidden(true);
-  }
+  const onDismiss = () => {
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    setDismissed(true);
+  };
 
-  if (hidden) return null;
-  if (!deferred && !iosPrompt) return null;
+  const onInstall = async () => {
+    const ok = await install();
+    if (ok) setDismissed(true);
+  };
 
   return (
     <div className="cl-install-prompt" role="dialog" aria-live="polite">
       <div className="cl-install-icon">
-        {iosPrompt ? <Share size={18} /> : <Download size={18} />}
+        {isIOSSafari && !canInstall ? <Share size={18} /> : <Download size={18} />}
       </div>
       <div className="cl-install-body">
         <strong>Install Cleano</strong>
         <span>
-          {iosPrompt
-            ? "Tap Share, then Add to Home Screen."
-            : "Add Cleano to your phone for the full app experience."}
+          {canInstall
+            ? "Add Cleano to your phone for the full app experience."
+            : "Tap Share, then Add to Home Screen."}
         </span>
       </div>
       <div className="cl-install-actions">
-        {deferred && (
-          <button type="button" className="cl-install-btn" onClick={install}>
+        {canInstall && (
+          <button type="button" className="cl-install-btn" onClick={onInstall}>
             Install
           </button>
         )}
         <button
           type="button"
           className="cl-install-dismiss"
-          onClick={dismiss}
+          onClick={onDismiss}
           aria-label="Dismiss">
           <X size={16} />
         </button>

@@ -5,6 +5,7 @@ import signOut from "./actions/signOut";
 import Sidebar from "./Sidebar";
 import CleanerSidebar from "./CleanerSidebar";
 import InstallPrompt from "@/components/InstallPrompt";
+import { InstallProvider } from "@/components/InstallContext";
 
 export default async function DashboardLayout({
   children,
@@ -28,15 +29,17 @@ export default async function DashboardLayout({
 
   if (!isAdmin) {
     return (
-      <div className="cl-app-shell">
-        <CleanerSidebar user={userWithRole} signOutAction={signOut} />
-        <main className="cl-app-main">
-          <div className="cl-app-main-inner">
-            {children}
-          </div>
-        </main>
-        <InstallPrompt />
-      </div>
+      <InstallProvider>
+        <div className="cl-app-shell">
+          <CleanerSidebar user={userWithRole} signOutAction={signOut} />
+          <main className="cl-app-main">
+            <div className="cl-app-main-inner">
+              {children}
+            </div>
+          </main>
+          <InstallPrompt />
+        </div>
+      </InstallProvider>
     );
   }
 

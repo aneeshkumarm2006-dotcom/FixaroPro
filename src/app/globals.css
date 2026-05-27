@@ -3259,6 +3259,24 @@ html, body { overscroll-behavior-y: contain; }
 }
 .cl-snav-settings:hover { color: #fff; background: rgba(255,255,255,0.08); }
 
+/* "Install app" entry in the cleaner drawer */
+.cl-snav-install {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px; border-radius: 11px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; text-align: left; transition: background .15s, transform .12s;
+}
+.cl-snav-install:hover { background: rgba(255,255,255,0.14); }
+.cl-snav-install:active { transform: scale(0.985); }
+.cl-snav-install > span:first-of-type { flex: 1; }
+.cl-snav-install-hint {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.85);
+  padding: 3px 7px; border-radius: 5px;
+}
+
 /* ═══════════════════════════════════════════════
    INVENTORY HERO + ROWS
 ═══════════════════════════════════════════════ */

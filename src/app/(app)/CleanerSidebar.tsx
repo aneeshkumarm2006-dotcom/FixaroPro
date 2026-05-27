@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, Download, Share } from "lucide-react";
+import { useInstall } from "@/components/InstallContext";
 
 interface Props {
   user: { name: string; email: string; role: string };
@@ -133,6 +134,8 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { canInstall, isStandalone, isIOSSafari, install } = useInstall();
+  const showInstall = !isStandalone && (canInstall || isIOSSafari);
 
   // Close the drawer whenever the route changes.
   useEffect(() => {
@@ -224,6 +227,29 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
             ))}
           </div>
         ))}
+
+        {/* Install app (only when installable and not already installed) */}
+        {showInstall && (
+          <div className="cl-snav-section">
+            <button
+              type="button"
+              className="cl-snav-install"
+              onClick={async () => {
+                if (canInstall) {
+                  await install();
+                } else if (isIOSSafari) {
+                  alert("To install Cleano:\n\n1. Tap the Share button in Safari\n2. Scroll down and tap 'Add to Home Screen'");
+                }
+                setOpen(false);
+              }}>
+              {isIOSSafari && !canInstall ? <Share size={16} /> : <Download size={16} />}
+              <span>Install app</span>
+              <span className="cl-snav-install-hint">
+                {canInstall ? "1-tap" : "iOS"}
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* User card */}
         <div style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>

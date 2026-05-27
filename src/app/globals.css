@@ -2744,7 +2744,14 @@ body {
   text-decoration: none; color: inherit;
 }
 @media (max-width: 600px) {
-  .cl-jobs2-card { grid-template-columns: 56px 1fr; gap: 12px 14px; padding: 16px; }
+  .cl-jobs2-card { grid-template-columns: 72px 1fr; gap: 14px 16px; padding: 16px; }
+  .cl-jobs2-datepill {
+    width: 100%; padding: 10px 6px; border-radius: 14px; gap: 0;
+  }
+  .cl-jobs2-datepill .day { font-size: 26px; }
+  .cl-jobs2-datepill .mo, .cl-jobs2-datepill .wd { font-size: 9.5px; }
+  .cl-jobs2-meta-head { gap: 6px 8px; }
+  .cl-jobs2-client { font-size: 16px; }
   .cl-jobs2-side {
     grid-column: 1 / -1; flex-direction: row;
     align-items: center; justify-content: space-between;
@@ -3122,38 +3129,25 @@ html, body { overscroll-behavior-y: contain; }
     box-shadow: 0 -4px 18px rgba(0, 60, 70, 0.06);
   }
   .cl-tab {
-    position: relative;
     flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; padding: 8px 4px 4px; border-radius: 12px; cursor: pointer;
+    gap: 4px; padding: 8px 4px; border-radius: 14px; cursor: pointer;
     color: rgba(0, 95, 106, 0.50);
     background: transparent;
     text-decoration: none;
     font-family: inherit;
     border: 0;
-    min-height: 54px;
+    min-height: 56px;
+    transition: background .18s ease, color .18s ease;
   }
-  /* Pill behind icon when active */
-  .cl-tab > svg { width: 22px; height: 22px; transition: transform .15s; position: relative; z-index: 1; }
-  .cl-tab::before {
-    content: ''; position: absolute; top: 4px; left: 50%;
-    width: 42px; height: 26px;
-    border-radius: 999px;
-    background: var(--primary);
-    transform: translateX(-50%) scaleX(0.4);
-    opacity: 0;
-    transition: opacity .18s ease, transform .22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-    pointer-events: none;
-  }
+  .cl-tab > svg { width: 22px; height: 22px; }
   .cl-tab span {
-    font-size: 10.5px; font-weight: 500; letter-spacing: 0.01em;
-    position: relative; z-index: 1; line-height: 1.2; margin-top: 2px;
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.01em; line-height: 1.2;
   }
-  .cl-tab.active { color: var(--primary-deep); }
-  .cl-tab.active::before {
-    opacity: 0.16;
-    transform: translateX(-50%) scaleX(1);
+  /* Active tab: full button filled with the deep-teal we use on "View details" buttons. */
+  .cl-tab.active {
+    background: var(--primary-deep);
+    color: #fff;
   }
-  .cl-tab.active > svg { transform: translateY(-1px); }
   .cl-tab.active span { font-weight: 700; }
   /* Make room above the tab bar so content isn't hidden behind it */
   .cl-app-main {
@@ -3629,7 +3623,7 @@ html, body { overscroll-behavior-y: contain; }
   font-variant-numeric: tabular-nums;
 }
 .clk-sessions {
-  width: min(640px, 92vw); margin: 28px auto 0;
+  width: min(420px, 90vw); margin: 28px auto 0;
   background: #fff; border: 1px solid var(--primary-10);
   border-radius: 18px; padding: 22px 26px;
 }

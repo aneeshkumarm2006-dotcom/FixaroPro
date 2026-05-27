@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { clockOut } from "../actions/clockOut";
-import { requestRefill } from "../actions/requestRefill";
 
 interface InventoryRule {
   usagePerJob: number;
@@ -31,15 +30,12 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inventories, setInventories] = useState<Record<string, string>>({});
-  const [refillingId, setRefillingId] = useState<string | null>(null);
-  const [refillDone, setRefillDone] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
   function handleOpen() {
     const init: Record<string, string> = {};
     employeeProducts.forEach((ep) => { init[ep.productId] = ep.quantity.toString(); });
     setInventories(init);
-    setRefillDone({});
     setOpen(true);
   }
 
@@ -67,28 +63,6 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
     }
   }
 
-  async function handleRefill(ep: EmployeeProduct) {
-    setRefillingId(ep.productId);
-    setError(null);
-    try {
-      const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
-      const qty = usagePerJob > 0 ? Math.max(usagePerJob * 5, 1) : 1;
-      const result = await requestRefill({
-        productId: ep.productId,
-        quantity: qty,
-        reason: `Low stock during clock-out for job ${jobId}`,
-      });
-      if (result.success) {
-        setRefillDone((prev) => ({ ...prev, [ep.productId]: true }));
-      } else {
-        setError(result.error || "Failed to request refill");
-      }
-    } catch {
-      setError("Failed to request refill");
-    } finally {
-      setRefillingId(null);
-    }
-  }
 
   const modal = open ? (
     <div className="co-overlay" onClick={() => !loading && setOpen(false)}>
@@ -181,26 +155,6 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
                     </div>
                   </div>
 
-                  {(isOut || isLow) && (
-                    <div className="co-refill">
-                      {refillDone[ep.productId] ? (
-                        <span className="co-refill-done">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          Replenishment requested
-                        </span>
-                      ) : (
-                        <button
-                          className="co-refill-btn"
-                          onClick={() => handleRefill(ep)}
-                          disabled={refillingId === ep.productId}
-                        >
-                          {refillingId === ep.productId ? "Requesting…" : "Replenish — pick up from warehouse"}
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })

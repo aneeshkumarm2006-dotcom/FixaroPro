@@ -251,6 +251,26 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
           </div>
         </div>
       </aside>
+
+      {/* Bottom tab bar — visible only on mobile via CSS. */}
+      <nav className="cl-tabbar" aria-label="Primary">
+        {[
+          { href: "/dashboard",      label: "Home",      icon: ICONS.dashboard },
+          { href: "/my-jobs",        label: "Jobs",      icon: ICONS.jobs },
+          { href: "/available-jobs", label: "Available", icon: ICONS.avail },
+          { href: "/my-pay",         label: "Pay",       icon: ICONS.pay },
+          { href: "/chat",           label: "Chat",      icon: ICONS.chat },
+        ].map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            onClick={() => setOpen(false)}
+            className={`cl-tab${isActive(t.href) ? " active" : ""}`}>
+            {t.icon}
+            <span>{t.label}</span>
+          </Link>
+        ))}
+      </nav>
     </>
   );
 }

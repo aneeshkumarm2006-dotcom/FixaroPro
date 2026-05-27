@@ -3085,6 +3085,63 @@ body {
   .cl-drawer-close { display: inline-flex; }
 }
 
+/* ── Native-app polish (cleaner side, mobile install) ──
+   Safe-area insets, tap feedback, no random text selection on UI elements.
+   These rules are gentle on desktop and crucial for installed PWA on phones. */
+.cl-snav-item, .cl-mobile-topbar, .cl-mobile-burger, .cl-portal-burger,
+.cl-mobile-avatar, .cl-portal-topbar-avatar, .cl-tab, .cl-snav-settings {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body { overscroll-behavior-y: contain; }
+@media (max-width: 900px) {
+  /* Press feedback on cleaner nav items */
+  .cl-snav-item:active, .cl-tab:active { transform: scale(0.97); }
+  .cl-snav-item, .cl-tab { transition: transform .08s, background .15s, color .15s; }
+  /* Respect the iPhone notch / home indicator */
+  .cl-mobile-topbar { padding-top: env(safe-area-inset-top); height: calc(56px + env(safe-area-inset-top)); }
+  .cl-app-main { padding-top: calc(72px + env(safe-area-inset-top)); }
+}
+
+/* ── Bottom tab bar (cleaner mobile only) ── */
+.cl-tabbar { display: none; }
+.cl-tab { display: inline-flex; }
+
+@media (max-width: 900px) {
+  .cl-tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 55;
+    background: #fff;
+    border-top: 1px solid rgba(0, 95, 106, 0.12);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 18px rgba(0, 60, 70, 0.06);
+  }
+  .cl-tab {
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 6px 4px; border-radius: 10px; cursor: pointer;
+    color: rgba(0, 95, 106, 0.55);
+    background: transparent;
+    text-decoration: none;
+    font-family: inherit;
+    border: 0;
+    min-height: 48px;
+  }
+  .cl-tab span {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em;
+  }
+  .cl-tab.active {
+    color: var(--primary-deep);
+    background: var(--primary-5);
+  }
+  .cl-tab.active span { font-weight: 700; }
+  /* Make room above the tab bar so content isn't hidden behind it */
+  .cl-app-main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+}
+
 /* Cleaner sidebar (dark teal) */
 .cl-sidebar-dark {
   background: var(--primary-deep); flex: 0 0 240px; width: 240px;

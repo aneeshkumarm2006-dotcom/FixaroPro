@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, Fraunces } from "next/font/google";
 import "./globals.css";
 import "./customer.css";
@@ -16,8 +16,27 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Cleano Software",
-  description: "Cleano Software",
+  title: "Cleano",
+  description: "Cleano — bookings, jobs, and crew workspace.",
+  applicationName: "Cleano",
+  appleWebApp: {
+    capable: true,
+    title: "Cleano",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#005F6A",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  // Lock the page from accidentally pinch-zooming, since installed PWA shouldn't behave like a web page.
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

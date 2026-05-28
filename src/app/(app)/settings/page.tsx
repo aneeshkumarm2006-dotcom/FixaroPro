@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import SettingsClient from "./SettingsClient";
+import { seedNotificationCatalog } from "@/lib/notifications";
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({
@@ -112,6 +113,33 @@ export default async function SettingsPage() {
       ])
     : [[], [], [], [], [], [], [], [], [], [], []];
 
+  // Notification catalog — auto-seed on first admin visit, then load.
+  let notificationSettings: Array<{
+    id: string;
+    recipient: "ADMIN" | "CUSTOMER" | "PROVIDER";
+    category: string;
+    key: string;
+    label: string;
+    trigger: string;
+    channel: "EMAIL" | "SMS" | "APP_PUSH";
+    enabled: boolean;
+    isProposed: boolean;
+    sortOrder: number;
+  }> = [];
+  if (isAdmin) {
+    const existingCount = await db.notificationSetting.count();
+    if (existingCount === 0) {
+      try {
+        await seedNotificationCatalog();
+      } catch (e) {
+        console.error("Failed to seed notification catalog", e);
+      }
+    }
+    notificationSettings = await db.notificationSetting.findMany({
+      orderBy: [{ recipient: "asc" }, { sortOrder: "asc" }],
+    });
+  }
+
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">
       <SettingsClient
@@ -128,6 +156,7 @@ export default async function SettingsPage() {
         documents={documents as never}
         users={users as never}
         serviceAreas={serviceAreas as never}
+        notificationSettings={notificationSettings}
       />
     </div>
   );

@@ -13,12 +13,18 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
+  Boxes,
+  AlertTriangle,
+  DollarSign,
+  Users,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import CustomDropdown from "@/components/ui/custom-dropdown";
+
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
 
 interface Product {
   id: string;
@@ -28,6 +34,7 @@ interface Product {
   costPerUnit: number;
   stockLevel: number;
   minStock: number;
+  category?: ProductCategory;
   totalAssigned: number;
   employeeCount: number;
   totalInventory: number;
@@ -108,9 +115,9 @@ export default function InventoryView({
     return matchesSearch && matchesStatus;
   });
 
-  // Pagination logic
-  const totalProducts = filteredProducts.length;
-  const totalPages = Math.ceil(totalProducts / rowsPerPage);
+  // Pagination logic (counts the filtered list)
+  const totalFilteredProducts = filteredProducts.length;
+  const totalPages = Math.ceil(totalFilteredProducts / rowsPerPage);
   const startIndex = (page - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
@@ -127,27 +134,76 @@ export default function InventoryView({
     updateURLParams({ rowsPerPage: newRowsPerPage, page: 1 });
   };
 
+  // Inventory stats — derived from product list (matches Jobs page pattern).
+  const totalProducts = products.length;
+  const lowStockCount = products.filter((p) => p.isLowStock).length;
+  const totalValue = products.reduce((s, p) => s + p.totalInventory * p.costPerUnit, 0);
+  const assignedCount = products.reduce((s, p) => s + p.totalAssigned, 0);
+
   return (
-    <div className="">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex flex-col">
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
-            Inventory
+    <div>
+      {/* Header — matches /jobs */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          marginBottom: 32,
+          gap: 16,
+          flexWrap: "wrap",
+        }}>
+        <div>
+          <p className="admin-eyebrow">Operations</p>
+          <h1 className="admin-page-title">
+            Inventory{" "}
+            <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>
+              · {totalProducts}
+            </span>
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
-            Manage your inventory and track your stock levels
-          </p>
         </div>
         <Button
           variant="primary"
-          size="md"
           border={false}
           onClick={onAddProduct}
-          className="rounded-2xl px-6 py-3">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
+          className="rounded-xl px-5 py-2.5">
+          <Plus className="w-4 h-4 mr-2" /> New product
         </Button>
+      </header>
+
+      {/* Stats — matches Jobs page */}
+      <div className="astat-grid" style={{ marginBottom: 28 }}>
+        <div className="astat">
+          <div className="astat-head">
+            <span className="astat-label">Total products</span>
+            <div className="astat-icon"><Boxes size={15} /></div>
+          </div>
+          <div className="astat-value">{totalProducts}</div>
+        </div>
+        <div className="astat">
+          <div className="astat-head">
+            <span className="astat-label">Low stock</span>
+            <div className="astat-icon"><AlertTriangle size={15} /></div>
+          </div>
+          <div className="astat-value">{lowStockCount}</div>
+          {lowStockCount > 0 && (
+            <div className="astat-delta">{lowStockCount} need refill</div>
+          )}
+        </div>
+        <div className="astat">
+          <div className="astat-head">
+            <span className="astat-label">Stock value</span>
+            <div className="astat-icon"><DollarSign size={15} /></div>
+          </div>
+          <div className="astat-value">${totalValue.toFixed(2)}</div>
+        </div>
+        <div className="astat">
+          <div className="astat-head">
+            <span className="astat-label">Assigned to crew</span>
+            <div className="astat-icon"><Users size={15} /></div>
+          </div>
+          <div className="astat-value">{assignedCount.toFixed(0)}</div>
+          <div className="astat-delta">units in field</div>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -273,7 +329,7 @@ export default function InventoryView({
         </div>
       ) : (
         <div className="mt-2">
-          {totalProducts === 0 ? (
+          {totalFilteredProducts === 0 ? (
             <div className="bg-white rounded-2xl">
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -462,11 +518,11 @@ export default function InventoryView({
               </div>
 
               {/* Pagination */}
-              {totalProducts > 0 && (
+              {totalFilteredProducts > 0 && (
                 <div className="flex items-center justify-between p-2 px-3 bg-[#005F6A]/4 rounded-b-2xl">
                   <div className="text-xs text-[#005F6A]/70 font-[350]">
                     Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, totalProducts)} of {totalProducts}{" "}
+                    {Math.min(endIndex, totalFilteredProducts)} of {totalFilteredProducts}{" "}
                     products
                   </div>
 

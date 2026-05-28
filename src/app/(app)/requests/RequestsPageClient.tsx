@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { Inbox, Check, X, ExternalLink } from "lucide-react";
 import Card from "@/components/ui/Card";
-import { ConfirmActionModal } from "@/components/common/ConfirmActionModal";
 import { resolveJobRequest } from "../actions/resolveJobRequest";
 
 interface JobRow {
@@ -53,6 +52,8 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
     decision: "approve" | "deny";
     msg: string;
   } | null>(null);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   function handle(
     jobId: string,
@@ -63,18 +64,29 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
       kind === "cancellation" && decision === "approve"
         ? "Approve this cancellation? The job will be marked as CANCELLED."
         : `Mark this ${kind} request as ${decision === "approve" ? "approved" : "denied"}?`;
+    setNote("");
     setPending({ jobId, kind, decision, msg });
   }
 
   async function confirmHandle() {
     if (!pending) return;
     const { jobId, kind, decision } = pending;
+    setSubmitting(true);
+    setError(null);
+    const res = await resolveJobRequest({
+      jobId,
+      kind,
+      decision,
+      note: note.trim() || undefined,
+    });
+    setSubmitting(false);
+    if (!res.success) {
+      setError(res.error || "Failed to resolve");
+      return;
+    }
     setPending(null);
     setBusyId(jobId);
-    setError(null);
-    const res = await resolveJobRequest({ jobId, kind, decision });
     setBusyId(null);
-    if (!res.success) setError(res.error || "Failed to resolve");
   }
 
   return (
@@ -236,18 +248,155 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
         )}
       </Card>
 
-      <ConfirmActionModal
-        isOpen={!!pending}
-        onClose={() => setPending(null)}
-        onConfirm={confirmHandle}
-        title={
-          pending?.decision === "approve"
-            ? `Approve ${pending?.kind}?`
-            : `Deny ${pending?.kind}?`
-        }
-        message={pending?.msg ?? ""}
-        confirmLabel={pending?.decision === "approve" ? "Approve" : "Deny"}
-      />
+      {pending && (
+        <div
+          onClick={() => !submitting && setPending(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 60, 70, 0.55)",
+            backdropFilter: "blur(2px)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              maxWidth: 480,
+              width: "100%",
+              padding: 28,
+              boxShadow: "0 20px 60px rgba(0, 60, 70, 0.25)",
+            }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: "var(--font-serif, serif)",
+                    fontSize: 24,
+                    color: "var(--primary-deep, #003C46)",
+                    margin: "0 0 6px",
+                    fontWeight: 400,
+                  }}>
+                  {pending.decision === "approve"
+                    ? `Approve ${pending.kind}?`
+                    : `Deny ${pending.kind}?`}
+                </h2>
+                <p style={{ fontSize: 13.5, color: "var(--primary-60, #5b7a80)", margin: 0, lineHeight: 1.5 }}>
+                  {pending.msg}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !submitting && setPending(null)}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--primary-50, #6b8085)",
+                  padding: 4,
+                  fontFamily: "inherit",
+                }}
+                aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ marginTop: 22 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--primary-60, #5b7a80)",
+                  marginBottom: 8,
+                }}>
+                {pending.decision === "deny"
+                  ? "Reason (optional, shown to the customer)"
+                  : "Note (optional, shown to the customer)"}
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={
+                  pending.decision === "deny"
+                    ? "e.g. We're outside our cancellation window — please contact us if you'd like to discuss."
+                    : "Any extra context to share with the customer."
+                }
+                rows={4}
+                disabled={submitting}
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  border: "1px solid var(--primary-10, rgba(0,95,106,0.15))",
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  color: "var(--ink, #003C46)",
+                  resize: "vertical",
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 22,
+              }}>
+              <button
+                type="button"
+                onClick={() => !submitting && setPending(null)}
+                disabled={submitting}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  padding: "10px 14px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "var(--primary-60, #5b7a80)",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmHandle}
+                disabled={submitting}
+                style={{
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  border: 0,
+                  background:
+                    pending.decision === "approve"
+                      ? "var(--primary-deep, #003C46)"
+                      : "#b91c1c",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  opacity: submitting ? 0.6 : 1,
+                }}>
+                {submitting
+                  ? "Working…"
+                  : pending.decision === "approve"
+                  ? "Approve"
+                  : "Deny"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

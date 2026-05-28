@@ -20,10 +20,30 @@ interface PerUnitRates {
   perHalfBath: number;
 }
 
+export type RoomType =
+  | "KITCHEN"
+  | "BATHROOM"
+  | "BEDROOM"
+  | "LIVING_ROOM"
+  | "LAUNDRY"
+  | "OUTDOOR"
+  | "WHOLE_HOME";
+
+const ROOM_OPTIONS: { value: RoomType; label: string }[] = [
+  { value: "KITCHEN", label: "Kitchen" },
+  { value: "BATHROOM", label: "Bathroom" },
+  { value: "BEDROOM", label: "Bedroom" },
+  { value: "LIVING_ROOM", label: "Living room" },
+  { value: "LAUNDRY", label: "Laundry" },
+  { value: "OUTDOOR", label: "Outdoor / patio" },
+  { value: "WHOLE_HOME", label: "Whole home" },
+];
+
 interface AddOn {
   id: string;
   name: string;
   price: number;
+  roomType?: RoomType;
 }
 
 const PER_UNIT_KEY = "pricing.perUnit";
@@ -66,7 +86,7 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   }
 
   function addAddOn() {
-    setAddOns((prev) => [...prev, { id: uid(), name: "", price: 0 }]);
+    setAddOns((prev) => [...prev, { id: uid(), name: "", price: 0, roomType: "WHOLE_HOME" }]);
   }
 
   function removeAddOn(id: string) {
@@ -184,7 +204,7 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
             <p className="text-sm text-[#005F6A]/60">No add-ons configured.</p>
           )}
           {addOns.map((addon) => (
-            <div key={addon.id} className="grid grid-cols-[2fr_1fr_auto] gap-3 items-end">
+            <div key={addon.id} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.4fr_auto] gap-3 items-end">
               <Field label="Name">
                 <Input
                   variant="form"
@@ -204,6 +224,20 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
                     updateAddOn(addon.id, { price: parseFloat(e.target.value) || 0 })
                   }
                 />
+              </Field>
+              <Field label="Room">
+                <select
+                  value={addon.roomType ?? "WHOLE_HOME"}
+                  onChange={(e) =>
+                    updateAddOn(addon.id, { roomType: e.target.value as RoomType })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-[#005F6A]/15 bg-white text-[#003C46] text-sm focus:outline-none focus:border-[#005F6A] focus:ring-2 focus:ring-[#005F6A]/10">
+                  {ROOM_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <IconButton
                 icon={Trash2}

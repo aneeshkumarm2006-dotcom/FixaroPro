@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { cloudinary } from "@/lib/cloudinary";
 import type { UploadApiResponse } from "cloudinary";
+import { sendAdminDocSigned } from "@/lib/email";
 
 interface SignDocumentInput {
   documentId: string;
@@ -106,6 +107,16 @@ export async function signDocument(input: SignDocumentInput) {
     revalidatePath("/documents");
     revalidatePath(`/documents/${documentId}`);
     revalidatePath("/settings");
+
+    // Admin notification — gated by `admin.docs.signed_completed`.
+    const doc = await db.document.findUnique({
+      where: { id: documentId },
+      select: { title: true },
+    });
+    sendAdminDocSigned({
+      signerName: session.user.name ?? "Cleaner",
+      documentTitle: doc?.title ?? "Document",
+    }).catch((e) => console.error("admin doc-signed", e));
 
     return { success: true, signature: updated };
   } catch (error) {

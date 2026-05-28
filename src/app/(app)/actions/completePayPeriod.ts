@@ -4,6 +4,41 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { isNotificationEnabled } from "@/lib/notifications";
+import type { NotificationGate } from "@/lib/email";
+import { Resend } from "resend";
+
+const FROM = process.env.EMAIL_FROM ?? "Cleano <no-reply@cleano.ca>";
+
+async function sendPaymentReceivedEmail(opts: {
+  to: string;
+  name: string;
+  amount: number;
+  periodLabel: string;
+}) {
+  const enabled = await isNotificationEnabled(
+    "PROVIDER",
+    "prov.payments.received",
+    "EMAIL"
+  );
+  if (!enabled || !process.env.RESEND_API_KEY) return;
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: FROM,
+    to: opts.to,
+    subject: `Cleano payout — $${opts.amount.toFixed(2)}`,
+    html: `<div style="font-family:sans-serif;padding:24px;background:#f5f2ed">
+      <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:28px">
+        <h1 style="color:#00424a;margin:0 0 12px">You just got paid</h1>
+        <p style="font-size:15px;color:#333">Hi ${opts.name.split(" ")[0]}, your payout for ${opts.periodLabel} was just processed.</p>
+        <p style="font-size:24px;font-weight:700;color:#00424a;margin:18px 0">$${opts.amount.toFixed(2)}</p>
+        <p style="font-size:13px;color:#666">Expect funds in your account within 1–2 business days.</p>
+      </div>
+    </div>`,
+  }).catch((e) => console.error("provider payment-received email", e));
+}
+// Ensure type import is kept (used by other parts of the module).
+void {} as NotificationGate | undefined;
 
 export async function completePayPeriod(payPeriodId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -63,6 +98,26 @@ export async function completePayPeriod(payPeriodId: string) {
         });
       }
     });
+
+    // Notify each cleaner who received a payout — gated by `prov.payments.received` EMAIL.
+    const byEmployee = new Map<string, number>();
+    for (const p of period.payouts) {
+      byEmployee.set(p.employeeId, (byEmployee.get(p.employeeId) ?? 0) + p.finalAmount);
+    }
+    const employees = await db.user.findMany({
+      where: { id: { in: Array.from(byEmployee.keys()) } },
+      select: { id: true, name: true, email: true },
+    });
+    for (const u of employees) {
+      const amount = byEmployee.get(u.id) ?? 0;
+      if (amount <= 0 || !u.email) continue;
+      sendPaymentReceivedEmail({
+        to: u.email,
+        name: u.name,
+        amount,
+        periodLabel,
+      }).catch((e) => console.error("provider payment email", e));
+    }
 
     revalidatePath("/payouts");
     revalidatePath(`/payouts/${payPeriodId}`);

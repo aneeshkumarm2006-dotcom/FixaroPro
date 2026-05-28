@@ -14,7 +14,11 @@ import {
   NEW_CLIENT_DISCOUNT,
   REFERRER_CREDIT,
 } from "@/lib/referral";
-import { sendBookingConfirmation } from "@/lib/email";
+import {
+  sendBookingConfirmation,
+  sendAdminNewBookingNotification,
+  sendCustomerBookingsPrepaid,
+} from "@/lib/email";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 
 type Frequency =
@@ -373,7 +377,61 @@ export async function submitBooking(input: SubmitBookingInput) {
       total: pricing.total,
       depositPaid: !!input.depositPaymentIntentId,
       logId: emailLog.id,
+      // ONE_TIME → cust.booking.receipt_ot; anything else (weekly/monthly/etc.)
+      // → cust.booking.receipt_rec
+      recurring: input.frequency !== "ONE_TIME",
     });
+
+    // If a referral code was applied, fire the dedicated catalog row
+    // `admin.booking.new_via_referral` in addition to the regular
+    // `admin.booking.new`. The fire-and-forget notifier handles the gate.
+    if (input.referralCode?.trim()) {
+      sendAdminNewBookingNotification({
+        jobId: primaryJob.id,
+        jobNumber: primaryJob.jobNumber,
+        clientName: client.name,
+        clientEmail: email,
+        clientPhone: input.phone ?? null,
+        startTime: startTime.toISOString(),
+        isFlexible: input.isFlexible,
+        address: input.address.trim(),
+        serviceType: input.serviceType,
+        price: pricing.total,
+        bookingSource: "web (referral)",
+        viaReferral: true,
+      }).catch((err) =>
+        console.error("admin new-booking-via-referral notification failed", err)
+      );
+    }
+
+    // Notify all admins of the new booking — gated by `admin.booking.new` EMAIL.
+    sendAdminNewBookingNotification({
+      jobId: primaryJob.id,
+      jobNumber: primaryJob.jobNumber,
+      clientName: client.name,
+      clientEmail: email,
+      clientPhone: input.phone ?? null,
+      startTime: startTime.toISOString(),
+      isFlexible: input.isFlexible,
+      address: input.address.trim(),
+      serviceType: input.serviceType,
+      price: pricing.total,
+      bookingSource: "web",
+    }).catch((err) =>
+      console.error("admin new-booking notification failed", err)
+    );
+
+    // Customer "Bookings pre-paid" email when a deposit was collected at
+    // booking time — gated by `cust.fee.bookings_prepaid`.
+    if (input.depositPaymentIntentId) {
+      sendCustomerBookingsPrepaid({
+        to: email,
+        clientName: client.name,
+        jobId: primaryJob.id,
+        jobNumber: primaryJob.jobNumber,
+        amount: 20, // $20 deposit per the existing booking flow
+      }).catch((err) => console.error("customer prepaid email", err));
+    }
 
     // 10. Log the booking activity on the primary job
     await db.jobLog.create({

@@ -5,6 +5,12 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { issueRefund } from "./issueRefund";
+import {
+  sendAdminBookingCanceled,
+  sendCustomerBookingCancellation,
+  sendProviderBookingCanceled,
+} from "@/lib/email";
+import { isNotificationEnabled } from "@/lib/notifications";
 
 interface CancelJobInput {
   jobId: string;
@@ -29,6 +35,12 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
         jobNumber: true,
         depositPaid: true,
         refundedAmount: true,
+        clientName: true,
+        startTime: true,
+        location: true,
+        jobType: true,
+        client: { select: { email: true } },
+        cleaners: { select: { id: true, name: true, email: true } },
       },
     });
     if (!job) return { success: false, error: "Job not found" };
@@ -66,6 +78,58 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
           amount: remaining,
           reason: input.reason ?? "Booking cancelled",
         });
+      }
+    }
+
+    // Lifecycle notifications — gated by Settings → Notifications.
+    const lifecycleInfo = {
+      jobId: input.jobId,
+      jobNumber: job.jobNumber,
+      clientName: job.clientName,
+      startTime: job.startTime.toISOString(),
+      address: job.location ?? "",
+      serviceType: job.jobType,
+    };
+    sendAdminBookingCanceled({
+      ...lifecycleInfo,
+      reason: input.reason,
+      canceledBy: session.user.name ?? "Admin",
+    }).catch((e) => console.error("admin cancel email", e));
+    if (job.client?.email) {
+      sendCustomerBookingCancellation({
+        ...lifecycleInfo,
+        to: job.client.email,
+        reason: input.reason,
+        refundIssued: !!refund && refund.success,
+      }).catch((e) => console.error("customer cancel email", e));
+    }
+    // Notify each assigned cleaner — email + (gated) app-push alert.
+    for (const c of job.cleaners) {
+      if (c.email) {
+        sendProviderBookingCanceled({
+          to: c.email,
+          providerName: c.name,
+          jobId: input.jobId,
+          jobNumber: job.jobNumber,
+          clientName: job.clientName,
+          startTime: job.startTime.toISOString(),
+          address: job.location ?? "",
+          serviceType: job.jobType,
+          reason: input.reason ?? null,
+        }).catch((e) => console.error("provider cancel email", e));
+      }
+      if (await isNotificationEnabled("PROVIDER", "prov.cancel.booking_canceled", "APP_PUSH")) {
+        await db.alert.create({
+          data: {
+            type: "CANCELLATION",
+            severity: "WARNING",
+            title: `Booking canceled — ${job.clientName}`,
+            message: `Job #${job.jobNumber} on ${job.startTime.toLocaleDateString()} was canceled by admin.`,
+            recipientUserId: c.id,
+            relatedId: input.jobId,
+            relatedType: "Job",
+          },
+        }).catch(() => {});
       }
     }
 

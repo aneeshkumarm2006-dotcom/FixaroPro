@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendAdminClockedIn } from "@/lib/email";
 
 export async function clockIn(jobId: string) {
   const session = await auth.api.getSession({
@@ -76,6 +77,14 @@ export async function clockIn(jobId: string) {
         description: `Status changed from ${job.status} to IN_PROGRESS`,
       },
     });
+
+    // Admin email — gated by `admin.clock.clocked_in`.
+    sendAdminClockedIn({
+      jobId,
+      jobNumber: job.jobNumber,
+      clientName: job.clientName,
+      cleanerName: session.user.name ?? "Cleaner",
+    }).catch((e) => console.error("admin clocked-in email", e));
 
     revalidatePath("/my-jobs");
     revalidatePath(`/jobs/${jobId}`);

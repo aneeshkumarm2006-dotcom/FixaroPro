@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { sendAdminNewReview, sendProviderNewReview } from "@/lib/email";
 
 interface SubmitRatingInput {
   token: string;
@@ -68,6 +69,43 @@ export async function submitRating(input: SubmitRatingInput) {
         data: { usedAt: new Date() },
       }),
     ]);
+
+    // Notify admin + each rated cleaner (gated). Recalc overall for the
+    // `overall_dropped` check.
+    const job = await db.job.findUnique({
+      where: { id: tokenRow.jobId },
+      select: { id: true, jobNumber: true },
+    });
+    for (const employeeId of cleanerIds) {
+      const cleaner = await db.user.findUnique({
+        where: { id: employeeId },
+        select: { name: true, email: true },
+      });
+      if (!cleaner) continue;
+      const allRatings = await db.employeeRating.aggregate({
+        where: { employeeId },
+        _avg: { rating: true },
+      });
+      const overall = allRatings._avg.rating ?? null;
+      sendAdminNewReview({
+        jobId: job?.id ?? null,
+        jobNumber: job?.jobNumber ?? null,
+        employeeName: cleaner.name,
+        rating: input.stars,
+        notes: input.comment?.trim() || null,
+        overallRating: overall,
+      }).catch((e) => console.error("admin new-review email", e));
+      if (cleaner.email) {
+        sendProviderNewReview({
+          to: cleaner.email,
+          employeeName: cleaner.name,
+          jobId: job?.id ?? null,
+          jobNumber: job?.jobNumber ?? null,
+          rating: input.stars,
+          notes: input.comment?.trim() || null,
+        }).catch((e) => console.error("provider new-review email", e));
+      }
+    }
 
     return { success: true };
   } catch (error) {

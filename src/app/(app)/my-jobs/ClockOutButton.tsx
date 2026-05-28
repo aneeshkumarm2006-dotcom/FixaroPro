@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { clockOut } from "../actions/clockOut";
+
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
 
 interface InventoryRule {
   usagePerJob: number;
@@ -17,6 +19,7 @@ interface EmployeeProduct {
     id: string;
     name: string;
     unit: string;
+    category: ProductCategory;
     inventoryRule?: InventoryRule | null;
   };
 }
@@ -26,16 +29,57 @@ interface ClockOutButtonProps {
   employeeProducts: EmployeeProduct[];
 }
 
+// Per the Post-Job Inventory Usage spec.
+const SPRAY_OPTIONS = [
+  { label: "None", sprays: 0 },
+  { label: "Light use", hint: "10–20 sprays", sprays: 15 },
+  { label: "Medium use", hint: "20–40 sprays", sprays: 30 },
+  { label: "Heavy use", hint: "40+ sprays", sprays: 50 },
+];
+const MOP_OPTIONS = [
+  { label: "None", mops: 0 },
+  { label: "1 mop", mops: 1 },
+  { label: "2 mops", mops: 2 },
+  { label: "3+ mops", mops: 3 },
+];
+const DISPOSABLE_OPTIONS = [0, 1, 2, 3];
+const ML_PER_SPRAY = 1.25;
+
 export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [inventories, setInventories] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
+  // category-keyed selections: productId → option index
+  const [sprayPick, setSprayPick] = useState<Record<string, number>>({});
+  const [mopPick, setMopPick] = useState<Record<string, number>>({});
+  const [dispPick, setDispPick] = useState<Record<string, number>>({});
+  // legacy "remaining" input for OTHER-category products
+  const [remaining, setRemaining] = useState<Record<string, string>>({});
+
+  const { sprays, mops, disposables, others } = useMemo(() => {
+    return {
+      sprays: employeeProducts.filter((ep) => ep.product.category === "LIQUID_SPRAY"),
+      mops: employeeProducts.filter((ep) => ep.product.category === "MOP_LIQUID"),
+      disposables: employeeProducts.filter((ep) => ep.product.category === "DISPOSABLE"),
+      others: employeeProducts.filter((ep) => ep.product.category === "OTHER"),
+    };
+  }, [employeeProducts]);
+
   function handleOpen() {
-    const init: Record<string, string> = {};
-    employeeProducts.forEach((ep) => { init[ep.productId] = ep.quantity.toString(); });
-    setInventories(init);
+    const sp: Record<string, number> = {};
+    const mp: Record<string, number> = {};
+    const dp: Record<string, number> = {};
+    const rem: Record<string, string> = {};
+    sprays.forEach((ep) => (sp[ep.productId] = 0));
+    mops.forEach((ep) => (mp[ep.productId] = 0));
+    disposables.forEach((ep) => (dp[ep.productId] = 0));
+    others.forEach((ep) => (rem[ep.productId] = ep.quantity.toString()));
+    setSprayPick(sp);
+    setMopPick(mp);
+    setDispPick(dp);
+    setRemaining(rem);
+    setError(null);
     setOpen(true);
   }
 
@@ -43,14 +87,28 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
     setLoading(true);
     setError(null);
     try {
-      const productInventories = employeeProducts
-        .map((ep) => ({
+      const usage = {
+        sprays: sprays.map((ep) => ({
           productId: ep.productId,
-          inventoryAfter: parseFloat(inventories[ep.productId] ?? "0"),
-        }))
-        .filter((inv) => !isNaN(inv.inventoryAfter));
+          sprayCount: SPRAY_OPTIONS[sprayPick[ep.productId] ?? 0].sprays,
+        })),
+        mops: mops.map((ep) => ({
+          productId: ep.productId,
+          mopCount: MOP_OPTIONS[mopPick[ep.productId] ?? 0].mops,
+        })),
+        disposables: disposables.map((ep) => ({
+          productId: ep.productId,
+          quantity: DISPOSABLE_OPTIONS[dispPick[ep.productId] ?? 0],
+        })),
+        remaining: others
+          .map((ep) => ({
+            productId: ep.productId,
+            inventoryAfter: parseFloat(remaining[ep.productId] ?? "0"),
+          }))
+          .filter((r) => !isNaN(r.inventoryAfter)),
+      };
 
-      const result = await clockOut(jobId, productInventories);
+      const result = await clockOut(jobId, usage);
       if (result.success) {
         setOpen(false);
       } else {
@@ -63,11 +121,12 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
     }
   }
 
+  const hasAssignments =
+    sprays.length + mops.length + disposables.length + others.length > 0;
 
   const modal = open ? (
     <div className="co-overlay" onClick={() => !loading && setOpen(false)}>
       <div className="co-sheet" onClick={(e) => e.stopPropagation()}>
-
         {/* Header */}
         <div className="co-head">
           <div className="co-head-left">
@@ -77,8 +136,8 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
               </svg>
             </span>
             <div>
-              <h2 className="co-title">Clock out</h2>
-              <p className="co-subtitle">Update your remaining supply levels before finishing.</p>
+              <h2 className="co-title">Post-job inventory</h2>
+              <p className="co-subtitle">Log what you used. Stock and restock alerts update automatically.</p>
             </div>
           </div>
           <button className="co-close" onClick={() => !loading && setOpen(false)} aria-label="Close">
@@ -88,76 +147,209 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
           </button>
         </div>
 
-        {/* Product list */}
+        {/* Body */}
         <div className="co-body">
-          {employeeProducts.length === 0 ? (
+          {!hasAssignments ? (
             <div className="co-empty">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-              </svg>
-              <p>No products assigned to you.</p>
+              <p>No products assigned to you. You can still close the job.</p>
             </div>
           ) : (
-            employeeProducts.map((ep) => {
-              const current = parseFloat(inventories[ep.productId] ?? "0");
-              const used = isNaN(current) ? 0 : Math.max(0, ep.quantity - current);
-              const remaining = isNaN(current) ? ep.quantity : current;
-              const threshold = ep.product.inventoryRule?.refillThreshold ?? 0;
-              const usagePerJob = ep.product.inventoryRule?.usagePerJob ?? 0;
-              const isOut = remaining <= 0;
-              const isLow = !isOut && threshold > 0 && remaining < threshold;
+            <>
+              {/* Liquid sprays */}
+              {sprays.length > 0 && (
+                <div className="pju-section">
+                  <div className="pju-section-head">
+                    <span className="pju-section-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 3h6v4l3 5v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-9l3-5z" />
+                        <line x1="9" y1="7" x2="15" y2="7" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h3>Liquid sprays</h3>
+                      <p>How much did you spray?</p>
+                    </div>
+                  </div>
+                  {sprays.map((ep) => {
+                    const pick = sprayPick[ep.productId] ?? 0;
+                    const sprayCount = SPRAY_OPTIONS[pick].sprays;
+                    const mlDeducted = sprayCount * ML_PER_SPRAY;
+                    return (
+                      <div key={ep.productId} className="pju-card">
+                        <div className="pju-card-head">
+                          <span className="pju-card-name">{ep.product.name}</span>
+                          <span className="pju-card-stock">
+                            {ep.quantity.toFixed(1)} {ep.product.unit}
+                          </span>
+                        </div>
+                        <div className="pju-pills">
+                          {SPRAY_OPTIONS.map((opt, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              className={`pju-pill${pick === idx ? " selected" : ""}`}
+                              onClick={() =>
+                                setSprayPick((p) => ({ ...p, [ep.productId]: idx }))
+                              }>
+                              <span className="lbl">{opt.label}</span>
+                              {opt.hint && <span className="hint">{opt.hint}</span>}
+                            </button>
+                          ))}
+                        </div>
+                        {mlDeducted > 0 && (
+                          <div className="pju-card-foot">
+                            Deducts {mlDeducted.toFixed(2)} ml ({sprayCount} sprays)
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-              return (
-                <div key={ep.productId} className={`co-product${isOut ? " danger" : isLow ? " warn" : ""}`}>
-                  <div className="co-product-top">
-                    <span className="co-product-icon">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              {/* Mop-based liquids */}
+              {mops.length > 0 && (
+                <div className="pju-section">
+                  <div className="pju-section-head">
+                    <span className="pju-section-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="3" x2="12" y2="14" />
+                        <path d="M6 14h12l-2 7H8z" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h3>Mop-based liquids</h3>
+                      <p>How many mop uses?</p>
+                    </div>
+                  </div>
+                  {mops.map((ep) => {
+                    const pick = mopPick[ep.productId] ?? 0;
+                    const mopCount = MOP_OPTIONS[pick].mops;
+                    return (
+                      <div key={ep.productId} className="pju-card">
+                        <div className="pju-card-head">
+                          <span className="pju-card-name">{ep.product.name}</span>
+                          <span className="pju-card-stock">
+                            {ep.quantity.toFixed(1)} {ep.product.unit}
+                          </span>
+                        </div>
+                        <div className="pju-pills">
+                          {MOP_OPTIONS.map((opt, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              className={`pju-pill${pick === idx ? " selected" : ""}`}
+                              onClick={() =>
+                                setMopPick((p) => ({ ...p, [ep.productId]: idx }))
+                              }>
+                              <span className="lbl">{opt.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {mopCount > 0 && (
+                          <div className="pju-card-foot">
+                            Deducts {mopCount} mop use{mopCount === 1 ? "" : "s"}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Disposables */}
+              {disposables.length > 0 && (
+                <div className="pju-section">
+                  <div className="pju-section-head">
+                    <span className="pju-section-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                       </svg>
                     </span>
-                    <div className="co-product-info">
-                      <span className="co-product-name">{ep.product.name}</span>
-                      <span className="co-product-sub">Started with {ep.quantity} {ep.product.unit}</span>
-                    </div>
-                    {isOut && <span className="co-badge danger">Out of stock</span>}
-                    {isLow && <span className="co-badge warn">Low stock</span>}
-                  </div>
-
-                  <div className="co-input-row">
-                    <label className="co-input-label">
-                      Remaining {ep.product.unit}
-                    </label>
-                    <input
-                      className="co-input"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={ep.quantity}
-                      value={inventories[ep.productId] ?? ""}
-                      onChange={(e) =>
-                        setInventories((prev) => ({ ...prev, [ep.productId]: e.target.value }))
-                      }
-                      placeholder="Enter remaining quantity"
-                    />
-                    {usagePerJob > 0 && (
-                      <span className="co-input-hint">Avg usage: {usagePerJob} {ep.product.unit} per job</span>
-                    )}
-                  </div>
-
-                  <div className="co-stats">
-                    <div className="co-stat">
-                      <span className="lbl">Used</span>
-                      <span className="val">{used > 0 ? used.toFixed(2) : "0"} {ep.product.unit}</span>
-                    </div>
-                    <div className={`co-stat${isOut ? " danger" : isLow ? " warn" : ""}`}>
-                      <span className="lbl">Remaining</span>
-                      <span className="val">{isNaN(current) ? "—" : current.toFixed(2)} {ep.product.unit}</span>
+                    <div>
+                      <h3>Disposables</h3>
+                      <p>How many items did you use?</p>
                     </div>
                   </div>
-
+                  <div className="pju-disp-grid">
+                    {disposables.map((ep) => {
+                      const pick = dispPick[ep.productId] ?? 0;
+                      const used = DISPOSABLE_OPTIONS[pick];
+                      return (
+                        <div key={ep.productId} className="pju-disp-card">
+                          <div className="pju-disp-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            </svg>
+                          </div>
+                          <div className="pju-disp-name">{ep.product.name}</div>
+                          <div className="pju-disp-stock">
+                            {ep.quantity.toFixed(0)} in stock
+                          </div>
+                          <div className="pju-disp-pills">
+                            {DISPOSABLE_OPTIONS.map((opt, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                className={`pju-disp-pill${pick === idx ? " selected" : ""}`}
+                                onClick={() =>
+                                  setDispPick((p) => ({ ...p, [ep.productId]: idx }))
+                                }>
+                                {idx === 0 ? "0" : `+${opt}`}
+                              </button>
+                            ))}
+                          </div>
+                          {used > 0 && (
+                            <div className="pju-disp-foot">−{used}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })
+              )}
+
+              {/* Other products — legacy "remaining" input */}
+              {others.length > 0 && (
+                <div className="pju-section">
+                  <div className="pju-section-head">
+                    <span className="pju-section-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h3>Other</h3>
+                      <p>How much do you have remaining?</p>
+                    </div>
+                  </div>
+                  {others.map((ep) => (
+                    <div key={ep.productId} className="pju-card">
+                      <div className="pju-card-head">
+                        <span className="pju-card-name">{ep.product.name}</span>
+                        <span className="pju-card-stock">
+                          Started with {ep.quantity} {ep.product.unit}
+                        </span>
+                      </div>
+                      <input
+                        className="co-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max={ep.quantity}
+                        value={remaining[ep.productId] ?? ""}
+                        onChange={(e) =>
+                          setRemaining((p) => ({ ...p, [ep.productId]: e.target.value }))
+                        }
+                        placeholder={`Remaining ${ep.product.unit}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -186,14 +378,14 @@ export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButt
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "co-spin 0.8s linear infinite" }}>
                   <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
-                Clocking out…
+                Submitting…
               </>
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
-                Confirm clock out
+                Submit usage and close job
               </>
             )}
           </button>

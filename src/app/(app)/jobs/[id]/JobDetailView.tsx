@@ -16,20 +16,23 @@ import {
   CheckCircle2, Package, Pencil, History, Activity,
   AlertTriangle, Trash2, Loader, Briefcase, Receipt, Camera, X,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText,
-  Star, Copy, Check,
+  Star, Copy, Check, Inbox, RotateCcw, XCircle,
 } from "lucide-react";
+import { resolveJobRequest } from "../../actions/resolveJobRequest";
+import { assignCleaners } from "../../actions/assignCleaners";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import Modal from "@/components/ui/Modal";
 import { cancelJobByAdmin } from "../../actions/cancelJobByAdmin";
 import { issueRefund } from "../../actions/issueRefund";
 
-type TabView = "details" | "financials" | "products" | "logs";
+type TabView = "details" | "financials" | "products" | "logs" | "requests";
 
 const TABS: Array<{ id: TabView; label: string; icon: React.ReactNode }> = [
   { id: "details",    label: "Job details",    icon: <Briefcase size={15} /> },
   { id: "financials", label: "Financials",     icon: <DollarSign size={15} /> },
   { id: "products",   label: "Product usage",  icon: <Package size={15} /> },
   { id: "logs",       label: "Logs",           icon: <History size={15} /> },
+  { id: "requests",   label: "Requests",       icon: <Inbox size={15} /> },
 ];
 
 interface Job {
@@ -65,6 +68,8 @@ interface Job {
   addOns?: Array<{ id: string; name: string; price: number }>;
   employee: { id: string; name: string };
   cleaners: Array<{ id: string; name: string }>;
+  cancellationRequestedAt?: string | null;
+  rescheduleRequestedAt?: string | null;
 }
 
 interface ClientLite { id: string; name: string; }
@@ -199,6 +204,73 @@ export default function JobDetailView({
   const backLabel = returnToUrl ? "Back to Calendar" : "Back to Jobs";
 
   const [activeView,       setActiveView]       = useState<TabView>("details");
+
+  // Requests tab — pending cancellation/reschedule action modal
+  const [requestModal, setRequestModal] = useState<{
+    kind: "cancellation" | "reschedule";
+    decision: "approve" | "deny";
+  } | null>(null);
+  const [requestNote, setRequestNote] = useState("");
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  function openRequestModal(
+    kind: "cancellation" | "reschedule",
+    decision: "approve" | "deny"
+  ) {
+    setRequestNote("");
+    setRequestError(null);
+    setRequestModal({ kind, decision });
+  }
+
+  // Inline cleaner-assignment modal (Team card on Job details tab)
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignSelected, setAssignSelected] = useState<Set<string>>(new Set());
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  function openAssignModal() {
+    setAssignSelected(new Set(job.cleaners.map((c) => c.id)));
+    setAssignSearch("");
+    setAssignError(null);
+    setAssignOpen(true);
+  }
+
+  async function confirmAssign() {
+    setAssignSubmitting(true);
+    setAssignError(null);
+    const res = await assignCleaners({
+      jobId: job.id,
+      cleanerIds: Array.from(assignSelected),
+    });
+    setAssignSubmitting(false);
+    if (!res.success) {
+      setAssignError(res.error || "Failed to assign");
+      return;
+    }
+    setAssignOpen(false);
+    router.refresh();
+  }
+
+  async function confirmRequestResolve() {
+    if (!requestModal) return;
+    setRequestSubmitting(true);
+    setRequestError(null);
+    const res = await resolveJobRequest({
+      jobId: job.id,
+      kind: requestModal.kind,
+      decision: requestModal.decision,
+      note: requestNote.trim() || undefined,
+    });
+    setRequestSubmitting(false);
+    if (!res.success) {
+      setRequestError(res.error || "Failed to resolve");
+      return;
+    }
+    setRequestModal(null);
+    router.refresh();
+  }
   const [isDeleting,       setIsDeleting]       = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditModalOpen,  setIsEditModalOpen]  = useState(false);
@@ -426,9 +498,33 @@ export default function JobDetailView({
       <div className="dcard">
         <div className="dcard-head">
           <h3>Team</h3>
-          {job.cleaners.length > 0 && (
-            <span style={{ fontSize: 12, color: 'var(--primary-50)' }}>{job.cleaners.length} assigned</span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {job.cleaners.length > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--primary-50)' }}>{job.cleaners.length} assigned</span>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={openAssignModal}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--primary-10)',
+                  borderRadius: 999,
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--primary)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}>
+                <Users className="w-3 h-3" />
+                {job.cleaners.length === 0 ? 'Assign cleaners' : 'Change'}
+              </button>
+            )}
+          </div>
         </div>
         <div className="team-list">
           <div className="team-row">
@@ -780,6 +876,266 @@ export default function JobDetailView({
     </div>
   );
 
+  // ── Requests tab ───────────────────────────────────────────────────────────
+  const RequestsTab = () => {
+    const hasCancel = !!job.cancellationRequestedAt;
+    const hasReschedule = !!job.rescheduleRequestedAt;
+    const empty = !hasCancel && !hasReschedule;
+
+    return (
+      <div className="tab-panel">
+        <div className="dcard tab-panel-wide">
+          <div className="dcard-head">
+            <h3>Customer requests</h3>
+          </div>
+
+          {empty ? (
+            <div
+              style={{
+                padding: '56px 24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+              }}
+            >
+              {/* Inline illustration — empty inbox */}
+              <svg
+                width="120"
+                height="120"
+                viewBox="0 0 120 120"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="60" cy="60" r="56" fill="var(--primary-5)" />
+                <path
+                  d="M30 52v32a6 6 0 006 6h48a6 6 0 006-6V52L72 28H42L30 52z"
+                  fill="#fff"
+                  stroke="var(--primary)"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M30 52h22l4 8h8l4-8h22"
+                  stroke="var(--primary)"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M48 38h24M50 44h20"
+                  stroke="var(--primary-40)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <circle cx="92" cy="32" r="10" fill="#10b981" />
+                <path
+                  d="M88 32l3 3 6-6"
+                  stroke="#fff"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+              <div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: 'var(--primary-deep)',
+                  }}
+                >
+                  All caught up
+                </p>
+                <p
+                  style={{
+                    margin: '6px 0 0',
+                    fontSize: 13,
+                    color: 'var(--primary-50)',
+                    maxWidth: 360,
+                  }}
+                >
+                  No cancellation or reschedule requests for this booking. The
+                  customer hasn't asked to change anything.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {hasCancel && (
+                <div
+                  style={{
+                    border: '1px solid var(--primary-10)',
+                    borderRadius: 14,
+                    padding: 18,
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                    <div>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          background: 'rgba(220, 38, 38, 0.10)',
+                          color: '#b91c1c',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                        }}
+                      >
+                        Cancellation requested
+                      </span>
+                      <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--ink)' }}>
+                        <strong>{job.clientName}</strong> asked to cancel this booking on{' '}
+                        {new Date(job.cancellationRequestedAt!).toLocaleString(undefined, {
+                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                        })}.
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => openRequestModal('cancellation', 'approve')}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: 999,
+                        border: 0,
+                        background: 'var(--primary-deep)',
+                        color: '#fff',
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Approve cancellation
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openRequestModal('cancellation', 'deny')}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: 999,
+                        border: '1px solid var(--primary-10)',
+                        background: '#fff',
+                        color: 'var(--primary-60)',
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Deny
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hasReschedule && (
+                <div
+                  style={{
+                    border: '1px solid var(--primary-10)',
+                    borderRadius: 14,
+                    padding: 18,
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                    <div>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          background: 'rgba(59, 130, 246, 0.12)',
+                          color: '#1d4ed8',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                        }}
+                      >
+                        Reschedule requested
+                      </span>
+                      <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--ink)' }}>
+                        <strong>{job.clientName}</strong> asked to reschedule this booking on{' '}
+                        {new Date(job.rescheduleRequestedAt!).toLocaleString(undefined, {
+                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                        })}.
+                      </p>
+                      <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--primary-50)' }}>
+                        Any preferred date or note left by the customer is recorded in the Logs tab.
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => openRequestModal('reschedule', 'approve')}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: 999,
+                        border: 0,
+                        background: 'var(--primary-deep)',
+                        color: '#fff',
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Approve reschedule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openRequestModal('reschedule', 'deny')}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: 999,
+                        border: '1px solid var(--primary-10)',
+                        background: '#fff',
+                        color: 'var(--primary-60)',
+                        fontSize: 13.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Deny
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -913,16 +1269,43 @@ export default function JobDetailView({
 
         {/* Tabs */}
         <div className="dtabs">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              className={`dtab ${activeView === t.id ? 'active' : ''}`}
-              onClick={() => updateView(t.id)}
-            >
-              {t.icon} {t.label}
-            </button>
-          ))}
+          {TABS.map(t => {
+            const requestBadge =
+              t.id === 'requests'
+                ? (job.cancellationRequestedAt ? 1 : 0) +
+                  (job.rescheduleRequestedAt ? 1 : 0)
+                : 0;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`dtab ${activeView === t.id ? 'active' : ''}`}
+                onClick={() => updateView(t.id)}
+              >
+                {t.icon} {t.label}
+                {requestBadge > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 18,
+                      height: 18,
+                      padding: '0 6px',
+                      borderRadius: 999,
+                      background: '#dc2626',
+                      color: '#fff',
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {requestBadge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab content */}
@@ -930,7 +1313,273 @@ export default function JobDetailView({
         {activeView === 'financials' && <FinancialsTab />}
         {activeView === 'products'   && <ProductUsageTab />}
         {activeView === 'logs'       && <LogsTab />}
+        {activeView === 'requests'   && <RequestsTab />}
       </div>
+
+      {/* Resolve request modal (notes + approve/deny) */}
+      {requestModal && (
+        <div
+          onClick={() => !requestSubmitting && setRequestModal(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 60, 70, 0.55)",
+            backdropFilter: "blur(2px)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              maxWidth: 480,
+              width: "100%",
+              padding: 28,
+              boxShadow: "0 20px 60px rgba(0, 60, 70, 0.25)",
+            }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-serif, serif)", fontSize: 24, color: "var(--primary-deep)", margin: "0 0 6px", fontWeight: 400 }}>
+                  {requestModal.decision === "approve"
+                    ? `Approve ${requestModal.kind}?`
+                    : `Deny ${requestModal.kind}?`}
+                </h2>
+                <p style={{ fontSize: 13.5, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+                  {requestModal.kind === "cancellation" && requestModal.decision === "approve"
+                    ? "Approve this cancellation? The job will be marked as CANCELLED."
+                    : `Mark this ${requestModal.kind} request as ${requestModal.decision === "approve" ? "approved" : "denied"}?`}
+                </p>
+              </div>
+              <button type="button" onClick={() => !requestSubmitting && setRequestModal(null)}
+                style={{ background: "transparent", border: 0, cursor: "pointer", color: "var(--primary-50)", padding: 4 }} aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ marginTop: 22 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--primary-60)", marginBottom: 8 }}>
+                {requestModal.decision === "deny"
+                  ? "Reason (optional, shown to the customer)"
+                  : "Note (optional, shown to the customer)"}
+              </label>
+              <textarea
+                value={requestNote}
+                onChange={(e) => setRequestNote(e.target.value)}
+                placeholder={requestModal.decision === "deny"
+                  ? "e.g. We're outside our cancellation window — please contact us if you'd like to discuss."
+                  : "Any extra context to share with the customer."}
+                rows={4}
+                disabled={requestSubmitting}
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  border: "1px solid var(--primary-10)",
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  color: "var(--ink)",
+                  resize: "vertical",
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            {requestError && (
+              <div style={{ marginTop: 14, fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px" }}>
+                {requestError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button type="button" onClick={() => !requestSubmitting && setRequestModal(null)} disabled={requestSubmitting}
+                style={{ background: "transparent", border: 0, padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "var(--primary-60)", cursor: requestSubmitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button type="button" onClick={confirmRequestResolve} disabled={requestSubmitting}
+                style={{
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  border: 0,
+                  background: requestModal.decision === "approve" ? "var(--primary-deep)" : "#b91c1c",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: requestSubmitting ? "not-allowed" : "pointer",
+                  opacity: requestSubmitting ? 0.6 : 1,
+                }}>
+                {requestSubmitting ? "Working…" : requestModal.decision === "approve" ? "Approve" : "Deny"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign cleaners modal */}
+      {assignOpen && (
+        <div
+          onClick={() => !assignSubmitting && setAssignOpen(false)}
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(0, 60, 70, 0.55)",
+            backdropFilter: "blur(2px)",
+            zIndex: 100,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              maxWidth: 520,
+              width: "100%",
+              maxHeight: "82vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 60px rgba(0, 60, 70, 0.25)",
+              overflow: "hidden",
+            }}>
+            <div style={{ padding: "24px 28px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-serif, serif)", fontSize: 22, color: "var(--primary-deep)", margin: "0 0 4px", fontWeight: 400 }}>
+                  Assign cleaners
+                </h2>
+                <p style={{ fontSize: 13, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+                  Pick one or more cleaners for this booking. They'll be notified by email and in-app.
+                </p>
+              </div>
+              <button type="button" onClick={() => !assignSubmitting && setAssignOpen(false)}
+                style={{ background: "transparent", border: 0, cursor: "pointer", color: "var(--primary-50)", padding: 4 }} aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ padding: "0 28px 12px" }}>
+              <input
+                type="search"
+                placeholder="Search cleaners by name…"
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "1px solid var(--primary-10)",
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            <div style={{ overflow: "auto", padding: "4px 12px 12px", flex: 1 }}>
+              {(() => {
+                const q = assignSearch.trim().toLowerCase();
+                const candidates = users
+                  .filter((u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+                  // Hide the admin/owner from the candidate list — only EMPLOYEE-level roles.
+                  // We don't have role on User here, but `users` prop is pre-filtered server-side
+                  // for the Edit modal so it's already cleaners.
+                  ;
+                if (candidates.length === 0) {
+                  return (
+                    <p style={{ textAlign: "center", color: "var(--primary-50)", fontSize: 13, padding: 20 }}>
+                      No cleaners match this search.
+                    </p>
+                  );
+                }
+                return candidates.map((u) => {
+                  const selected = assignSelected.has(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setAssignSelected((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(u.id)) next.delete(u.id);
+                          else next.add(u.id);
+                          return next;
+                        });
+                      }}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 16px",
+                        background: selected ? "var(--primary-5)" : "transparent",
+                        border: 0,
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                        margin: "2px 0",
+                      }}>
+                      <span style={{
+                        width: 36, height: 36, borderRadius: 999,
+                        background: avatarBg(u.name),
+                        color: "#fff",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 600, flexShrink: 0,
+                      }}>{initials(u.name)}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{u.name}</span>
+                        <span style={{ display: "block", fontSize: 11.5, color: "var(--primary-50)" }}>{u.email}</span>
+                      </span>
+                      <span style={{
+                        width: 22, height: 22, borderRadius: 6,
+                        border: selected ? "0" : "1.5px solid var(--primary-10)",
+                        background: selected ? "var(--primary-deep)" : "transparent",
+                        color: "#fff",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        {selected && <Check className="w-3.5 h-3.5" />}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {assignError && (
+              <div style={{ margin: "0 28px 12px", fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px" }}>
+                {assignError}
+              </div>
+            )}
+
+            <div style={{ padding: "12px 28px 20px", borderTop: "1px solid var(--primary-10)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 12.5, color: "var(--primary-50)" }}>
+                {assignSelected.size} selected
+              </span>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={() => !assignSubmitting && setAssignOpen(false)} disabled={assignSubmitting}
+                  style={{ background: "transparent", border: 0, padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "var(--primary-60)", cursor: assignSubmitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+                <button type="button" onClick={confirmAssign} disabled={assignSubmitting}
+                  style={{
+                    padding: "10px 22px",
+                    borderRadius: 999, border: 0,
+                    background: "var(--primary-deep)", color: "#fff",
+                    fontSize: 14, fontWeight: 600,
+                    fontFamily: "inherit",
+                    cursor: assignSubmitting ? "not-allowed" : "pointer",
+                    opacity: assignSubmitting ? 0.6 : 1,
+                  }}>
+                  {assignSubmitting ? "Assigning…" : `Assign ${assignSelected.size} cleaner${assignSelected.size === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit modal */}
       <JobModal

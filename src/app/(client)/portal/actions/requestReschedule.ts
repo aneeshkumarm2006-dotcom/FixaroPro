@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendAdminBookingPostpone } from "@/lib/email";
 
 export async function requestReschedule(input: {
   jobId: string;
@@ -45,6 +46,16 @@ export async function requestReschedule(input: {
         },
       }),
     ]);
+
+    // Notify all admins (gated).
+    sendAdminBookingPostpone({
+      jobId: input.jobId,
+      jobNumber: job.jobNumber,
+      clientName: job.clientName,
+      startTime: job.startTime.toISOString(),
+      address: job.location ?? "",
+      serviceType: job.jobType,
+    }).catch((e) => console.error("admin postpone email", e));
 
     revalidatePath("/portal");
     revalidatePath("/portal/bookings");

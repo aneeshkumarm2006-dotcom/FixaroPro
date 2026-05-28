@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { hashPassword } from "better-auth/crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendAccountEmail } from "@/lib/email";
 
 type State = {
   message: string;
@@ -88,6 +89,30 @@ export default async function createEmployee(
         password: hashedPassword,
       },
     });
+
+    // Welcome emails — gated. "How it works" + "New account" + "Activated"
+    // (admin-created accounts are auto-verified, so they are immediately active).
+    const sendRole = role === "CLIENT" ? "CUSTOMER" : "PROVIDER";
+    sendAccountEmail({
+      to: email,
+      name,
+      role: sendRole,
+      event: "new_account",
+    }).catch((e) => console.error("new_account email", e));
+    if (sendRole === "PROVIDER") {
+      sendAccountEmail({
+        to: email,
+        name,
+        role: "PROVIDER",
+        event: "how_it_works",
+      }).catch((e) => console.error("how_it_works email", e));
+    }
+    sendAccountEmail({
+      to: email,
+      name,
+      role: sendRole,
+      event: "activated",
+    }).catch((e) => console.error("activated email", e));
 
     revalidatePath("/employees");
     return {

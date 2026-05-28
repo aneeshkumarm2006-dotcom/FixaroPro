@@ -3,6 +3,14 @@
 import { db } from "@/db";
 import { syncDefaultLocationStock } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
+import type { ProductCategory } from "@prisma/client";
+
+const ALLOWED_CATEGORIES: readonly ProductCategory[] = [
+  "LIQUID_SPRAY",
+  "MOP_LIQUID",
+  "DISPOSABLE",
+  "OTHER",
+];
 
 type State = {
   message: string;
@@ -19,6 +27,10 @@ export default async function createProduct(
   const costPerUnit = parseFloat(formData.get("costPerUnit") as string);
   const stockLevel = parseFloat(formData.get("stockLevel") as string);
   const minStock = parseFloat(formData.get("minStock") as string);
+  const categoryRaw = (formData.get("category") as string) || "OTHER";
+  const category: ProductCategory = ALLOWED_CATEGORIES.includes(categoryRaw as ProductCategory)
+    ? (categoryRaw as ProductCategory)
+    : "OTHER";
 
   // Validate required fields
   if (!name || !unit || isNaN(costPerUnit) || isNaN(stockLevel) || isNaN(minStock)) {
@@ -58,6 +70,7 @@ export default async function createProduct(
         costPerUnit,
         stockLevel,
         minStock,
+        category,
       },
     });
 

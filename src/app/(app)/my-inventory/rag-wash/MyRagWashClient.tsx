@@ -1,29 +1,91 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRagWash } from "../../actions/createRagWash";
-import { Calendar, Plus } from "lucide-react";
+import { claimWashPayout } from "../../actions/claimWashPayout";
+import { Plus, Sparkles, Wallet, CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
+
+type PayoutStatus = "PENDING" | "COMPLETED" | "FAILED";
 
 interface WashEntry {
   id: string;
   washDate: string;
   ragCount: number;
+  padCount: number;
   notes: string | null;
+}
+
+interface JobEntry {
+  id: string;
+  jobNumber: number;
+  clientName: string;
+  clockOutTime: string | null;
+  bedCount: number | null;
+  bathCount: number | null;
+  jobType: string | null;
+  projectedRags: number | null;
+  projectedPads: number | null;
+  cappedRags: number | null;
+  cappedPads: number | null;
+  actualRags: number | null;
+  actualPads: number | null;
+  flagged: boolean;
+}
+
+interface PayoutEntry {
+  id: string;
+  amount: number;
+  ragCreditsUsed: number;
+  padCreditsUsed: number;
+  status: PayoutStatus;
+  createdAt: string;
 }
 
 interface MyRagWashClientProps {
   employeeId: string;
+  ragCredits: number;
+  padCredits: number;
+  payable: {
+    ragUnits: number;
+    padUnits: number;
+    ragCreditsConsumed: number;
+    padCreditsConsumed: number;
+    amount: number;
+  };
+  thresholds: {
+    rag: { credits: number; amount: number };
+    pad: { credits: number; amount: number };
+  };
   washes: WashEntry[];
+  jobs: JobEntry[];
+  payouts: PayoutEntry[];
   totalRags: number;
+  totalPads: number;
   totalWashes: number;
   lastWashDate: string | null;
 }
 
+function fmtDate(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function MyRagWashClient({
   employeeId,
+  ragCredits,
+  padCredits,
+  payable,
+  thresholds,
   washes,
+  jobs,
+  payouts,
   totalRags,
+  totalPads,
   totalWashes,
   lastWashDate,
 }: MyRagWashClientProps) {
@@ -33,13 +95,15 @@ export default function MyRagWashClient({
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [washDate, setWashDate] = useState(new Date().toISOString().split("T")[0]);
   const [ragCount, setRagCount] = useState("1");
+  const [padCount, setPadCount] = useState("0");
   const [notes, setNotes] = useState("");
-
-  const avgRagsPerWash = totalWashes > 0 ? (totalRags / totalWashes).toFixed(1) : "—";
+  const [claiming, startClaim] = useTransition();
+  const [claimResult, setClaimResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   function resetForm() {
     setWashDate(new Date().toISOString().split("T")[0]);
     setRagCount("1");
+    setPadCount("0");
     setNotes("");
     setMessage(null);
   }
@@ -51,6 +115,7 @@ export default function MyRagWashClient({
       employeeId,
       washDate,
       ragCount: parseInt(ragCount) || 0,
+      padCount: parseInt(padCount) || 0,
       notes: notes || undefined,
     });
     if (res.success) {
@@ -61,154 +126,349 @@ export default function MyRagWashClient({
         router.refresh();
       }, 600);
     } else {
-      setMessage({ type: "error", text: res.error || "Failed to log entry." });
+      setMessage({ type: "error", text: ("error" in res && res.error) || "Save failed." });
     }
     setSaving(false);
   }
 
+  function handleClaim() {
+    if (payable.amount <= 0) return;
+    setClaimResult(null);
+    startClaim(async () => {
+      const res = await claimWashPayout();
+      if ("success" in res && res.success) {
+        setClaimResult({
+          type: "success",
+          text: `Claimed $${res.amount.toFixed(2)} — payout is processing.`,
+        });
+        router.refresh();
+      } else {
+        setClaimResult({
+          type: "error",
+          text: "error" in res ? res.error : "Failed to claim.",
+        });
+      }
+    });
+  }
+
+  const ragProgress = Math.min(100, (ragCredits / thresholds.rag.credits) * 100);
+  const padProgress = Math.min(100, (padCredits / thresholds.pad.credits) * 100);
+
   return (
     <div className="cl-page-wrap">
-      <button
-        className="cl-back-link"
-        onClick={() => router.push("/my-inventory")}
-        style={{ marginBottom: 14 }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
-        Back to my inventory
-      </button>
-
       <div className="cl-page-head">
-        <div>
-          <h1 className="cl-page-title">My rag washes</h1>
-          <p className="cl-page-sub">Log and track the rags you have laundered.</p>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 4,
+            minWidth: 0,
+          }}>
+          <a
+            href="/my-inventory"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--primary-60)",
+              textDecoration: "none",
+            }}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to inventory
+          </a>
+          <h1 className="cl-page-title" style={{ margin: 0 }}>Wash earnings</h1>
+          <p className="cl-page-sub" style={{ margin: 0 }}>
+            Wash your own rags + pads and cash out as credits build up.
+          </p>
         </div>
         <button
-          className="cl-log-wash-btn"
-          onClick={() => { resetForm(); setShowAddModal(true); }}>
-          <Plus className="w-[14px] h-[14px]" />
-          Log new wash
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="cl-action-btn">
+          <Plus className="w-3.5 h-3.5" />
+          Log a wash
         </button>
       </div>
 
-      <div className="cl-rag-stats">
-        <div className="cl-rag-stat">
-          <div className="label">Total washes</div>
-          <div className="val">{totalWashes}</div>
+      {/* Hero: ledger + claim */}
+      <div className="cl-rw-hero">
+        <div className="cl-rw-hero-main">
+          <span className="greet-label">Your wash funds</span>
+          <h2>
+            ${payable.amount.toFixed(2)}{" "}
+            <em>ready to claim.</em>
+          </h2>
+          <p className="desc">
+            You earn credits automatically as completed jobs are projected.
+            {thresholds.rag.credits} rag credits = ${thresholds.rag.amount.toFixed(2)} ·{" "}
+            {thresholds.pad.credits} pad credits = ${thresholds.pad.amount.toFixed(2)}.
+          </p>
+          <button
+            type="button"
+            onClick={handleClaim}
+            disabled={payable.amount <= 0 || claiming}
+            className="cl-inv-hero-btn">
+            <Wallet className="w-3.5 h-3.5" />
+            {claiming ? "Claiming…" : payable.amount > 0 ? "Claim wash funds" : "No funds yet"}
+          </button>
+          {claimResult && (
+            <p
+              style={{
+                marginTop: 12,
+                fontSize: 12.5,
+                color: claimResult.type === "success" ? "#34d399" : "#fca5a5",
+              }}>
+              {claimResult.text}
+            </p>
+          )}
         </div>
-        <div className="cl-rag-stat">
-          <div className="label">Total rags</div>
-          <div className="val">{totalRags}</div>
-        </div>
-        <div className="cl-rag-stat">
-          <div className="label">Avg rags / wash</div>
-          <div className="val">{avgRagsPerWash}</div>
-        </div>
-        <div className="cl-rag-stat">
-          <div className="label">Last wash</div>
-          <div className="val dt">
-            {lastWashDate
-              ? new Date(lastWashDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-              : "—"}
+
+        <div className="cl-rw-meter">
+          <div className="meter-head">
+            <span>Rag credits</span>
+            <strong>
+              {ragCredits} / {thresholds.rag.credits}
+            </strong>
           </div>
+          <div className="meter-bar">
+            <div className="meter-fill" style={{ width: `${ragProgress}%` }} />
+          </div>
+          <span className="meter-sub">
+            +${thresholds.rag.amount.toFixed(2)} per {thresholds.rag.credits} credits
+          </span>
+        </div>
+
+        <div className="cl-rw-meter">
+          <div className="meter-head">
+            <span>Pad credits</span>
+            <strong>
+              {padCredits} / {thresholds.pad.credits}
+            </strong>
+          </div>
+          <div className="meter-bar">
+            <div className="meter-fill" style={{ width: `${padProgress}%` }} />
+          </div>
+          <span className="meter-sub">
+            +${thresholds.pad.amount.toFixed(2)} per {thresholds.pad.credits} credits
+          </span>
         </div>
       </div>
 
-      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", margin: "20px 0 12px", letterSpacing: "-0.01em" }}>
-        Wash history
-      </h2>
-
-      <div className="cl-rag-table">
-        <div className="cl-rag-table-head">
-          <div>Date</div>
-          <div>Rag count</div>
-          <div>Notes</div>
-        </div>
-        {washes.length === 0 ? (
-          <div style={{ padding: "32px 22px", textAlign: "center", color: "var(--primary-50)", fontSize: 13 }}>
-            No wash entries yet. Click &ldquo;Log new wash&rdquo; to get started.
+      {/* Recent payouts */}
+      <div className="cl-inv-section">
+        <h2>
+          Payouts <span className="count">{payouts.length}</span>
+        </h2>
+      </div>
+      {payouts.length === 0 ? (
+        <div className="cl-empty-block">
+          <div className="icon-bubble">
+            <Wallet className="w-7 h-7" />
           </div>
-        ) : (
-          washes.map((wash) => (
-            <div className="cl-rag-table-row" key={wash.id}>
-              <div className="date">
-                <span className="icon-bubble">
-                  <Calendar className="w-4 h-4" />
-                </span>
-                {new Date(wash.washDate).toLocaleDateString("en-US", {
-                  weekday: "short", month: "short", day: "numeric", year: "numeric",
-                })}
-              </div>
+          <div>No payouts yet — your first claim will show up here.</div>
+        </div>
+      ) : (
+        <div className="cl-rw-payout-list">
+          {payouts.map((p) => (
+            <article key={p.id} className="cl-rw-payout-row">
+              <div className="cl-rw-payout-amount">${p.amount.toFixed(2)}</div>
               <div>
-                <span className="cl-rag-count-pill">
-                  {wash.ragCount} rag{wash.ragCount !== 1 ? "s" : ""}
-                </span>
+                <div className="cl-rw-payout-meta">{fmtDate(p.createdAt)}</div>
+                <div className="cl-rw-payout-detail">
+                  {p.ragCreditsUsed} rag · {p.padCreditsUsed} pad credits used
+                </div>
               </div>
-              <div style={{ color: wash.notes ? "var(--ink-soft)" : "var(--primary-40)", fontSize: 13 }}>
-                {wash.notes || "—"}
+              <span
+                className={`cl-rw-payout-status status-${p.status.toLowerCase()}`}>
+                {p.status === "COMPLETED" ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                ) : null}
+                {p.status}
+              </span>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* Projection log per job */}
+      <div className="cl-inv-section" style={{ marginTop: 28 }}>
+        <h2>
+          Recent jobs <span className="count">{jobs.length}</span>
+        </h2>
+      </div>
+      {jobs.length === 0 ? (
+        <div className="cl-empty-block">
+          <div className="icon-bubble">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <div>No completed jobs yet. Credits unlock automatically as you finish jobs.</div>
+        </div>
+      ) : (
+        <div className="cl-rw-jobs">
+          {jobs.map((j) => (
+            <article key={j.id} className="cl-rw-job-row">
+              <div className="cl-rw-job-head">
+                <div>
+                  <div className="cl-rw-job-name">{j.clientName}</div>
+                  <div className="cl-rw-job-sub">
+                    Job #{j.jobNumber} · {fmtDate(j.clockOutTime)} ·{" "}
+                    {(j.bedCount ?? 0)}br / {(j.bathCount ?? 0)}ba
+                  </div>
+                </div>
+                {j.flagged && (
+                  <span className="cl-rw-job-flag">
+                    <AlertTriangle className="w-3 h-3" />
+                    Over projection
+                  </span>
+                )}
+              </div>
+              <div className="cl-rw-job-stats">
+                <div>
+                  <span className="lbl">Projected</span>
+                  <span className="val">
+                    {j.projectedRags ?? 0} rags · {j.projectedPads ?? 0} pads
+                  </span>
+                </div>
+                <div>
+                  <span className="lbl">Awarded (capped)</span>
+                  <span className="val">
+                    {j.cappedRags ?? 0} rags · {j.cappedPads ?? 0} pads
+                  </span>
+                </div>
+                {j.actualRags !== null && (
+                  <div>
+                    <span className="lbl">Actual</span>
+                    <span className="val">
+                      {j.actualRags} rags · {j.actualPads ?? 0} pads
+                    </span>
+                  </div>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* Manual wash log */}
+      <div className="cl-inv-section" style={{ marginTop: 28 }}>
+        <h2>
+          Wash log <span className="count">{totalWashes}</span>
+        </h2>
+      </div>
+      <div className="cl-rw-summary">
+        <div>
+          <span className="lbl">Total rags washed</span>
+          <span className="val">{totalRags}</span>
+        </div>
+        <div>
+          <span className="lbl">Total pads washed</span>
+          <span className="val">{totalPads}</span>
+        </div>
+        <div>
+          <span className="lbl">Last entry</span>
+          <span className="val">{fmtDate(lastWashDate)}</span>
+        </div>
+      </div>
+      {washes.length > 0 ? (
+        <div className="cl-rw-log">
+          {washes.map((w) => (
+            <div key={w.id} className="cl-rw-log-row">
+              <div>
+                <div className="cl-rw-log-date">{fmtDate(w.washDate)}</div>
+                {w.notes && <div className="cl-rw-log-notes">{w.notes}</div>}
+              </div>
+              <div className="cl-rw-log-counts">
+                <span>{w.ragCount} rag</span>
+                <span>·</span>
+                <span>{w.padCount} pad</span>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
+      {/* Modal: log a wash */}
       {showAddModal && (
-        <div className="cl-modal-overlay" onClick={() => { setShowAddModal(false); resetForm(); }}>
-          <div className="cl-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <div className="cl-modal-head">
-              <h2 className="cl-modal-title">Log new wash</h2>
-              <button
-                className="cl-modal-close"
-                onClick={() => { setShowAddModal(false); resetForm(); }}
-                aria-label="Close">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        <div className="co-overlay" onClick={() => !saving && setShowAddModal(false)}>
+          <div className="co-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="co-head">
+              <div className="co-head-left">
+                <span className="co-head-icon">
+                  <Sparkles size={18} />
+                </span>
+                <div>
+                  <h2 className="co-title">Log a wash</h2>
+                  <p className="co-subtitle">Record what you ran through the laundry today.</p>
+                </div>
+              </div>
+              <button className="co-close" onClick={() => !saving && setShowAddModal(false)}>
+                ✕
               </button>
             </div>
-            <div className="cl-modal-section">
-              <label className="cl-form-label">Wash date</label>
-              <input
-                className="cl-form-input"
-                type="date"
-                value={washDate}
-                onChange={(e) => setWashDate(e.target.value)}
-              />
-            </div>
-            <div className="cl-modal-section">
-              <label className="cl-form-label">Rag count</label>
-              <input
-                className="cl-form-input"
-                type="number"
-                min="1"
-                value={ragCount}
-                onChange={(e) => setRagCount(e.target.value)}
-                placeholder="Number of rags washed"
-              />
-            </div>
-            <div className="cl-modal-section">
-              <label className="cl-form-label">Notes (optional)</label>
-              <textarea
-                className="cl-modal-textarea"
-                rows={3}
-                placeholder="Any additional notes…"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-            {message && (
-              <div style={{
-                padding: "12px 16px", borderRadius: 12, fontSize: 13,
-                background: message.type === "success" ? "rgba(0,95,106,0.08)" : "#fee2e2",
-                color: message.type === "success" ? "var(--primary)" : "#dc2626",
-                marginBottom: 8,
-              }}>
-                {message.text}
+            <div className="co-body">
+              <div className="co-input-row">
+                <label className="co-input-label">Wash date</label>
+                <input
+                  className="co-input"
+                  type="date"
+                  value={washDate}
+                  onChange={(e) => setWashDate(e.target.value)}
+                />
               </div>
-            )}
-            <div className="cl-modal-foot">
-              <button className="cl-modal-cancel" onClick={() => { setShowAddModal(false); resetForm(); }}>Cancel</button>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="co-input-row">
+                  <label className="co-input-label">Rags washed</label>
+                  <input
+                    className="co-input"
+                    type="number"
+                    min={0}
+                    value={ragCount}
+                    onChange={(e) => setRagCount(e.target.value)}
+                  />
+                </div>
+                <div className="co-input-row">
+                  <label className="co-input-label">Pads washed</label>
+                  <input
+                    className="co-input"
+                    type="number"
+                    min={0}
+                    value={padCount}
+                    onChange={(e) => setPadCount(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="co-input-row">
+                <label className="co-input-label">Notes (optional)</label>
+                <input
+                  className="co-input"
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. extra greasy load from move-out"
+                />
+              </div>
+              {message && (
+                <p
+                  style={{
+                    fontSize: 12.5,
+                    color: message.type === "success" ? "var(--primary)" : "#dc2626",
+                  }}>
+                  {message.text}
+                </p>
+              )}
+            </div>
+            <div className="co-footer">
               <button
-                className="cl-modal-confirm"
-                onClick={handleAdd}
-                disabled={saving || !ragCount || parseInt(ragCount) < 1}>
-                {saving ? "Saving..." : "Log wash"}
+                className="co-btn-ghost"
+                onClick={() => !saving && setShowAddModal(false)}
+                disabled={saving}>
+                Cancel
+              </button>
+              <button className="co-btn-confirm" onClick={handleAdd} disabled={saving}>
+                {saving ? "Saving…" : "Log wash"}
               </button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Menu, X, MessageCircle } from "lucide-react";
 import NavLink from "./NavLink";
 import UserActions from "./UserActions";
 import { getUnreadChatCount } from "./chat/actions";
+import { getPendingRequestCount } from "./actions/getPendingRequestCount";
 
 interface User {
   id: string;
@@ -33,6 +34,7 @@ export default function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const [chatUnread, setChatUnread] = useState(0);
+  const [pendingRequests, setPendingRequests] = useState(0);
   const [chatToast, setChatToast] = useState<{ senderName: string; body: string } | null>(null);
   const prevLatestAtRef = useRef<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,6 +110,28 @@ export default function Sidebar({
       cancelled = true;
       clearInterval(id);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // Poll pending portal requests (cancellation + reschedule) every 5s for
+  // the Requests sidebar badge. resolveJobRequest clears the *RequestedAt
+  // field on approve/deny, so the badge naturally drops when an admin acts.
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const { count } = await getPendingRequestCount();
+        if (!cancelled) setPendingRequests(count);
+      } catch {
+        // ignore transient errors
+      }
+    }
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
     };
   }, []);
 
@@ -213,6 +237,12 @@ export default function Sidebar({
                   expanded={expanded}>
                   Rag Wash
                 </NavLink>
+                <NavLink
+                  href="/wash-payouts"
+                  icon="rag-wash"
+                  expanded={expanded}>
+                  Wash Payouts
+                </NavLink>
                 <NavLink href="/jobs" icon="jobs" expanded={expanded}>
                   Jobs
                 </NavLink>
@@ -246,7 +276,11 @@ export default function Sidebar({
                 <NavLink href="/waitlist" icon="waitlist" expanded={expanded}>
                   Waitlist
                 </NavLink>
-                <NavLink href="/requests" icon="requests" expanded={expanded}>
+                <NavLink
+                  href="/requests"
+                  icon="requests"
+                  expanded={expanded}
+                  badge={pendingRequests}>
                   Requests
                 </NavLink>
                 <NavLink href="/training" icon="training" expanded={expanded}>

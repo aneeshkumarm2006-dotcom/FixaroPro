@@ -94,6 +94,7 @@ export default async function InventoryPage({
       costPerUnit: product.costPerUnit,
       stockLevel: product.stockLevel,
       minStock: product.minStock,
+      category: product.category,
       totalAssigned,
       employeeCount,
       totalInventory: product.stockLevel + totalAssigned,

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendProviderDocumentUploaded } from "@/lib/email";
 
 interface CreateDocumentInput {
   title: string;
@@ -65,6 +66,20 @@ export async function createDocument(input: CreateDocumentInput) {
           })),
           skipDuplicates: true,
         });
+        // Notify each assigned provider that a new document is on their drive
+        // (gated by `prov.drive.doc_uploaded`).
+        const assignedUsers = await db.user.findMany({
+          where: { id: { in: targetUserIds } },
+          select: { name: true, email: true, role: true },
+        });
+        for (const u of assignedUsers) {
+          if (!u.email || u.role === "CLIENT") continue;
+          sendProviderDocumentUploaded({
+            to: u.email,
+            providerName: u.name,
+            documentTitle: document.title,
+          }).catch((e) => console.error("provider doc-uploaded", e));
+        }
       }
     }
 

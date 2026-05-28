@@ -17,6 +17,7 @@ import {
   Calendar as CalendarIcon,
   GraduationCap,
   FileSignature,
+  Bell,
 } from "lucide-react";
 import ProfileTab from "./tabs/ProfileTab";
 import TaxSettingsTab from "./tabs/TaxSettingsTab";
@@ -39,6 +40,7 @@ import DocumentsTab, {
   DocumentRecord,
   UserOption,
 } from "./tabs/DocumentsTab";
+import NotificationsTab, { NotificationSettingRow } from "./tabs/NotificationsTab";
 import {
   SettingsUser,
   AppSettingRecord,
@@ -65,6 +67,7 @@ interface SettingsClientProps {
   documents: DocumentRecord[];
   users: UserOption[];
   serviceAreas: ServiceAreaRecord[];
+  notificationSettings: NotificationSettingRow[];
 }
 
 type TabId =
@@ -83,7 +86,8 @@ type TabId =
   | "roles"
   | "suppliers"
   | "inventoryLocations"
-  | "serviceAreas";
+  | "serviceAreas"
+  | "notifications";
 
 interface TabDef {
   id: TabId;
@@ -149,6 +153,12 @@ const TABS: TabDef[] = [
     icon: MapPin,
     adminOnly: true,
   },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    adminOnly: true,
+  },
 ];
 
 export default function SettingsClient({
@@ -165,6 +175,7 @@ export default function SettingsClient({
   documents,
   users,
   serviceAreas,
+  notificationSettings,
 }: SettingsClientProps) {
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -250,6 +261,9 @@ export default function SettingsClient({
           )}
           {activeTab === "serviceAreas" && isAdmin && (
             <ServiceAreasTab serviceAreas={serviceAreas} />
+          )}
+          {activeTab === "notifications" && isAdmin && (
+            <NotificationsTab settings={notificationSettings} />
           )}
         </section>
       </div>

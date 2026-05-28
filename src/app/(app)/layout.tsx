@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import CleanerSidebar from "./CleanerSidebar";
 import InstallPrompt from "@/components/InstallPrompt";
 import { InstallProvider } from "@/components/InstallContext";
+import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 
 export default async function DashboardLayout({
   children,
@@ -38,6 +39,7 @@ export default async function DashboardLayout({
             </div>
           </main>
           <InstallPrompt />
+          <PresenceHeartbeat />
         </div>
       </InstallProvider>
     );
@@ -45,6 +47,7 @@ export default async function DashboardLayout({
 
   return (
     <Sidebar user={userWithRole} isAdmin={isAdmin} signOutAction={signOut}>
+      <PresenceHeartbeat />
       {children}
     </Sidebar>
   );

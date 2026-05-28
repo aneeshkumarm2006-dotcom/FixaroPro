@@ -9,6 +9,8 @@ import ForecastView from "./ForecastView";
 import Button from "@/components/ui/Button";
 import { Package, DollarSign, TrendingDown } from "lucide-react";
 
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+
 interface Product {
   id: string;
   name: string;
@@ -17,6 +19,7 @@ interface Product {
   costPerUnit: number;
   stockLevel: number;
   minStock: number;
+  category?: ProductCategory;
   totalAssigned: number;
   employeeCount: number;
   totalInventory: number;
@@ -145,24 +148,23 @@ export default function InventoryPageClient({
   };
 
   return (
-    <>
-      {/* Tabs */}
-      <div className="flex items-center gap-2 bg-[#005F6A]/5 rounded-2xl p-1 w-fit overflow-x-auto mb-6">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <Button
+    <div className="admin-font">
+      {/* Segmented tabs — matches the Jobs page pattern */}
+      <div style={{ marginBottom: 18 }}>
+        <div className="atabs">
+          {TABS.map((tab) => (
+            <button
               key={tab.id}
-              border={false}
-              onClick={() => setActiveTab(tab.id)}
-              variant={isActive ? "action" : "ghost"}
-              size="md"
-              className="rounded-xl px-4 md:px-6 py-3 whitespace-nowrap">
-              <span className="mr-2 hidden sm:inline">{tab.icon}</span>
-              {tab.label}
-            </Button>
-          );
-        })}
+              type="button"
+              className={`atab ${activeTab === tab.id ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {tab.icon}
+                {tab.label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -204,6 +206,6 @@ export default function InventoryPageClient({
       {activeTab === "forecast" && forecastData && (
         <ForecastView employees={forecastData} />
       )}
-    </>
+    </div>
   );
 }

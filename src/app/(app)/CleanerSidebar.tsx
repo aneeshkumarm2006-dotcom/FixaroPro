@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, Download, Share } from "lucide-react";
+import { LogOut, Download, Share, MessageCircle, X } from "lucide-react";
 import { useInstall } from "@/components/InstallContext";
+import { getUnreadChatCount } from "./chat/actions";
 
 interface Props {
   user: { name: string; email: string; role: string };
@@ -137,6 +138,95 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
   const { canInstall, isStandalone, isIOSSafari, install } = useInstall();
   const showInstall = !isStandalone && (canInstall || isIOSSafari);
 
+  const [chatUnread, setChatUnread] = useState(0);
+  const [chatToast, setChatToast] = useState<{ senderName: string; body: string } | null>(null);
+  const prevLatestAtRef = useRef<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathnameRef = useRef(pathname);
+  const notificationPermissionRequestedRef = useRef(false);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    if (pathname.startsWith("/chat")) setChatToast(null);
+  }, [pathname]);
+
+  // Poll unread count + emit toast + browser notification on new messages.
+  useEffect(() => {
+    let cancelled = false;
+
+    // One-time, gentle permission request after a short delay so it doesn't
+    // collide with the install prompt.
+    const askPermission = setTimeout(() => {
+      if (
+        !notificationPermissionRequestedRef.current &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "default"
+      ) {
+        notificationPermissionRequestedRef.current = true;
+        Notification.requestPermission().catch(() => {});
+      }
+    }, 8000);
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const { count, latest } = await getUnreadChatCount();
+        if (cancelled) return;
+
+        setChatUnread(count);
+
+        const latestAt = latest?.at ?? "";
+        const isInitialized = prevLatestAtRef.current !== null;
+        const hasNew =
+          isInitialized && latestAt !== "" && latestAt !== prevLatestAtRef.current;
+
+        if (hasNew && latest && !pathnameRef.current.startsWith("/chat")) {
+          setChatToast({ senderName: latest.senderName, body: latest.body });
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setChatToast(null), 5000);
+
+          // Native browser notification when granted and tab is backgrounded
+          if (
+            typeof window !== "undefined" &&
+            "Notification" in window &&
+            Notification.permission === "granted" &&
+            document.visibilityState !== "visible"
+          ) {
+            try {
+              const n = new Notification(`${latest.senderName} sent a message`, {
+                body: latest.body,
+                icon: "/icon/192",
+                badge: "/icon/192",
+                tag: "cleano-chat",
+              });
+              n.onclick = () => {
+                window.focus();
+                router.push("/chat");
+                n.close();
+              };
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        prevLatestAtRef.current = latestAt;
+      } catch {
+        // ignore transient errors
+      }
+    }
+
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearTimeout(askPermission);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, [router]);
+
   // Close the drawer whenever the route changes.
   useEffect(() => {
     setOpen(false);
@@ -223,6 +313,11 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
                 className={`cl-snav-item${isActive(item.href) ? " active" : ""}`}>
                 {item.icon}
                 <span>{item.label}</span>
+                {item.href === "/chat" && chatUnread > 0 && (
+                  <span className="cl-snav-badge-count">
+                    {chatUnread > 99 ? "99+" : chatUnread}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
@@ -278,6 +373,35 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
         </div>
       </aside>
 
+      {/* Chat notification toast */}
+      {chatToast && (
+        <div className="cl-chat-toast" role="status" aria-live="polite">
+          <div className="cl-chat-toast-icon">
+            <MessageCircle size={18} color="#fff" />
+          </div>
+          <div className="cl-chat-toast-body">
+            <p className="cl-chat-toast-name">{chatToast.senderName}</p>
+            <p className="cl-chat-toast-msg">{chatToast.body}</p>
+            <button
+              type="button"
+              className="cl-chat-toast-link"
+              onClick={() => {
+                setChatToast(null);
+                router.push("/chat");
+              }}>
+              Open Chat →
+            </button>
+          </div>
+          <button
+            type="button"
+            className="cl-chat-toast-close"
+            onClick={() => setChatToast(null)}
+            aria-label="Dismiss">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Bottom tab bar — visible only on mobile via CSS. */}
       <nav className="cl-tabbar" aria-label="Primary">
         {[
@@ -292,7 +416,14 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
             href={t.href}
             onClick={() => setOpen(false)}
             className={`cl-tab${isActive(t.href) ? " active" : ""}`}>
-            {t.icon}
+            <span className="cl-tab-icon-wrap">
+              {t.icon}
+              {t.href === "/chat" && chatUnread > 0 && (
+                <span className="cl-tab-badge">
+                  {chatUnread > 9 ? "9+" : chatUnread}
+                </span>
+              )}
+            </span>
             <span>{t.label}</span>
           </Link>
         ))}

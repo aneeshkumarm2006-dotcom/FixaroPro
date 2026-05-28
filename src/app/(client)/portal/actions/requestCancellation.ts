@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendAdminBookingCancellationRequest } from "@/lib/email";
 
 // Per spec: cancellation requests are flagged for admin review — never auto-cancel.
 export async function requestCancellation(jobId: string) {
@@ -47,6 +48,16 @@ export async function requestCancellation(jobId: string) {
         },
       }),
     ]);
+
+    // Notify all admins (gated by Settings → Notifications).
+    sendAdminBookingCancellationRequest({
+      jobId,
+      jobNumber: job.jobNumber,
+      clientName: job.clientName,
+      startTime: job.startTime.toISOString(),
+      address: job.location ?? "",
+      serviceType: job.jobType,
+    }).catch((e) => console.error("admin cancellation-request email", e));
 
     revalidatePath("/portal");
     revalidatePath("/portal/bookings");

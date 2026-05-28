@@ -1,8 +1,28 @@
 "use client";
 
-import { BookingDraft, SERVICE_TYPES, FREQUENCIES } from "../types";
+import { BookingDraft, SERVICE_TYPES, FREQUENCIES, RoomType } from "../types";
 import { Field, Input } from "@/components/customer/Field";
 import { NumberStepper, ChoiceButton } from "@/components/customer/atoms";
+
+const ROOM_LABELS: Record<RoomType, string> = {
+  KITCHEN: "Kitchen",
+  BATHROOM: "Bathroom",
+  BEDROOM: "Bedroom",
+  LIVING_ROOM: "Living room",
+  LAUNDRY: "Laundry",
+  OUTDOOR: "Outdoor / patio",
+  WHOLE_HOME: "Whole home",
+};
+
+const ROOM_ORDER: RoomType[] = [
+  "KITCHEN",
+  "BATHROOM",
+  "BEDROOM",
+  "LIVING_ROOM",
+  "LAUNDRY",
+  "OUTDOOR",
+  "WHOLE_HOME",
+];
 
 interface Props {
   draft: BookingDraft;
@@ -110,28 +130,57 @@ export default function Step2Property({ draft, onChange }: Props) {
 
       <div className="cl-stack-12">
         <span className="cl-label">Add-ons</span>
-        <div className="cl-stack-8">
-          {draft.addOns.map((a, idx) => (
-            <label
-              key={a.name}
-              className={`cl-addon-row ${a.selected ? "active" : ""}`}>
-              <div className="cl-row" style={{ gap: 12 }}>
-                <input
-                  type="checkbox"
-                  className="cl-check"
-                  checked={a.selected}
-                  onChange={(e) => {
-                    const next = [...draft.addOns];
-                    next[idx] = { ...a, selected: e.target.checked };
-                    onChange({ addOns: next });
-                  }}
-                />
-                <span className="cl-addon-name">{a.name}</span>
+        {draft.addOns.length === 0 ? (
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--primary-60)",
+              margin: 0,
+            }}>
+            No add-ons available right now.
+          </p>
+        ) : (
+          ROOM_ORDER.map((room) => {
+            const items = draft.addOns
+              .map((a, idx) => ({ a, idx }))
+              .filter(({ a }) => (a.roomType ?? "WHOLE_HOME") === room);
+            if (items.length === 0) return null;
+            return (
+              <div key={room} className="cl-stack-8" style={{ marginTop: 4 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--primary-60)",
+                  }}>
+                  {ROOM_LABELS[room]}
+                </span>
+                {items.map(({ a, idx }) => (
+                  <label
+                    key={a.id ?? `${a.name}-${idx}`}
+                    className={`cl-addon-row ${a.selected ? "active" : ""}`}>
+                    <div className="cl-row" style={{ gap: 12 }}>
+                      <input
+                        type="checkbox"
+                        className="cl-check"
+                        checked={a.selected}
+                        onChange={(e) => {
+                          const next = [...draft.addOns];
+                          next[idx] = { ...a, selected: e.target.checked };
+                          onChange({ addOns: next });
+                        }}
+                      />
+                      <span className="cl-addon-name">{a.name}</span>
+                    </div>
+                    <span className="cl-addon-price">+${a.price.toFixed(2)}</span>
+                  </label>
+                ))}
               </div>
-              <span className="cl-addon-price">+${a.price.toFixed(2)}</span>
-            </label>
-          ))}
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

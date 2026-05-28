@@ -2,6 +2,8 @@ export type ChatRole = "OWNER" | "ADMIN" | "EMPLOYEE";
 
 export type SenderRole = "EMPLOYEE" | "ADMIN";
 
+export type DeliveryState = "SENT" | "DELIVERED" | "READ";
+
 export interface ChatMessageDTO {
   id: string;
   conversationId: string;
@@ -15,6 +17,9 @@ export interface ChatMessageDTO {
   createdAt: string;
   readByAdminAt: string | null;
   readByEmployeeAt: string | null;
+  deliveredAt: string | null;
+  /** Computed receipt state for messages the *current viewer* sent. */
+  receipt: DeliveryState;
 }
 
 export interface AdminConversationSummary {
@@ -31,6 +36,8 @@ export interface AdminConversationSummary {
 export interface EmployeeChatPayload {
   conversationId: string;
   messages: ChatMessageDTO[];
+  /** True if the admin (any of them) has pinged within the presence window. */
+  otherOnline: boolean;
 }
 
 export interface AdminChatPayload {
@@ -39,4 +46,6 @@ export interface AdminChatPayload {
   employeeName: string;
   employeeImage: string | null;
   messages: ChatMessageDTO[];
+  /** True if the employee has pinged within the presence window. */
+  otherOnline: boolean;
 }

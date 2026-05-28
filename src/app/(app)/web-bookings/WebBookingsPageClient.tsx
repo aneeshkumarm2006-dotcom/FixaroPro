@@ -11,7 +11,6 @@ import {
   RotateCw,
   Clock,
 } from "lucide-react";
-import Card from "@/components/ui/Card";
 
 interface WebJob {
   id: string;
@@ -80,100 +79,129 @@ export default function WebBookingsPageClient({ jobs }: { jobs: WebJob[] }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A] flex items-center gap-3">
-          <Globe className="w-7 h-7" /> Web Bookings
-        </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
-          Jobs booked through the public website. Assign cleaners and confirm
-          times here.
-        </p>
-      </div>
+    <div className="admin-font">
+      {/* Header — matches /jobs */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          marginBottom: 32,
+          gap: 16,
+          flexWrap: "wrap",
+        }}>
+        <div>
+          <p className="admin-eyebrow">Operations</p>
+          <h1 className="admin-page-title">
+            Web bookings{" "}
+            <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>
+              · {counts.all}
+            </span>
+          </h1>
+        </div>
+      </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <StatTile
-          icon={<Globe className="w-4 h-4" />}
+      {/* Stats — match Jobs page; clickable to filter */}
+      <div className="astat-grid" style={{ marginBottom: 28 }}>
+        <FilterStat
+          icon={<Globe size={15} />}
           label="Total"
-          value={counts.all.toString()}
+          value={counts.all}
           active={filter === "all"}
           onClick={() => setFilter("all")}
         />
-        <StatTile
-          icon={<UserPlus className="w-4 h-4" />}
+        <FilterStat
+          icon={<UserPlus size={15} />}
           label="Needs cleaner"
-          value={counts.unassigned.toString()}
-          variant={counts.unassigned > 0 ? "warn" : "default"}
+          value={counts.unassigned}
+          warn={counts.unassigned > 0}
           active={filter === "unassigned"}
           onClick={() => setFilter("unassigned")}
         />
-        <StatTile
-          icon={<Clock className="w-4 h-4" />}
+        <FilterStat
+          icon={<Clock size={15} />}
           label="Flexible time"
-          value={counts.flexible.toString()}
+          value={counts.flexible}
           active={filter === "flexible"}
           onClick={() => setFilter("flexible")}
         />
-        <StatTile
-          icon={<AlertTriangle className="w-4 h-4" />}
+        <FilterStat
+          icon={<AlertTriangle size={15} />}
           label="Needs attention"
-          value={counts.needs_attention.toString()}
-          variant={counts.needs_attention > 0 ? "warn" : "default"}
+          value={counts.needs_attention}
+          warn={counts.needs_attention > 0}
           active={filter === "needs_attention"}
           onClick={() => setFilter("needs_attention")}
         />
       </div>
 
-      <Card variant="default" className="p-5">
+      {/* List */}
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid var(--primary-10)",
+          borderRadius: 16,
+          padding: 18,
+        }}>
         {filtered.length === 0 ? (
-          <div className="text-center text-sm text-[#005F6A]/60 py-12">
+          <div style={{ textAlign: "center", color: "var(--primary-50)", fontSize: 13, padding: "48px 0" }}>
             {filter === "unassigned"
               ? "🎉 Every web booking has a cleaner assigned."
               : "No web bookings match this filter."}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {filtered.map((j) => (
               <BookingRow key={j.id} job={j} />
             ))}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
 
-function StatTile({
+function FilterStat({
   icon,
   label,
   value,
+  warn,
   active,
-  variant = "default",
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: number;
+  warn?: boolean;
   active?: boolean;
-  variant?: "default" | "warn";
-  onClick?: () => void;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`text-left px-4 py-3 rounded-xl border transition-colors ${
-        active
-          ? "bg-[#005F6A] border-[#005F6A] text-white"
-          : variant === "warn" && value !== "0"
-          ? "bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100"
-          : "bg-white border-[#005F6A]/10 text-[#005F6A] hover:bg-[#005F6A]/5"
-      }`}>
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide font-medium opacity-80">
-        {icon}
-        {label}
+      className="astat"
+      style={{
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        border: active
+          ? "1.5px solid var(--primary)"
+          : warn && value > 0
+          ? "1px solid #fde68a"
+          : undefined,
+        background: active
+          ? "var(--primary-5)"
+          : warn && value > 0
+          ? "#fffbeb"
+          : undefined,
+      }}>
+      <div className="astat-head">
+        <span className="astat-label">{label}</span>
+        <div className="astat-icon">{icon}</div>
       </div>
-      <div className="text-2xl font-light mt-1">{value}</div>
+      <div className="astat-value">{value}</div>
+      {active && <div className="astat-delta">Showing</div>}
     </button>
   );
 }

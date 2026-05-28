@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { sendInvoiceEmail } from "@/lib/email";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -63,6 +64,25 @@ export async function sendInvoice(invoiceId: string) {
 
     revalidatePath("/invoices");
     revalidatePath(`/invoices/${invoiceId}`);
+
+    // Customer "Invoice resent" — gated by `cust.invoice.resend`.
+    const fresh = await db.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { client: { select: { name: true, email: true } } },
+    });
+    if (fresh?.client?.email) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+      sendInvoiceEmail({
+        to: fresh.client.email,
+        recipient: "CUSTOMER",
+        event: "resend",
+        invoiceNumber: fresh.invoiceNumber,
+        amount: fresh.totalAmount,
+        clientName: fresh.client.name,
+        link: `${appUrl}/portal/invoices/${fresh.id}`,
+      }).catch((e) => console.error("customer invoice-resend", e));
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error sending invoice:", error);

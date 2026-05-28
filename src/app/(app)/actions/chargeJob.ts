@@ -5,7 +5,12 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { stripe } from "@/lib/stripe";
-import { queueAndSendReceipt } from "@/lib/email";
+import {
+  queueAndSendReceipt,
+  sendCustomerBookingCharged,
+  sendCustomerCardDeclined,
+  sendAdminCardDeclined,
+} from "@/lib/email";
 
 export async function chargeJob(jobId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -79,6 +84,19 @@ export async function chargeJob(jobId: string) {
 
     queueAndSendReceipt(jobId).catch(() => {});
 
+    // Customer "booking charged" notification (separate from the receipt;
+    // gated by `cust.fee.booking_charged`).
+    if (client.email) {
+      sendCustomerBookingCharged({
+        to: client.email,
+        clientName: client.name,
+        jobId,
+        jobNumber: job.jobNumber,
+        amount: amountCents / 100,
+        paymentMethod: "Card on file",
+      }).catch((e) => console.error("customer booking-charged email", e));
+    }
+
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath("/jobs");
     revalidatePath("/finances");
@@ -94,6 +112,26 @@ export async function chargeJob(jobId: string) {
         paymentFailureReason: failureReason,
       },
     }).catch(() => {});
+
+    // Notify admin + customer of the declined card (gated by toggles).
+    sendAdminCardDeclined({
+      jobId,
+      jobNumber: job.jobNumber,
+      clientName: job.clientName,
+      reason: failureReason,
+      amountAttempted: amountCents / 100,
+      context: "charge",
+    }).catch((e) => console.error("admin card-declined email", e));
+    if (client.email) {
+      sendCustomerCardDeclined({
+        to: client.email,
+        clientName: client.name,
+        jobId,
+        jobNumber: job.jobNumber,
+        reason: failureReason,
+        context: "charge",
+      }).catch((e) => console.error("customer card-declined email", e));
+    }
 
     revalidatePath(`/jobs/${jobId}`);
     return { success: false, error: failureReason };

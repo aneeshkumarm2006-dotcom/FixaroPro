@@ -9,6 +9,7 @@ interface CreateRagWashParams {
   employeeId: string;
   washDate: string;
   ragCount: number;
+  padCount?: number;
   notes?: string;
 }
 
@@ -20,11 +21,15 @@ export async function createRagWash(params: CreateRagWashParams) {
     const sessionUserId = session.user.id;
 
     const { employeeId, washDate, ragCount, notes } = params;
+    const padCount = Math.max(0, Math.floor(params.padCount ?? 0));
     if (!employeeId) {
       return { success: false, error: "Employee is required" };
     }
-    if (ragCount < 1) {
-      return { success: false, error: "Rag count must be at least 1" };
+    if (ragCount < 0) {
+      return { success: false, error: "Rag count must be 0 or more" };
+    }
+    if (ragCount === 0 && padCount === 0) {
+      return { success: false, error: "Log at least one rag or one pad" };
     }
 
     const isAdmin = role === "OWNER" || role === "ADMIN";
@@ -42,6 +47,7 @@ export async function createRagWash(params: CreateRagWashParams) {
         employeeId,
         washDate: new Date(washDate),
         ragCount,
+        padCount,
         notes: notes || null,
       },
     });

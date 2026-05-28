@@ -154,6 +154,8 @@ export default async function JobPage({
       ? { id: job.employee.id, name: job.employee.name }
       : { id: "", name: "Unassigned" },
     cleaners: job.cleaners.map((c) => ({ id: c.id, name: c.name })),
+    cancellationRequestedAt: job.cancellationRequestedAt?.toISOString() ?? null,
+    rescheduleRequestedAt: job.rescheduleRequestedAt?.toISOString() ?? null,
   };
 
   const productUsageData = job.productUsage.map((usage) => ({

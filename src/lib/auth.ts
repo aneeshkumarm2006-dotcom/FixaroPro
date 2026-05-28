@@ -5,6 +5,21 @@ import { cache } from "react";
 import { headers as nextHeaders } from "next/headers";
 
 import { db } from "@/db";
+import { sendAccountEmail } from "@/lib/email";
+
+// better-auth doesn't ship a "role" on the user object passed to email hooks
+// — fetch it once so the email goes to the right catalog row (customer vs
+// provider). Defaults to CUSTOMER for unknown roles to avoid leaking
+// provider-only copy to anonymous flows.
+async function roleOf(userId: string): Promise<"CUSTOMER" | "PROVIDER"> {
+  const u = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!u) return "CUSTOMER";
+  // Anything that isn't a customer (CLIENT) is a provider on Cleano.
+  return u.role === "CLIENT" ? "CUSTOMER" : "PROVIDER";
+}
 
 export const auth = betterAuth({
   database: prismaAdapter(db, {
@@ -12,6 +27,38 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      const role = await roleOf(user.id);
+      sendAccountEmail({
+        to: user.email,
+        name: user.name,
+        role,
+        event: "reset_password",
+        link: url,
+      }).catch((e) => console.error("reset_password email", e));
+    },
+    onPasswordReset: async ({ user }) => {
+      const role = await roleOf(user.id);
+      sendAccountEmail({
+        to: user.email,
+        name: user.name,
+        role,
+        event: "password_changed",
+      }).catch((e) => console.error("password_changed email", e));
+    },
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      const role = await roleOf(user.id);
+      // For customers this maps to "Set up password" / for providers to "Email verification".
+      sendAccountEmail({
+        to: user.email,
+        name: user.name,
+        role,
+        event: role === "CUSTOMER" ? "setup_password" : "email_verification",
+        link: url,
+      }).catch((e) => console.error("verify email", e));
+    },
   },
   plugins: [customSession(async (session) => {
       if (session.user) {

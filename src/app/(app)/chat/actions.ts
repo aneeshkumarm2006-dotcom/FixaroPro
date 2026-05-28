@@ -11,6 +11,7 @@ import type {
   ChatMessageDTO,
   EmployeeChatPayload,
 } from "./types";
+import { notifyChatEmail } from "./notifyChatEmail";
 
 type SessionUser = { id: string; name: string; role?: string };
 type AppRole = "OWNER" | "ADMIN" | "OPS_MANAGER" | "FIELD_LEAD" | "EMPLOYEE";
@@ -51,10 +52,34 @@ type RawMessage = {
   createdAt: Date;
   readByAdminAt: Date | null;
   readByEmployeeAt: Date | null;
+  deliveredAt: Date | null;
   sender: { name: string };
 };
 
-function toMessageDTO(m: RawMessage): ChatMessageDTO {
+const PRESENCE_WINDOW_MS = 60_000;
+
+function isOnline(lastSeenAt: Date | null | undefined): boolean {
+  if (!lastSeenAt) return false;
+  return Date.now() - lastSeenAt.getTime() < PRESENCE_WINDOW_MS;
+}
+
+function toMessageDTO(m: RawMessage, viewerIsAdmin: boolean): ChatMessageDTO {
+  // Receipt state, from the perspective of the message's *sender*.
+  // - READ: the other side has opened it
+  // - DELIVERED: marked delivered (recipient pinged after send)
+  // - SENT: still waiting
+  let receipt: "SENT" | "DELIVERED" | "READ" = "SENT";
+  if (m.senderRole === "ADMIN") {
+    if (m.readByEmployeeAt) receipt = "READ";
+    else if (m.deliveredAt) receipt = "DELIVERED";
+  } else {
+    if (m.readByAdminAt) receipt = "READ";
+    else if (m.deliveredAt) receipt = "DELIVERED";
+  }
+  // viewerIsAdmin is intentionally consumed so the type matches; the
+  // bubble renders the receipt only on messages it owns.
+  void viewerIsAdmin;
+
   return {
     id: m.id,
     conversationId: m.conversationId,
@@ -68,6 +93,8 @@ function toMessageDTO(m: RawMessage): ChatMessageDTO {
     createdAt: m.createdAt.toISOString(),
     readByAdminAt: m.readByAdminAt ? m.readByAdminAt.toISOString() : null,
     readByEmployeeAt: m.readByEmployeeAt ? m.readByEmployeeAt.toISOString() : null,
+    deliveredAt: m.deliveredAt ? m.deliveredAt.toISOString() : null,
+    receipt,
   };
 }
 
@@ -82,18 +109,12 @@ async function findOrCreateConversationForEmployee(employeeId: string) {
 export async function getEmployeeChat(): Promise<
   { success: true; data: EmployeeChatPayload } | { success: false; error: string }
 > {
-  const auth = await requireUser();
-  if ("error" in auth) return { success: false, error: auth.error };
+  const a = await requireUser();
+  if ("error" in a) return { success: false, error: a.error };
 
-  const conversation = await findOrCreateConversationForEmployee(auth.user.id);
+  const conversation = await findOrCreateConversationForEmployee(a.user.id);
 
-  const messages = await db.chatMessage.findMany({
-    where: { conversationId: conversation.id },
-    orderBy: { createdAt: "asc" },
-    include: { sender: { select: { name: true } } },
-  });
-
-  // Mark all admin-sent messages as read by this employee.
+  // Mark admin-sent messages as read & delivered by this employee.
   const now = new Date();
   await db.chatMessage.updateMany({
     where: {
@@ -101,14 +122,31 @@ export async function getEmployeeChat(): Promise<
       senderRole: "ADMIN",
       readByEmployeeAt: null,
     },
-    data: { readByEmployeeAt: now },
+    data: { readByEmployeeAt: now, deliveredAt: now },
+  });
+
+  const messages = await db.chatMessage.findMany({
+    where: { conversationId: conversation.id },
+    orderBy: { createdAt: "asc" },
+    include: { sender: { select: { name: true } } },
+  });
+
+  // "Other side online" = any admin pinged within window. We approximate by
+  // looking at any admin-role user's lastSeenAt.
+  const recentAdmin = await db.user.findFirst({
+    where: {
+      role: { in: ["OWNER", "ADMIN", "OPS_MANAGER", "FIELD_LEAD"] },
+      lastSeenAt: { gte: new Date(Date.now() - PRESENCE_WINDOW_MS) },
+    },
+    select: { id: true },
   });
 
   return {
     success: true,
     data: {
       conversationId: conversation.id,
-      messages: messages.map(toMessageDTO),
+      messages: messages.map((m) => toMessageDTO(m, false)),
+      otherOnline: !!recentAdmin,
     },
   };
 }
@@ -208,22 +246,15 @@ export async function getAdminChat(
 
   const employee = await db.user.findUnique({
     where: { id: employeeId },
-    select: { id: true, name: true, image: true, role: true },
+    select: { id: true, name: true, image: true, role: true, lastSeenAt: true },
   });
-  // Allow any non-admin, non-client employee to have a conversation
   if (!employee || isAdminRole(employee.role) || employee.role === "CLIENT") {
     return { success: false, error: "Employee not found" };
   }
 
   const conversation = await findOrCreateConversationForEmployee(employee.id);
 
-  const messages = await db.chatMessage.findMany({
-    where: { conversationId: conversation.id },
-    orderBy: { createdAt: "asc" },
-    include: { sender: { select: { name: true } } },
-  });
-
-  // Mark all employee-sent messages as read by admin.
+  // Mark employee-sent messages as read & delivered by admin.
   const now = new Date();
   await db.chatMessage.updateMany({
     where: {
@@ -231,7 +262,13 @@ export async function getAdminChat(
       senderRole: "EMPLOYEE",
       readByAdminAt: null,
     },
-    data: { readByAdminAt: now },
+    data: { readByAdminAt: now, deliveredAt: now },
+  });
+
+  const messages = await db.chatMessage.findMany({
+    where: { conversationId: conversation.id },
+    orderBy: { createdAt: "asc" },
+    include: { sender: { select: { name: true } } },
   });
 
   return {
@@ -241,7 +278,8 @@ export async function getAdminChat(
       employeeId: employee.id,
       employeeName: employee.name,
       employeeImage: employee.image,
-      messages: messages.map(toMessageDTO),
+      messages: messages.map((m) => toMessageDTO(m, true)),
+      otherOnline: isOnline(employee.lastSeenAt),
     },
   };
 }
@@ -283,6 +321,27 @@ export async function sendChatMessage(
 
   const now = new Date();
 
+  // Is the recipient online right now? Used to immediately set deliveredAt
+  // (gives ✓✓) and also to gate the email notification (only email when
+  // they're not active).
+  let recipientOnline = false;
+  if (senderRole === "EMPLOYEE") {
+    const adminPresent = await db.user.findFirst({
+      where: {
+        role: { in: ["OWNER", "ADMIN", "OPS_MANAGER", "FIELD_LEAD"] },
+        lastSeenAt: { gte: new Date(Date.now() - PRESENCE_WINDOW_MS) },
+      },
+      select: { id: true },
+    });
+    recipientOnline = !!adminPresent;
+  } else {
+    const emp = await db.user.findUnique({
+      where: { id: conversation.employeeId },
+      select: { lastSeenAt: true },
+    });
+    recipientOnline = isOnline(emp?.lastSeenAt);
+  }
+
   const message = await db.chatMessage.create({
     data: {
       conversationId,
@@ -292,9 +351,9 @@ export async function sendChatMessage(
       attachmentUrl: attachment?.url ?? null,
       attachmentType: attachment?.type ?? null,
       attachmentName: attachment?.name ?? null,
-      // Auto-mark the sender's own side as read.
       readByAdminAt: senderRole === "ADMIN" ? now : null,
       readByEmployeeAt: senderRole === "EMPLOYEE" ? now : null,
+      deliveredAt: recipientOnline ? now : null,
     },
     include: { sender: { select: { name: true } } },
   });
@@ -309,7 +368,16 @@ export async function sendChatMessage(
     },
   });
 
-  return { success: true, data: toMessageDTO(message) };
+  // Fire-and-forget email notification (respects admin's notification toggles).
+  notifyChatEmail({
+    conversationId,
+    senderRole,
+    senderName: a.user.name,
+    body: trimmed,
+    recipientOnline,
+  }).catch((err) => console.error("notifyChatEmail failed", err));
+
+  return { success: true, data: toMessageDTO(message, isAdminRole(a.role)) };
 }
 
 export async function getUnreadChatCount(): Promise<{

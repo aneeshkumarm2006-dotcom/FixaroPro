@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { sendInvoiceEmail } from "@/lib/email";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -139,6 +140,25 @@ export async function createInvoice(params: CreateInvoiceParams) {
     });
 
     revalidatePath("/invoices");
+
+    // Customer "new invoice" email — gated by `cust.invoice.new`.
+    const client = await db.client.findUnique({
+      where: { id: params.clientId },
+      select: { name: true, email: true },
+    });
+    if (client?.email) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+      sendInvoiceEmail({
+        to: client.email,
+        recipient: "CUSTOMER",
+        event: "new",
+        invoiceNumber: invoice.invoiceNumber,
+        amount: totalAmount,
+        clientName: client.name,
+        link: `${appUrl}/portal/invoices/${invoice.id}`,
+      }).catch((e) => console.error("customer new-invoice email", e));
+    }
+
     return { success: true, invoiceId: invoice.id };
   } catch (error) {
     console.error("Error creating invoice:", error);

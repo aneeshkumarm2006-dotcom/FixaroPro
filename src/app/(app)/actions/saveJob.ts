@@ -5,6 +5,19 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import { invalidateCalendarDay } from "./invalidateCalendarDay";
+import {
+  sendAdminBookingModified,
+  sendAdminBookingCanceled,
+  sendCustomerBookingConfirmed,
+  sendCustomerBookingModified,
+  sendCustomerBookingCancellation,
+  sendAdminTipReceived,
+  sendCustomerFeesCharged,
+  sendAdminUnassignedEvent,
+  sendProviderNewTip,
+  sendProviderBookingCanceled,
+} from "@/lib/email";
+import { isNotificationEnabled } from "@/lib/notifications";
 
 const VALID_PAYMENT_TYPES = [
   "CASH",
@@ -123,10 +136,24 @@ export async function saveJob(formData: FormData) {
     const statusRaw = (formData.get("status") as string) || null;
 
     if (editingJobId) {
-      // Fetch existing job to detect status change to CANCELLED
-      const existingJob = statusRaw === "CANCELLED"
-        ? await db.job.findUnique({ where: { id: editingJobId }, select: { status: true, clientName: true } })
-        : null;
+      // Snapshot the existing job so we can detect transitions:
+      //  - status → CANCELLED (sends customer + admin cancellation)
+      //  - 0 cleaners → ≥1 (sends customer "confirmed" email)
+      //  - any other change (sends "modified" notifications)
+      const existingJob = await db.job.findUnique({
+        where: { id: editingJobId },
+        select: {
+          status: true,
+          clientName: true,
+          jobNumber: true,
+          startTime: true,
+          location: true,
+          jobType: true,
+          totalTip: true,
+          client: { select: { email: true, name: true } },
+          cleaners: { select: { id: true, name: true, email: true } },
+        },
+      });
 
       const updateData: any = {
         ...jobData,
@@ -149,12 +176,26 @@ export async function saveJob(formData: FormData) {
         data: updateData,
       });
 
-      // Create cancellation alert if job was just cancelled
+      // ── Booking lifecycle notifications ──────────────────────────
+      const sessionUserName = session.user.name ?? "Admin";
+      const lifecycleInfo = existingJob
+        ? {
+            jobId: editingJobId,
+            jobNumber: existingJob.jobNumber,
+            clientName: existingJob.clientName,
+            startTime: existingJob.startTime.toISOString(),
+            address: existingJob.location ?? "",
+            serviceType: existingJob.jobType,
+          }
+        : null;
+
+      // Case A — job just got CANCELLED
       if (
         statusRaw === "CANCELLED" &&
         existingJob &&
         existingJob.status !== "CANCELLED"
       ) {
+        // System alert (legacy)
         await db.alert.create({
           data: {
             type: "CANCELLATION",
@@ -165,6 +206,206 @@ export async function saveJob(formData: FormData) {
             relatedType: "Job",
           },
         });
+
+        // Admin email (after-5pm variant chosen inside the helper)
+        if (lifecycleInfo) {
+          sendAdminBookingCanceled({
+            ...lifecycleInfo,
+            canceledBy: sessionUserName,
+          }).catch((e) => console.error("admin cancel email", e));
+
+          // Customer email
+          if (existingJob.client?.email) {
+            sendCustomerBookingCancellation({
+              ...lifecycleInfo,
+              to: existingJob.client.email,
+            }).catch((e) => console.error("customer cancel email", e));
+          }
+
+          // Notify each assigned cleaner — email + app-push alert.
+          for (const c of existingJob.cleaners) {
+            if (c.email) {
+              sendProviderBookingCanceled({
+                to: c.email,
+                providerName: c.name,
+                jobId: editingJobId,
+                jobNumber: existingJob.jobNumber,
+                clientName: existingJob.clientName,
+                startTime: existingJob.startTime.toISOString(),
+                address: existingJob.location ?? "",
+                serviceType: existingJob.jobType,
+              }).catch((e) => console.error("provider cancel email", e));
+            }
+            if (await isNotificationEnabled("PROVIDER", "prov.cancel.booking_canceled", "APP_PUSH")) {
+              await db.alert.create({
+                data: {
+                  type: "CANCELLATION",
+                  severity: "WARNING",
+                  title: `Booking canceled — ${existingJob.clientName}`,
+                  message: `Job #${existingJob.jobNumber} on ${existingJob.startTime.toLocaleDateString()} was canceled.`,
+                  recipientUserId: c.id,
+                  relatedId: editingJobId,
+                  relatedType: "Job",
+                },
+              }).catch(() => {});
+            }
+          }
+        }
+      } else if (existingJob && lifecycleInfo) {
+        // Case B — non-cancel edit. Detect "cleaners just got assigned"
+        // (customer "Booking confirmed") + generic "Booking modified".
+        const previousCleanerIds = new Set(existingJob.cleaners.map((c) => c.id));
+        const cleanersAdded = cleanerIds.filter((id) => !previousCleanerIds.has(id));
+        const justGotFirstCleaner =
+          existingJob.cleaners.length === 0 && cleanerIds.length > 0;
+
+        // Customer "Booking confirmed" when the first cleaner is paired.
+        if (justGotFirstCleaner && existingJob.client?.email) {
+          const assignedCleaners = await db.user.findMany({
+            where: { id: { in: cleanerIds } },
+            select: { name: true },
+          });
+          sendCustomerBookingConfirmed({
+            ...lifecycleInfo,
+            to: existingJob.client.email,
+            cleanerNames: assignedCleaners.map((c) => c.name),
+          }).catch((e) => console.error("customer confirmed email", e));
+        }
+
+        // Admin + customer "Booking modified" on any other edit.
+        if (!justGotFirstCleaner) {
+          sendAdminBookingModified({
+            ...lifecycleInfo,
+            changedBy: sessionUserName,
+          }).catch((e) => console.error("admin modified email", e));
+          if (existingJob.client?.email) {
+            sendCustomerBookingModified({
+              ...lifecycleInfo,
+              to: existingJob.client.email,
+            }).catch((e) => console.error("customer modified email", e));
+          }
+        }
+
+        // Provider app-push for newly assigned cleaners ("New booking" for them).
+        for (const cleanerId of cleanersAdded) {
+          if (await isNotificationEnabled("PROVIDER", "prov.booking.new", "APP_PUSH")) {
+            await db.alert.create({
+              data: {
+                type: "GENERAL",
+                severity: "INFO",
+                title: `New booking — ${existingJob.clientName}`,
+                message: `Job #${existingJob.jobNumber} on ${existingJob.startTime.toLocaleDateString()} at ${existingJob.startTime.toLocaleTimeString()} has been assigned to you.`,
+                recipientUserId: cleanerId,
+                relatedId: editingJobId,
+                relatedType: "Job",
+              },
+            }).catch(() => {});
+          }
+        }
+
+        // Provider app-push for cleaners on a modified (already assigned) job.
+        const stillAssigned = cleanerIds.filter((id) => previousCleanerIds.has(id));
+        if (!justGotFirstCleaner && stillAssigned.length > 0) {
+          const after5 = (() => {
+            const dayBefore = new Date(existingJob.startTime);
+            dayBefore.setDate(dayBefore.getDate() - 1);
+            dayBefore.setHours(17, 0, 0, 0);
+            return new Date() >= dayBefore && new Date() < existingJob.startTime;
+          })();
+          const provKey = after5 ? "prov.booking.modified_after_5pm" : "prov.booking.modified";
+          for (const cleanerId of stillAssigned) {
+            if (await isNotificationEnabled("PROVIDER", provKey, "APP_PUSH")) {
+              await db.alert.create({
+                data: {
+                  type: "GENERAL",
+                  severity: after5 ? "WARNING" : "INFO",
+                  title: `Booking updated — ${existingJob.clientName}`,
+                  message: `Job #${existingJob.jobNumber} on ${existingJob.startTime.toLocaleDateString()} was modified${after5 ? " after 5 pm" : ""}.`,
+                  recipientUserId: cleanerId,
+                  relatedId: editingJobId,
+                  relatedType: "Job",
+                },
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+
+      // Unassigned-folder events. The PDF treats "unassigned" as a booking
+      // without any cleaners assigned yet (or fewer than required). Detect
+      // transitions and fire the right catalog row.
+      if (existingJob && lifecycleInfo) {
+        const previouslyUnassigned = existingJob.cleaners.length === 0;
+        const nowUnassigned = cleanerIds.length === 0;
+        const openStatus =
+          statusRaw !== "CANCELLED" &&
+          statusRaw !== "COMPLETED" &&
+          statusRaw !== "PAID";
+
+        if (openStatus) {
+          if (!previouslyUnassigned && nowUnassigned) {
+            // Cleaners just got removed → "moved to unassigned"
+            sendAdminUnassignedEvent({
+              event: "moved",
+              ...lifecycleInfo,
+            }).catch((e) => console.error("admin unassigned moved", e));
+          } else if (previouslyUnassigned && !nowUnassigned) {
+            // Someone grabbed it
+            sendAdminUnassignedEvent({
+              event: "grabbed",
+              ...lifecycleInfo,
+            }).catch((e) => console.error("admin unassigned grabbed", e));
+          } else if (previouslyUnassigned && nowUnassigned) {
+            // Was unassigned, still unassigned, but the booking was edited
+            sendAdminUnassignedEvent({
+              event: "modified",
+              ...lifecycleInfo,
+            }).catch((e) => console.error("admin unassigned modified", e));
+          }
+        }
+      }
+
+      // Tip detection — admin gets `admin.fee.tip_received`, customer gets
+      // `cust.fee.fees_charged` (only when totalTip increased).
+      if (existingJob && lifecycleInfo) {
+        const oldTip = existingJob.totalTip ?? 0;
+        const newTip = jobData.totalTip ?? 0;
+        if (newTip > oldTip && newTip - oldTip > 0.001) {
+          const tipDelta = newTip - oldTip;
+          sendAdminTipReceived({
+            ...lifecycleInfo,
+            tipAmount: tipDelta,
+            cleanerNames: existingJob.cleaners.map((c) => c.name),
+          }).catch((e) => console.error("admin tip-received email", e));
+          if (existingJob.client?.email) {
+            sendCustomerFeesCharged({
+              ...lifecycleInfo,
+              to: existingJob.client.email,
+              clientName: existingJob.clientName,
+              feeType: "tip",
+              amount: tipDelta,
+            }).catch((e) => console.error("customer tip-fee email", e));
+          }
+          // Tell every assigned cleaner about their tip — split evenly.
+          if (existingJob.cleaners.length > 0) {
+            const perCleaner = tipDelta / existingJob.cleaners.length;
+            const cleanerUsers = await db.user.findMany({
+              where: { id: { in: existingJob.cleaners.map((c) => c.id) } },
+              select: { name: true, email: true },
+            });
+            for (const c of cleanerUsers) {
+              if (!c.email) continue;
+              sendProviderNewTip({
+                to: c.email,
+                providerName: c.name,
+                jobId: editingJobId,
+                jobNumber: existingJob.jobNumber,
+                tipAmount: perCleaner,
+                clientName: existingJob.clientName,
+              }).catch((e) => console.error("provider tip email", e));
+            }
+          }
+        }
       }
 
       if (jobData.startTime) {
@@ -189,6 +430,17 @@ export async function saveJob(formData: FormData) {
       }
 
       const newJob = await db.job.create({ data: jobData });
+
+      // If created with no cleaners, this lands in the unassigned folder.
+      if (cleanerIds.length === 0 && jobData.startTime) {
+        sendAdminUnassignedEvent({
+          event: "new",
+          jobId: newJob.id,
+          jobNumber: newJob.jobNumber,
+          clientName: newJob.clientName,
+          startTime: jobData.startTime.toISOString(),
+        }).catch((e) => console.error("admin unassigned new", e));
+      }
 
       if (jobData.startTime) {
         await invalidateCalendarDay(

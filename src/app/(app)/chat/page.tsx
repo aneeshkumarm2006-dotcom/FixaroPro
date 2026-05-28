@@ -27,7 +27,9 @@ export default async function ChatPage() {
   }
 
   const chat = await getEmployeeChat();
-  const initial = chat.success ? chat.data : { conversationId: "", messages: [] };
+  const initial = chat.success
+    ? chat.data
+    : { conversationId: "", messages: [], otherOnline: false };
   return (
     <div className="h-full overflow-hidden">
       <EmployeeChatClient initial={initial} userName={session.user.name ?? undefined} />

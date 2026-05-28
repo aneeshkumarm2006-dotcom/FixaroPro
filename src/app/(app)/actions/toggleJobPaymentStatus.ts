@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
-import { queueAndSendReceipt } from "@/lib/email";
+import { queueAndSendReceipt, sendCustomerBookingCharged } from "@/lib/email";
 
 export async function togglePaymentReceived(jobId: string) {
   const session = await auth.api.getSession({
@@ -99,9 +99,27 @@ export async function togglePaymentReceived(jobId: string) {
 
     await db.$transaction(ops);
 
-    // Send receipt email when payment is marked received
+    // Send receipt + "booking charged" email when payment is marked received
     if (newStatus) {
       queueAndSendReceipt(jobId).catch(() => {});
+
+      // The receipt has the formal totals; "booking charged" is the simpler
+      // confirmation gated by `cust.fee.booking_charged`.
+      const fullJob = await db.job.findUnique({
+        where: { id: jobId },
+        include: { client: { select: { name: true, email: true } } },
+      });
+      if (fullJob?.client?.email) {
+        const amount = (fullJob.price ?? 0) - (fullJob.discountAmount ?? 0);
+        sendCustomerBookingCharged({
+          to: fullJob.client.email,
+          clientName: fullJob.client.name,
+          jobId,
+          jobNumber: fullJob.jobNumber,
+          amount: amount > 0 ? amount : (fullJob.price ?? 0),
+          paymentMethod: fullJob.paymentType ?? "Cash / cheque",
+        }).catch((e) => console.error("customer booking-charged (manual)", e));
+      }
     }
 
     revalidatePath(`/jobs/${jobId}`);

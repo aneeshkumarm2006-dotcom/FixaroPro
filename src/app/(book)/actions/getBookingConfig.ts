@@ -1,0 +1,60 @@
+"use server";
+
+import { db } from "@/db";
+
+export type RoomType =
+  | "KITCHEN"
+  | "BATHROOM"
+  | "BEDROOM"
+  | "LIVING_ROOM"
+  | "LAUNDRY"
+  | "OUTDOOR"
+  | "WHOLE_HOME";
+
+export interface BookingAddOn {
+  id: string;
+  name: string;
+  price: number;
+  roomType: RoomType;
+}
+
+const VALID_ROOMS: ReadonlySet<RoomType> = new Set([
+  "KITCHEN",
+  "BATHROOM",
+  "BEDROOM",
+  "LIVING_ROOM",
+  "LAUNDRY",
+  "OUTDOOR",
+  "WHOLE_HOME",
+]);
+
+function normalizeAddOn(raw: unknown): BookingAddOn | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === "string" ? r.id : null;
+  const name = typeof r.name === "string" ? r.name : null;
+  const price = typeof r.price === "number" ? r.price : null;
+  if (!id || !name || price === null || price < 0) return null;
+  const roomCandidate = typeof r.roomType === "string" ? (r.roomType as RoomType) : "WHOLE_HOME";
+  const roomType = VALID_ROOMS.has(roomCandidate) ? roomCandidate : "WHOLE_HOME";
+  return { id, name, price, roomType };
+}
+
+export async function getBookingConfig(): Promise<{ addOns: BookingAddOn[] }> {
+  try {
+    const setting = await db.appSetting.findUnique({
+      where: { key: "pricing.addOns" },
+    });
+
+    if (!setting) return { addOns: [] };
+    if (!Array.isArray(setting.value)) return { addOns: [] };
+
+    const normalized = setting.value
+      .map(normalizeAddOn)
+      .filter((a): a is BookingAddOn => a !== null);
+
+    return { addOns: normalized };
+  } catch {
+    return { addOns: [] };
+  }
+}

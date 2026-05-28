@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { queueAndSendReceipt, queueAndSendRefund } from "@/lib/email";
+import {
+  queueAndSendReceipt,
+  queueAndSendRefund,
+  sendCustomerBookingCharged,
+  sendCustomerCardDeclined,
+  sendAdminCardDeclined,
+  sendAdminNewCardAdded,
+} from "@/lib/email";
 import Stripe from "stripe";
 
 export const config = { api: { bodyParser: false } };
@@ -10,7 +17,10 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
   const jobId = pi.metadata?.jobId;
   if (!jobId) return;
 
-  const job = await db.job.findUnique({ where: { id: jobId } });
+  const job = await db.job.findUnique({
+    where: { id: jobId },
+    include: { client: { select: { name: true, email: true } } },
+  });
   if (!job || job.paymentReceived) return;
 
   await db.$transaction([
@@ -45,6 +55,17 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
   ]);
 
   queueAndSendReceipt(jobId).catch(() => {});
+
+  if (job.client?.email) {
+    sendCustomerBookingCharged({
+      to: job.client.email,
+      clientName: job.client.name,
+      jobId,
+      jobNumber: job.jobNumber,
+      amount: pi.amount_received / 100,
+      paymentMethod: "Card on file",
+    }).catch((e) => console.error("customer booking-charged (webhook)", e));
+  }
 }
 
 async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
@@ -54,6 +75,12 @@ async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
   const reason =
     pi.last_payment_error?.message ?? "Payment failed";
 
+  const job = await db.job.findUnique({
+    where: { id: jobId },
+    include: { client: { select: { name: true, email: true } } },
+  });
+  if (!job) return;
+
   await db.job.update({
     where: { id: jobId },
     data: {
@@ -61,6 +88,26 @@ async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
       paymentFailureReason: reason,
     },
   }).catch(() => {});
+
+  // Notify admin + customer (gated by Settings → Notifications).
+  sendAdminCardDeclined({
+    jobId,
+    jobNumber: job.jobNumber,
+    clientName: job.clientName,
+    reason,
+    amountAttempted: pi.amount / 100,
+    context: "charge",
+  }).catch((e) => console.error("admin card-declined (webhook)", e));
+  if (job.client?.email) {
+    sendCustomerCardDeclined({
+      to: job.client.email,
+      clientName: job.client.name,
+      jobId,
+      jobNumber: job.jobNumber,
+      reason,
+      context: "charge",
+    }).catch((e) => console.error("customer card-declined (webhook)", e));
+  }
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {
@@ -127,6 +174,13 @@ async function handleSetupIntentSucceeded(si: Stripe.SetupIntent) {
   if (!customerId || !paymentMethodId) return;
 
   // Save the default payment method on the client record
+  const client = await db.client.findFirst({
+    where: { stripeCustomerId: customerId },
+    select: { id: true, name: true, email: true, defaultPaymentMethodId: true },
+  });
+
+  const isNewCard = client && client.defaultPaymentMethodId !== paymentMethodId;
+
   await db.client.updateMany({
     where: { stripeCustomerId: customerId },
     data: { defaultPaymentMethodId: paymentMethodId },
@@ -136,6 +190,15 @@ async function handleSetupIntentSucceeded(si: Stripe.SetupIntent) {
   await stripe.customers.update(customerId, {
     invoice_settings: { default_payment_method: paymentMethodId },
   });
+
+  // Notify admins (gated). Only fire when this is genuinely a new card —
+  // skips noise when Stripe re-confirms the same card.
+  if (client && isNewCard) {
+    sendAdminNewCardAdded({
+      clientName: client.name,
+      clientEmail: client.email ?? "—",
+    }).catch((e) => console.error("admin new-card email", e));
+  }
 }
 
 export async function POST(req: NextRequest) {

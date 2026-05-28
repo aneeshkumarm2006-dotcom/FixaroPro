@@ -61,10 +61,27 @@ export default async function JobDetailPage({ params }: PageProps) {
   const isCleaner = job.cleaners.some((c) => c.id === session.user.id);
   if (!isEmployee && !isCleaner) redirect("/my-jobs");
 
-  const employeeProducts = await db.employeeProduct.findMany({
+  const employeeProductsRaw = await db.employeeProduct.findMany({
     where: { employeeId: session.user.id },
     include: { product: { include: { inventoryRule: true } } },
   });
+  const employeeProducts = employeeProductsRaw.map((ep) => ({
+    id: ep.id,
+    productId: ep.productId,
+    quantity: ep.quantity,
+    product: {
+      id: ep.product.id,
+      name: ep.product.name,
+      unit: ep.product.unit,
+      category: ep.product.category,
+      inventoryRule: ep.product.inventoryRule
+        ? {
+            usagePerJob: ep.product.inventoryRule.usagePerJob,
+            refillThreshold: ep.product.inventoryRule.refillThreshold,
+          }
+        : null,
+    },
+  }));
 
   const jobWithClock = job as any;
   const duration =

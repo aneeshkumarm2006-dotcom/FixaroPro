@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import { InvoiceStatus } from "@prisma/client";
+import { sendInvoiceEmail } from "@/lib/email";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -111,6 +112,58 @@ export async function updateInvoice(params: UpdateInvoiceParams) {
 
     revalidatePath("/invoices");
     revalidatePath(`/invoices/${params.id}`);
+
+    // Notifications — gated. Detect status transitions.
+    const fresh = await db.invoice.findUnique({
+      where: { id: params.id },
+      include: { client: { select: { name: true, email: true } } },
+    });
+    if (fresh) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+      const link = `${appUrl}/portal/invoices/${fresh.id}`;
+      // Status changed to PAID → admin + customer charge confirmation
+      if (params.status === "PAID" && existing.status !== "PAID") {
+        if (fresh.client?.email) {
+          sendInvoiceEmail({
+            to: fresh.client.email,
+            recipient: "CUSTOMER",
+            event: "charge",
+            invoiceNumber: fresh.invoiceNumber,
+            amount: fresh.totalAmount,
+            clientName: fresh.client.name,
+            link,
+          }).catch((e) => console.error("customer invoice-charge", e));
+        }
+        // Admin email is gated by a separate row.
+        const admins = await db.user.findMany({
+          where: { role: { in: ["OWNER", "ADMIN", "OPS_MANAGER", "FIELD_LEAD"] } },
+          select: { email: true },
+        });
+        for (const a of admins) {
+          sendInvoiceEmail({
+            to: a.email,
+            recipient: "ADMIN",
+            event: "charge",
+            invoiceNumber: fresh.invoiceNumber,
+            amount: fresh.totalAmount,
+          }).catch((e) => console.error("admin invoice-charge", e));
+        }
+      } else if (params.lineItems || params.status !== undefined) {
+        // Non-PAID update → customer "Invoice updated"
+        if (fresh.client?.email) {
+          sendInvoiceEmail({
+            to: fresh.client.email,
+            recipient: "CUSTOMER",
+            event: "update",
+            invoiceNumber: fresh.invoiceNumber,
+            amount: fresh.totalAmount,
+            clientName: fresh.client.name,
+            link,
+          }).catch((e) => console.error("customer invoice-update", e));
+        }
+      }
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error updating invoice:", error);

@@ -1,5 +1,16 @@
 import { Resend } from "resend";
 import { db } from "@/db";
+import { isNotificationEnabled } from "@/lib/notifications";
+
+/**
+ * Identifies the catalog row that gates a given email send.
+ * If admin has toggled this row's EMAIL channel off in
+ * Settings → Notifications, `deliver()` skips the send.
+ */
+export interface NotificationGate {
+  recipient: "ADMIN" | "CUSTOMER" | "PROVIDER";
+  key: string;
+}
 
 const FROM = process.env.EMAIL_FROM ?? "Cleano <no-reply@cleano.ca>";
 
@@ -74,7 +85,29 @@ async function deliver(opts: {
   subject: string;
   html: string;
   logId?: string;
+  notification?: NotificationGate;
 }) {
+  // Respect admin's notification toggles (Settings → Notifications).
+  // If the EMAIL channel for this catalog row is off, we skip the send
+  // and stamp the EmailLog so the admin can see we considered it.
+  if (opts.notification) {
+    const enabled = await isNotificationEnabled(
+      opts.notification.recipient,
+      opts.notification.key,
+      "EMAIL"
+    );
+    if (!enabled) {
+      if (opts.logId) {
+        await db.emailLog
+          .update({
+            where: { id: opts.logId },
+            data: { status: "FAILED", error: "Disabled in Settings → Notifications" },
+          })
+          .catch(() => {});
+      }
+      return { ok: false, skipped: true as const };
+    }
+  }
   const resend = getResend();
   if (!resend) {
     if (opts.logId) {
@@ -136,6 +169,8 @@ export async function sendBookingConfirmation(opts: {
   total: number | null;
   depositPaid?: boolean;
   logId?: string;
+  /** When true, gate by `cust.booking.receipt_rec` instead of `_ot`. */
+  recurring?: boolean;
 }) {
   const timeLine = opts.isFlexible
     ? "Flexible — our team will confirm the time"
@@ -170,7 +205,16 @@ export async function sendBookingConfirmation(opts: {
       btn("Manage all my bookings", `${appUrl}/portal/bookings`)
   );
 
-  return deliver({ to: opts.to, subject: `Cleano booking confirmed — ${fmtDate(opts.startTime)}`, html, logId: opts.logId });
+  return deliver({
+    to: opts.to,
+    subject: `Cleano booking confirmed — ${fmtDate(opts.startTime)}`,
+    html,
+    logId: opts.logId,
+    notification: {
+      recipient: "CUSTOMER",
+      key: opts.recurring ? "cust.booking.receipt_rec" : "cust.booking.receipt_ot",
+    },
+  });
 }
 
 export async function sendReminder24h(opts: {
@@ -202,7 +246,13 @@ export async function sendReminder24h(opts: {
       btn("Manage all my bookings", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings`)
   );
 
-  return deliver({ to: opts.to, subject: `Reminder: your Cleano cleaning is tomorrow`, html, logId: opts.logId });
+  return deliver({
+    to: opts.to,
+    subject: `Reminder: your Cleano cleaning is tomorrow`,
+    html,
+    logId: opts.logId,
+    notification: { recipient: "CUSTOMER", key: "cust.reminders.booking_reminder" },
+  });
 }
 
 export async function sendReceipt(opts: {
@@ -242,7 +292,13 @@ export async function sendReceipt(opts: {
       (ratingSection ? `<div style="margin-top:24px">${p("How did we do? A quick rating helps our team a lot.")}</div>${ratingSection}` : "")
   );
 
-  return deliver({ to: opts.to, subject: `Cleano receipt — job #${opts.jobNumber}`, html, logId: opts.logId });
+  return deliver({
+    to: opts.to,
+    subject: `Cleano receipt — job #${opts.jobNumber}`,
+    html,
+    logId: opts.logId,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.service_receipt" },
+  });
 }
 
 export async function sendRefundConfirmation(opts: {
@@ -263,7 +319,97 @@ export async function sendRefundConfirmation(opts: {
       btn("View your bookings", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/bookings`)
   );
 
-  return deliver({ to: opts.to, subject: `Cleano refund — job #${opts.jobNumber}`, html, logId: opts.logId });
+  return deliver({
+    to: opts.to,
+    subject: `Cleano refund — job #${opts.jobNumber}`,
+    html,
+    logId: opts.logId,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.refund_given" },
+  });
+}
+
+/**
+ * True if `now` is after 5 pm on the day before the booking start time.
+ * Used to gate the spec's "after 5 pm" notification variants.
+ */
+function isAfter5pmDayBefore(startTime: Date, now: Date = new Date()): boolean {
+  const dayBefore = new Date(startTime);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  dayBefore.setHours(17, 0, 0, 0);
+  return now >= dayBefore && now < startTime;
+}
+
+async function fetchAdmins() {
+  return db.user.findMany({
+    where: { role: { in: ["OWNER", "ADMIN", "OPS_MANAGER", "FIELD_LEAD"] } },
+    select: { id: true, name: true, email: true },
+  });
+}
+
+/**
+ * Notify all admin/owner roles that a new booking just came in. Gated by
+ * the `admin.booking.new` toggle in Settings → Notifications.
+ */
+export async function sendAdminNewBookingNotification(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  clientEmail: string | null;
+  clientPhone: string | null;
+  startTime: string;
+  isFlexible: boolean;
+  address: string;
+  serviceType: string | null;
+  price: number | null;
+  bookingSource: string | null;
+  /** When true, gate by `admin.booking.new_via_referral` instead of `admin.booking.new`. */
+  viaReferral?: boolean;
+}) {
+  const admins = await db.user.findMany({
+    where: { role: { in: ["OWNER", "ADMIN", "OPS_MANAGER", "FIELD_LEAD"] } },
+    select: { id: true, name: true, email: true },
+  });
+  if (admins.length === 0) return;
+
+  const timeLine = opts.isFlexible
+    ? "Flexible — confirm time with customer"
+    : fmtTime(opts.startTime);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const html = layout(
+    h1(`New booking: ${opts.clientName}`) +
+      p(`A ${opts.bookingSource === "web" ? "web" : "new"} booking just landed.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Email", opts.clientEmail ?? "—"],
+        ["Phone", opts.clientPhone ?? "—"],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", timeLine],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+        ["Total", fmt(opts.price)],
+      ]) +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+
+  const catalogKey = opts.viaReferral
+    ? "admin.booking.new_via_referral"
+    : "admin.booking.new";
+
+  // One email per admin, each gated by the same toggle.
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `New booking — ${opts.clientName} (#${opts.jobNumber})`,
+        html,
+        notification: { recipient: "ADMIN", key: catalogKey },
+      });
+    } catch (e) {
+      console.error("sendAdminNewBookingNotification failed for", admin.email, e);
+    }
+  }
 }
 
 // ── Queue helpers (create log + send immediately) ──────────────────────────
@@ -378,5 +524,1507 @@ export async function queueAndSendRefund(jobId: string, refundAmount: number, re
     refundAmount,
     reason,
     logId: log.id,
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// BOOKING LIFECYCLE — admin + customer notifications
+// All senders are gated by their catalog row in Settings → Notifications.
+// "After 5 pm the day before service" rules use isAfter5pmDayBefore.
+// ──────────────────────────────────────────────────────────────────────
+
+interface LifecycleJobInfo {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  address: string;
+  serviceType: string | null;
+}
+
+/** Admin email when a booking is edited. Picks `_after_5pm` variant if applicable. */
+export async function sendAdminBookingModified(opts: LifecycleJobInfo & {
+  changedBy: string;
+  changesSummary?: string;
+}) {
+  const after5 = isAfter5pmDayBefore(new Date(opts.startTime));
+  const key = after5 ? "admin.booking.modified_after_5pm" : "admin.booking.modified";
+  const subject = after5
+    ? `Late edit (after 5 pm) — ${opts.clientName} (#${opts.jobNumber})`
+    : `Booking modified — ${opts.clientName} (#${opts.jobNumber})`;
+
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(after5 ? "Late booking change" : "Booking updated") +
+      p(`${opts.changedBy} updated job #${opts.jobNumber} for <strong>${opts.clientName}</strong>.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.changesSummary ? p(`<em>${opts.changesSummary}</em>`) : "") +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject,
+      html,
+      notification: { recipient: "ADMIN", key },
+    }).catch((e) => console.error("sendAdminBookingModified", admin.email, e));
+  }
+}
+
+/** Admin email when a booking is canceled. Picks `_after_5pm` variant if applicable. */
+export async function sendAdminBookingCanceled(opts: LifecycleJobInfo & {
+  reason?: string | null;
+  canceledBy: string;
+}) {
+  const after5 = isAfter5pmDayBefore(new Date(opts.startTime));
+  const key = after5 ? "admin.cancel.booking_canceled_after_5pm" : "admin.cancel.booking_canceled";
+  const subject = after5
+    ? `Late cancel (after 5 pm) — ${opts.clientName} (#${opts.jobNumber})`
+    : `Booking canceled — ${opts.clientName} (#${opts.jobNumber})`;
+
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(after5 ? "Late cancellation" : "Booking canceled") +
+      p(`${opts.canceledBy} canceled job #${opts.jobNumber} for <strong>${opts.clientName}</strong>.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Was scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.reason ? p(`<strong>Reason:</strong> ${opts.reason}`) : "") +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject,
+      html,
+      notification: { recipient: "ADMIN", key },
+    }).catch((e) => console.error("sendAdminBookingCanceled", admin.email, e));
+  }
+}
+
+/** Admin email when a customer submits a cancellation request via the portal. */
+export async function sendAdminBookingCancellationRequest(opts: LifecycleJobInfo) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const html = layout(
+    h1("Cancellation requested") +
+      p(`<strong>${opts.clientName}</strong> requested to cancel job #${opts.jobNumber}.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      p("Review the request and either approve the cancellation or contact the customer.") +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Cancellation requested — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.cancel.booking_cancellation_request" },
+    }).catch((e) => console.error("sendAdminBookingCancellationRequest", admin.email, e));
+  }
+}
+
+/** Admin email when a customer postpones / requests a reschedule via the portal. */
+export async function sendAdminBookingPostpone(opts: LifecycleJobInfo) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const html = layout(
+    h1("Booking postponed by customer") +
+      p(`<strong>${opts.clientName}</strong> requested to postpone job #${opts.jobNumber}.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Was scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      p("Get in touch with the customer to confirm a new time.") +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Postpone request — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.cancel.postpone_booking" },
+    }).catch((e) => console.error("sendAdminBookingPostpone", admin.email, e));
+  }
+}
+
+/** Customer email when their booking is confirmed (provider paired). */
+export async function sendCustomerBookingConfirmed(opts: LifecycleJobInfo & {
+  to: string;
+  cleanerNames: string[];
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Your cleaner is confirmed`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, great news — your booking is fully set.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+        ["Your cleaner" + (opts.cleanerNames.length > 1 ? "s" : ""), opts.cleanerNames.join(", ") || "—"],
+      ]) +
+      btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+
+  return deliver({
+    to: opts.to,
+    subject: `Cleaner confirmed for your Cleano booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.booking.confirmed" },
+  });
+}
+
+/** Customer email when their booking is modified by admin. */
+export async function sendCustomerBookingModified(opts: LifecycleJobInfo & {
+  to: string;
+  changesSummary?: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Your booking was updated`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we've made a change to your upcoming cleaning.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.changesSummary ? p(`<em>${opts.changesSummary}</em>`) : "") +
+      p("If anything looks off, just reply to this email and we'll sort it out.") +
+      btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+
+  return deliver({
+    to: opts.to,
+    subject: `Cleano booking updated — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.booking.modified" },
+  });
+}
+
+/** Customer email when their booking is canceled. */
+export async function sendCustomerBookingCancellation(opts: LifecycleJobInfo & {
+  to: string;
+  reason?: string | null;
+  refundIssued?: boolean;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Your booking was canceled`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your Cleano booking has been canceled.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Was scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.reason ? p(`<strong>Reason:</strong> ${opts.reason}`) : "") +
+      (opts.refundIssued
+        ? p("A refund has been issued and will appear on your card within 5–10 business days.")
+        : p("If you have any questions, just reply to this email.")) +
+      btn("Book another cleaning", `${appUrl}/book`)
+  );
+
+  return deliver({
+    to: opts.to,
+    subject: `Cleano booking canceled — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.cancel.booking_cancellation" },
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// PAYMENTS + REFUNDS lifecycle (Batch 2)
+// ──────────────────────────────────────────────────────────────────────
+
+/** Customer email when the booking total is charged (Stripe-confirmed or manual). */
+export async function sendCustomerBookingCharged(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  amount: number;
+  paymentMethod?: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Payment received") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we've received your payment for job #${opts.jobNumber}.`) +
+      section([
+        ["Amount", fmt(opts.amount)],
+        ["Paid by", opts.paymentMethod ?? "Card on file"],
+      ]) +
+      p("Your itemized receipt will follow shortly.") +
+      btn("View booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Cleano payment received — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.booking_charged" },
+  });
+}
+
+/** Customer email when an extra fee (tip / cancellation / extra) is charged on top of a booking. */
+export async function sendCustomerFeesCharged(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  feeType: "tip" | "cancellation" | "extra" | "reschedule";
+  amount: number;
+}) {
+  const labelMap = {
+    tip: "Tip charged",
+    cancellation: "Cancellation fee charged",
+    extra: "Extra charge",
+    reschedule: "Reschedule fee charged",
+  } as const;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(labelMap[opts.feeType]) +
+      p(
+        `Hi ${opts.clientName.split(" ")[0]}, we charged ${fmt(opts.amount)} to your card on file for job #${opts.jobNumber}.`
+      ) +
+      section([
+        ["Type", labelMap[opts.feeType]],
+        ["Amount", fmt(opts.amount)],
+      ]) +
+      btn("View booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `${labelMap[opts.feeType]} — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.fees_charged" },
+  });
+}
+
+/** Customer email when a booking deposit / pre-payment is charged. */
+export async function sendCustomerBookingsPrepaid(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  amount: number;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Deposit received") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we collected your ${fmt(opts.amount)} deposit for booking #${opts.jobNumber}.`) +
+      p("The balance will be charged after your cleaning is complete.") +
+      btn("View booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Cleano deposit received — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.bookings_prepaid" },
+  });
+}
+
+/** Customer email when their card is declined. */
+export async function sendCustomerCardDeclined(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  reason: string;
+  context: "charge" | "hold" | "modified_hold_failed";
+}) {
+  const keyMap = {
+    charge: "cust.card.declined",
+    hold: "cust.card.declined_on_hold",
+    modified_hold_failed: "cust.card.modified_hold_failed",
+  } as const;
+  const labelMap = {
+    charge: "Card declined",
+    hold: "Card declined during hold",
+    modified_hold_failed: "Card hold failed for booking change",
+  };
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const html = layout(
+    h1(labelMap[opts.context]) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we weren't able to process your card for booking #${opts.jobNumber}.`) +
+      p(`<strong>Reason from your bank:</strong> ${opts.reason}`) +
+      p("Please update your card details in the portal — we'll retry once it's saved.") +
+      btn("Update card", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Cleano card declined — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: keyMap[opts.context] },
+  });
+}
+
+/** Admin email when a customer card is declined. Context picks the catalog key. */
+export async function sendAdminCardDeclined(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  reason: string;
+  amountAttempted?: number;
+  context: "charge" | "hold" | "modified_hold_failed";
+}) {
+  const keyMap = {
+    charge: "admin.card.declined",
+    hold: "admin.card.declined_on_hold",
+    modified_hold_failed: "admin.card.modified_hold_failed",
+  } as const;
+
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Card declined — ${opts.clientName}`) +
+      p(`The customer's card was declined while attempting to process job #${opts.jobNumber}.`) +
+      section([
+        ["Customer", opts.clientName],
+        ["Booking #", String(opts.jobNumber)],
+        ["Amount", opts.amountAttempted ? fmt(opts.amountAttempted) : "—"],
+        ["Reason", opts.reason],
+      ]) +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Card declined — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: keyMap[opts.context] },
+    }).catch((e) => console.error("sendAdminCardDeclined", admin.email, e));
+  }
+}
+
+/** Admin email when a customer adds a new card on file. */
+export async function sendAdminNewCardAdded(opts: {
+  clientName: string;
+  clientEmail: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1("New card added") +
+      p(`<strong>${opts.clientName}</strong> (${opts.clientEmail}) added a new card to their profile.`) +
+      p("They'll be billed on the new card going forward.")
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `New card on file — ${opts.clientName}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.card.new_card_added" },
+    }).catch((e) => console.error("sendAdminNewCardAdded", admin.email, e));
+  }
+}
+
+/** Admin email when a tip is recorded post-booking. */
+export async function sendAdminTipReceived(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  tipAmount: number;
+  cleanerNames?: string[];
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Tip received — ${fmt(opts.tipAmount)}`) +
+      p(`<strong>${opts.clientName}</strong> tipped ${fmt(opts.tipAmount)} on job #${opts.jobNumber}.`) +
+      (opts.cleanerNames && opts.cleanerNames.length > 0
+        ? p(`Goes to: ${opts.cleanerNames.join(", ")}`)
+        : "") +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Tip received — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.fee.tip_received" },
+    }).catch((e) => console.error("sendAdminTipReceived", admin.email, e));
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// RATING + REVIEW + CLOCK + CHECKLIST (Sub-batch 3A)
+// ──────────────────────────────────────────────────────────────────────
+
+/** Customer "Rate us" email — sent post-job with the rating-token link. */
+export async function sendCustomerRateUs(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  ratingToken: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`How did we do?`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your cleaning is done — would you mind sharing how it went? It takes 10 seconds and helps our team a lot.`) +
+      btn("Rate your cleaning", `${appUrl}/rate/${opts.ratingToken}`) +
+      p(`<small>If the button doesn't work, paste this link in your browser: ${appUrl}/rate/${opts.ratingToken}</small>`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Rate your Cleano cleaning — job #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.rating.rate_us" },
+  });
+}
+
+/** Admin emails when a new review is left. Picks `poor` or `overall_dropped` variants when applicable. */
+export async function sendAdminNewReview(opts: {
+  jobId: string | null;
+  jobNumber: number | null;
+  employeeName: string;
+  rating: number;
+  notes?: string | null;
+  overallRating?: number | null; // post-recalc rating, used for `overall_dropped`
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const isPoor = opts.rating <= 3;
+  const overallDropped =
+    typeof opts.overallRating === "number" && opts.overallRating < 4;
+
+  const body =
+    h1(`${opts.rating}/5 review for ${opts.employeeName}${isPoor ? " ⚠️" : ""}`) +
+    p(opts.jobNumber ? `Left for job #${opts.jobNumber}.` : "Manual rating entry.") +
+    section([
+      ["Cleaner", opts.employeeName],
+      ["Rating", `${opts.rating}/5`],
+      ["Overall after recalc", typeof opts.overallRating === "number" ? `${opts.overallRating.toFixed(2)}/5` : "—"],
+    ]) +
+    (opts.notes ? p(`<strong>Notes:</strong> ${opts.notes}`) : "") +
+    (opts.jobId ? btn("Open job", `${appUrl}/jobs/${opts.jobId}`) : "");
+
+  const html = layout(body);
+
+  // Always send `admin.rating.new`; additionally `admin.rating.poor` for ≤3,
+  // and `admin.rating.overall_dropped` when the post-recalc rating slipped <4.
+  const keys: string[] = ["admin.rating.new"];
+  if (isPoor) keys.push("admin.rating.poor");
+  if (overallDropped) keys.push("admin.rating.overall_dropped");
+
+  for (const admin of admins) {
+    for (const key of keys) {
+      await deliver({
+        to: admin.email,
+        subject: `${opts.rating}/5 review — ${opts.employeeName}`,
+        html,
+        notification: { recipient: "ADMIN", key },
+      }).catch((e) => console.error("sendAdminNewReview", admin.email, key, e));
+    }
+  }
+}
+
+/** Provider email when they get a new review. */
+export async function sendProviderNewReview(opts: {
+  to: string;
+  employeeName: string;
+  jobId: string | null;
+  jobNumber: number | null;
+  rating: number;
+  notes?: string | null;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`You got a ${opts.rating}/5 review`) +
+      p(`Hi ${opts.employeeName.split(" ")[0]}, you received a new rating.`) +
+      section([
+        ["Rating", `${opts.rating}/5 ⭐`],
+        ["Job", opts.jobNumber ? `#${opts.jobNumber}` : "—"],
+      ]) +
+      (opts.notes ? p(`<strong>What the customer said:</strong> ${opts.notes}`) : "") +
+      (opts.jobId ? btn("Open job", `${appUrl}/my-jobs/${opts.jobId}`) : "")
+  );
+  return deliver({
+    to: opts.to,
+    subject: `${opts.rating}/5 review on your Cleano work`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.rating.new_review" },
+  });
+}
+
+/** Admin email when a cleaner clocks in. */
+export async function sendAdminClockedIn(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  cleanerName: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`${opts.cleanerName} clocked in`) +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> just started.`) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Clocked in — ${opts.cleanerName} on #${opts.jobNumber}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.clock.clocked_in" },
+    }).catch((e) => console.error("sendAdminClockedIn", admin.email, e));
+  }
+}
+
+/** Admin email when a cleaner clocks out. */
+export async function sendAdminClockedOut(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  cleanerName: string;
+  durationMinutes: number;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`${opts.cleanerName} clocked out`) +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> is done.`) +
+      section([
+        ["Duration", `${opts.durationMinutes} min`],
+      ]) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Clocked out — ${opts.cleanerName} on #${opts.jobNumber}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.clock.clocked_out" },
+    }).catch((e) => console.error("sendAdminClockedOut", admin.email, e));
+  }
+}
+
+/** Admin email when a job checklist is fully completed. */
+export async function sendAdminChecklistCompleted(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  cleanerName: string;
+  itemCount: number;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Checklist complete — ${opts.clientName}`) +
+      p(`<strong>${opts.cleanerName}</strong> just finished every checklist item on job #${opts.jobNumber}.`) +
+      section([
+        ["Items completed", `${opts.itemCount}/${opts.itemCount}`],
+      ]) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Checklist done — #${opts.jobNumber}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.checklist.completed" },
+    }).catch((e) => console.error("sendAdminChecklistCompleted", admin.email, e));
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// ACCOUNT LIFECYCLE — customer + provider variants in one place.
+// Use sendAccountEmail(...) with the right `event` + `role`.
+// ──────────────────────────────────────────────────────────────────────
+
+type AccountEvent =
+  | "new_account"
+  | "setup_password"
+  | "reset_password"
+  | "password_changed"
+  | "profile_changed"
+  | "activated"
+  | "deactivated"
+  | "add_card"
+  | "how_it_works"
+  | "email_verification"
+  | "signup_submitted"
+  | "signup_rejected";
+
+interface AccountEmailOpts {
+  to: string;
+  name: string;
+  role: "CUSTOMER" | "PROVIDER";
+  event: AccountEvent;
+  /** Reset / verify / setup URL when applicable. */
+  link?: string;
+}
+
+const ACCOUNT_KEY_MAP: Record<
+  "CUSTOMER" | "PROVIDER",
+  Partial<Record<AccountEvent, string>>
+> = {
+  CUSTOMER: {
+    new_account: "cust.account.new",
+    setup_password: "cust.account.setup_password",
+    reset_password: "cust.account.reset_password",
+    password_changed: "cust.account.password_changed",
+    profile_changed: "cust.account.profile_changed",
+    activated: "cust.account.activated",
+    deactivated: "cust.account.deactivated",
+    add_card: "cust.account.add_card",
+  },
+  PROVIDER: {
+    new_account: "prov.account.new",
+    how_it_works: "prov.account.how_it_works",
+    reset_password: "prov.account.reset_password",
+    password_changed: "prov.account.password_changed",
+    activated: "prov.account.activated",
+    deactivated: "prov.account.deactivated",
+    email_verification: "prov.account.email_verification",
+    signup_submitted: "prov.account.signup_submitted",
+    signup_rejected: "prov.account.signup_rejected",
+  },
+};
+
+const ACCOUNT_COPY: Record<AccountEvent, { subject: string; title: string; body: (name: string, link?: string) => string }> = {
+  new_account: {
+    subject: "Welcome to Cleano",
+    title: "Welcome to Cleano",
+    body: (n) => `Hi ${n.split(" ")[0]}, thanks for joining Cleano. We're glad to have you.`,
+  },
+  setup_password: {
+    subject: "Set up your Cleano password",
+    title: "Set your password",
+    body: (n, l) => `Hi ${n.split(" ")[0]}, set your password to finish creating your Cleano account.${l ? ` <a href="${l}">Set my password</a>` : ""}`,
+  },
+  reset_password: {
+    subject: "Reset your Cleano password",
+    title: "Password reset",
+    body: (n, l) => `Hi ${n.split(" ")[0]}, click the link below to choose a new password. It expires in 1 hour.${l ? ` <a href="${l}">Reset my password</a>` : ""}`,
+  },
+  password_changed: {
+    subject: "Your Cleano password was changed",
+    title: "Password updated",
+    body: (n) => `Hi ${n.split(" ")[0]}, your password was just changed. If this wasn't you, please contact us right away.`,
+  },
+  profile_changed: {
+    subject: "Your Cleano profile was updated",
+    title: "Profile updated",
+    body: (n) => `Hi ${n.split(" ")[0]}, your profile information was just updated. If this wasn't you, please get in touch.`,
+  },
+  activated: {
+    subject: "Your Cleano account is active",
+    title: "Account activated",
+    body: (n) => `Hi ${n.split(" ")[0]}, your Cleano account is active and ready to use.`,
+  },
+  deactivated: {
+    subject: "Your Cleano account was deactivated",
+    title: "Account deactivated",
+    body: (n) => `Hi ${n.split(" ")[0]}, your Cleano account has been deactivated. Reach out if you have any questions.`,
+  },
+  add_card: {
+    subject: "Add a card to your Cleano account",
+    title: "Add a payment method",
+    body: (n, l) => `Hi ${n.split(" ")[0]}, please add a card to your profile to complete the booking flow.${l ? ` <a href="${l}">Add card</a>` : ""}`,
+  },
+  how_it_works: {
+    subject: "How Cleano works",
+    title: "Quick tour",
+    body: (n) =>
+      `Hi ${n.split(" ")[0]}, here's the rundown:<br><br>` +
+      `<strong>1.</strong> Browse the Available jobs tab and accept ones that fit your schedule.<br>` +
+      `<strong>2.</strong> Clock in when you arrive, complete the checklist, clock out when done.<br>` +
+      `<strong>3.</strong> Payments and wash credits land in your account automatically.<br><br>` +
+      `Reach out anytime via the Messages tab — admin is one tap away.`,
+  },
+  email_verification: {
+    subject: "Verify your Cleano email",
+    title: "Verify your email",
+    body: (n, l) => `Hi ${n.split(" ")[0]}, click the link below to verify your email and continue onboarding.${l ? ` <a href="${l}">Verify email</a>` : ""}`,
+  },
+  signup_submitted: {
+    subject: "We received your Cleano application",
+    title: "Application received",
+    body: (n) => `Hi ${n.split(" ")[0]}, thanks for applying to join Cleano. We'll review and get back to you within 2–3 business days.`,
+  },
+  signup_rejected: {
+    subject: "Update on your Cleano application",
+    title: "Application update",
+    body: (n) => `Hi ${n.split(" ")[0]}, after reviewing your application we're not able to move forward at this time. We appreciate your interest in Cleano.`,
+  },
+};
+
+export async function sendAccountEmail(opts: AccountEmailOpts) {
+  const key = ACCOUNT_KEY_MAP[opts.role][opts.event];
+  if (!key) return { ok: false, error: "Unknown event for role" };
+  const copy = ACCOUNT_COPY[opts.event];
+  const html = layout(h1(copy.title) + p(copy.body(opts.name, opts.link)));
+  return deliver({
+    to: opts.to,
+    subject: copy.subject,
+    html,
+    notification: { recipient: opts.role, key },
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// INVOICE LIFECYCLE
+// ──────────────────────────────────────────────────────────────────────
+
+type InvoiceEvent =
+  | "new"
+  | "update"
+  | "resend"
+  | "partial_charge"
+  | "charge"
+  | "card_declined"
+  | "skip"
+  | "end_recurring"
+  | "custom_refund"
+  | "charge_auth"
+  | "contract_otp";
+
+interface InvoiceEmailOpts {
+  to: string;
+  recipient: "ADMIN" | "CUSTOMER";
+  event: InvoiceEvent;
+  invoiceNumber: number | string;
+  amount?: number;
+  link?: string;
+  clientName?: string;
+}
+
+const INVOICE_KEY_MAP: Record<"ADMIN" | "CUSTOMER", Partial<Record<InvoiceEvent, string>>> = {
+  ADMIN: {
+    partial_charge: "admin.invoice.partial_charge",
+    charge: "admin.invoice.charge",
+    card_declined: "admin.invoice.card_declined",
+    skip: "admin.invoice.skip",
+    end_recurring: "admin.invoice.end_recurring",
+  },
+  CUSTOMER: {
+    new: "cust.invoice.new",
+    update: "cust.invoice.update",
+    resend: "cust.invoice.resend",
+    partial_charge: "cust.invoice.partial_charge",
+    charge: "cust.invoice.charge",
+    card_declined: "cust.invoice.card_declined",
+    custom_refund: "cust.invoice.custom_refund",
+    charge_auth: "cust.invoice.charge_auth",
+    contract_otp: "cust.invoice.contract_otp",
+  },
+};
+
+const INVOICE_COPY: Record<InvoiceEvent, { subject: (n: string | number) => string; title: string; body: (opts: InvoiceEmailOpts) => string }> = {
+  new: {
+    subject: (n) => `New Cleano invoice #${n}`,
+    title: "New invoice",
+    body: (o) => `Hi ${(o.clientName ?? "there").split(" ")[0]}, a new invoice has been generated${o.amount ? ` for ${fmt(o.amount)}` : ""}.${o.link ? ` <a href="${o.link}">View invoice</a>` : ""}`,
+  },
+  update: {
+    subject: (n) => `Invoice #${n} updated`,
+    title: "Invoice updated",
+    body: (o) => `Hi ${(o.clientName ?? "there").split(" ")[0]}, your invoice was updated.${o.link ? ` <a href="${o.link}">View invoice</a>` : ""}`,
+  },
+  resend: {
+    subject: (n) => `Invoice #${n} (resent)`,
+    title: "Invoice resent",
+    body: (o) => `Hi ${(o.clientName ?? "there").split(" ")[0]}, resending your invoice as requested.${o.link ? ` <a href="${o.link}">View invoice</a>` : ""}`,
+  },
+  partial_charge: {
+    subject: (n) => `Invoice #${n} — partial payment`,
+    title: "Partial payment received",
+    body: (o) => `${o.amount ? fmt(o.amount) : "Part of the invoice"} has been charged.`,
+  },
+  charge: {
+    subject: (n) => `Invoice #${n} — paid`,
+    title: "Invoice paid",
+    body: (o) => `Invoice paid in full${o.amount ? ` (${fmt(o.amount)})` : ""}.`,
+  },
+  card_declined: {
+    subject: (n) => `Invoice #${n} — card declined`,
+    title: "Card declined",
+    body: () => `The card on file was declined while charging this invoice. Please retry or update payment details.`,
+  },
+  skip: {
+    subject: (n) => `Invoice #${n} skipped`,
+    title: "Invoice skipped",
+    body: () => `This invoice was skipped because no valid booking was found to bill.`,
+  },
+  end_recurring: {
+    subject: () => `Recurring invoice ended`,
+    title: "Recurring schedule ended",
+    body: () => `The recurring invoice schedule has ended (no upcoming bookings).`,
+  },
+  custom_refund: {
+    subject: (n) => `Invoice #${n} — refund issued`,
+    title: "Refund issued",
+    body: (o) => `${o.amount ? fmt(o.amount) : "An amount"} has been refunded for this invoice.`,
+  },
+  charge_auth: {
+    subject: (n) => `Invoice #${n} — authentication needed`,
+    title: "Confirm your card",
+    body: (o) => `Your bank needs you to confirm this charge. ${o.link ? `<a href="${o.link}">Confirm payment</a>` : ""}`,
+  },
+  contract_otp: {
+    subject: () => `Your Cleano contract code`,
+    title: "Verification code",
+    body: (o) => `Your one-time code: <strong>${o.amount ?? "—"}</strong>`,
+  },
+};
+
+export async function sendInvoiceEmail(opts: InvoiceEmailOpts) {
+  const key = INVOICE_KEY_MAP[opts.recipient][opts.event];
+  if (!key) return { ok: false, error: "Unknown invoice event for recipient" };
+  const copy = INVOICE_COPY[opts.event];
+  const html = layout(h1(copy.title) + p(copy.body(opts)));
+  return deliver({
+    to: opts.to,
+    subject: copy.subject(opts.invoiceNumber),
+    html,
+    notification: { recipient: opts.recipient, key },
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// DOCUMENTS + UNASSIGNED + SCHEDULE
+// ──────────────────────────────────────────────────────────────────────
+
+export async function sendProviderDocumentUploaded(opts: {
+  to: string;
+  providerName: string;
+  documentTitle: string;
+}) {
+  const html = layout(
+    h1("New document on your Cleano drive") +
+      p(`Hi ${opts.providerName.split(" ")[0]}, <strong>${opts.documentTitle}</strong> was added to your drive.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `New document: ${opts.documentTitle}`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.drive.doc_uploaded" },
+  });
+}
+
+export async function sendAdminDocSignatureRequest(opts: {
+  signerName: string;
+  documentTitle: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1("New document needs a signature") +
+      p(`<strong>${opts.signerName}</strong> needs to sign <strong>${opts.documentTitle}</strong>.`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Signature requested — ${opts.documentTitle}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.docs.signature_request" },
+    }).catch((e) => console.error("admin signature-request", admin.email, e));
+  }
+}
+
+export async function sendAdminDocSigned(opts: {
+  signerName: string;
+  documentTitle: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1("Document signed") +
+      p(`<strong>${opts.signerName}</strong> signed <strong>${opts.documentTitle}</strong>.`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Signed: ${opts.documentTitle}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.docs.signed_completed" },
+    }).catch((e) => console.error("admin signed-completed", admin.email, e));
+  }
+}
+
+type UnassignedEvent = "new" | "moved" | "modified" | "grabbed";
+const UNASSIGNED_KEY_MAP: Record<UnassignedEvent, string> = {
+  new: "admin.unassigned.new",
+  moved: "admin.unassigned.moved",
+  modified: "admin.unassigned.modified",
+  grabbed: "admin.unassigned.grabbed",
+};
+const UNASSIGNED_LABEL: Record<UnassignedEvent, string> = {
+  new: "New booking in unassigned folder",
+  moved: "Booking moved to unassigned folder",
+  modified: "Unassigned booking modified",
+  grabbed: "Someone grabbed an unassigned job",
+};
+
+export async function sendAdminUnassignedEvent(opts: {
+  event: UnassignedEvent;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(UNASSIGNED_LABEL[opts.event]) +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong>${opts.event === "new" || opts.event === "moved" ? " is currently unassigned." : "."}`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+      ]) +
+      btn("Open in admin", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `${UNASSIGNED_LABEL[opts.event]} — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: UNASSIGNED_KEY_MAP[opts.event] },
+    }).catch((e) => console.error("admin unassigned", admin.email, opts.event, e));
+  }
+}
+
+export async function sendAdminScheduleSettingsEvent(opts: {
+  event: "settings_mod_request" | "schedule_mod_request" | "schedule_updated" | "settings_updated";
+  providerName: string;
+  detail?: string;
+}) {
+  const keyMap = {
+    settings_mod_request: "admin.schedule.settings_modification_request",
+    schedule_mod_request: "admin.schedule.schedule_modification_request",
+    schedule_updated: "admin.schedule.schedule_updated",
+    settings_updated: "admin.schedule.settings_updated",
+  } as const;
+  const labelMap = {
+    settings_mod_request: "Settings modification request",
+    schedule_mod_request: "Schedule modification request",
+    schedule_updated: "Schedule updated",
+    settings_updated: "Settings updated",
+  } as const;
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1(`${opts.providerName}: ${labelMap[opts.event]}`) +
+      (opts.detail ? p(opts.detail) : "")
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `${labelMap[opts.event]} — ${opts.providerName}`,
+      html,
+      notification: { recipient: "ADMIN", key: keyMap[opts.event] },
+    }).catch((e) => console.error("admin schedule-event", admin.email, opts.event, e));
+  }
+}
+
+export async function sendProviderScheduleResponse(opts: {
+  to: string;
+  providerName: string;
+  approved: boolean;
+  detail?: string;
+  scope: "schedule" | "settings";
+}) {
+  const keyMap = {
+    schedule: "prov.schedule.modification_response",
+    settings: opts.approved ? "prov.schedule.settings_approved" : "prov.schedule.settings_declined",
+  } as const;
+  const titleMap = {
+    schedule: opts.approved ? "Your schedule change was approved" : "Your schedule change was declined",
+    settings: opts.approved ? "Your settings change was approved" : "Your settings change was declined",
+  } as const;
+  const html = layout(
+    h1(titleMap[opts.scope]) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, ${opts.approved ? "your request was approved." : "your request was declined."}`) +
+      (opts.detail ? p(opts.detail) : "")
+  );
+  return deliver({
+    to: opts.to,
+    subject: titleMap[opts.scope],
+    html,
+    notification: { recipient: "PROVIDER", key: keyMap[opts.scope] },
+  });
+}
+
+export async function sendAdminSignupReview(opts: {
+  applicantName: string;
+  applicantEmail: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("New cleaner sign-up to review") +
+      p(`<strong>${opts.applicantName}</strong> (${opts.applicantEmail}) signed up. Approve or reject from the admin.`) +
+      btn("Open admin", `${appUrl}/requests`)
+  );
+  // Fire two catalog rows — `admin.signup.new_provider` (informational) AND
+  // `admin.signup.review_request` (review action needed).
+  for (const admin of admins) {
+    for (const key of ["admin.signup.new_provider", "admin.signup.review_request"]) {
+      await deliver({
+        to: admin.email,
+        subject: `New cleaner sign-up: ${opts.applicantName}`,
+        html,
+        notification: { recipient: "ADMIN", key },
+      }).catch((e) => console.error("admin signup-review", admin.email, key, e));
+    }
+  }
+}
+
+/** Provider email when they receive a tip on a job. Gated by `prov.payments.new_tip`. */
+export async function sendProviderNewTip(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  tipAmount: number;
+  clientName: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`You received a tip!`) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, <strong>${opts.clientName}</strong> just tipped you ${fmt(opts.tipAmount)} on job #${opts.jobNumber}.`) +
+      btn("Open job", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `You got a ${fmt(opts.tipAmount)} tip 🎉`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.payments.new_tip" },
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// CRON-DRIVEN NOTIFICATIONS (Yellow batch)
+// All helpers in this section are designed to be called from
+// /api/cron/notifications. Each uses `notificationKey` on EmailLog so the
+// dispatcher can be idempotent across multiple cron firings.
+// ──────────────────────────────────────────────────────────────────────
+
+interface JobReminderOpts {
+  to: string;
+  recipientName: string;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  address: string;
+  cleanerNames: string[];
+  logId: string;
+}
+
+/** Admin "unassigned starts in N hours" — picks the row based on the window. */
+export async function sendAdminUnassignedDeadline(opts: {
+  window: "12h" | "4h" | "1h";
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  logId: string;
+}) {
+  const keyMap = {
+    "12h": "admin.unassigned.starts_12h",
+    "4h": "admin.unassigned.starts_4h",
+    "1h": "admin.unassigned.starts_1h",
+  } as const;
+  const subjectMap = {
+    "12h": "12 hours",
+    "4h": "4 hours",
+    "1h": "1 hour",
+  } as const;
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Unassigned booking starts in ${subjectMap[opts.window]}`) +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> has no cleaner assigned yet.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Start", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+      ]) +
+      btn("Assign now", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Unassigned (${subjectMap[opts.window]}) — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: keyMap[opts.window] },
+      logId: opts.logId,
+    }).catch((e) => console.error("admin unassigned-deadline", admin.email, opts.window, e));
+  }
+}
+
+/** Admin "Booking not clocked in" reminder. */
+export async function sendAdminNotClockedIn(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  cleanerNames: string[];
+  startTime: string;
+  logId: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Cleaner hasn't clocked in") +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> was supposed to start at ${fmtTime(opts.startTime)}. No clock-in yet.`) +
+      p(`Assigned: ${opts.cleanerNames.join(", ") || "—"}`) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Not clocked in — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.clock.not_clocked_in" },
+      logId: opts.logId,
+    }).catch((e) => console.error("admin not-clocked-in", admin.email, e));
+  }
+}
+
+/** Admin cash/check upcoming reminder. */
+export async function sendAdminCashCheckReminder(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  paymentType: string;
+  logId: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Upcoming cash/check booking`) +
+      p(`Heads up — job #${opts.jobNumber} for <strong>${opts.clientName}</strong> uses ${opts.paymentType}. Cleaner should collect payment on-site.`) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `Cash/check upcoming — ${opts.clientName} (#${opts.jobNumber})`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.reminders.cash_check" },
+      logId: opts.logId,
+    }).catch((e) => console.error("admin cash-check", admin.email, e));
+  }
+}
+
+/** Admin "Poor rating twice in a week" — fires once per cleaner per week. */
+export async function sendAdminPoorRatingTwiceWeek(opts: {
+  cleanerName: string;
+  count: number;
+  logId: string;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1(`Multiple poor ratings — ${opts.cleanerName}`) +
+      p(`<strong>${opts.cleanerName}</strong> received ${opts.count} ratings of 3/5 or lower in the past 7 days. Worth a check-in.`)
+  );
+  for (const admin of admins) {
+    await deliver({
+      to: admin.email,
+      subject: `${opts.count} poor ratings this week — ${opts.cleanerName}`,
+      html,
+      notification: { recipient: "ADMIN", key: "admin.rating.poor_twice_week" },
+      logId: opts.logId,
+    }).catch((e) => console.error("admin poor-x2", admin.email, e));
+  }
+}
+
+/** Customer 48h reminder (catalog key `cust.reminders.booking_reminder_2`). */
+export async function sendCustomerReminder48h(opts: JobReminderOpts) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Your Cleano cleaning is in 2 days") +
+      p(`Hi ${opts.recipientName.split(" ")[0]}, just a heads-up that your cleaning is coming up in about 48 hours.`) +
+      section([
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+        ["Address", opts.address],
+      ]) +
+      p(opts.cleanerNames.length > 0
+        ? `Your cleaner${opts.cleanerNames.length > 1 ? "s" : ""}: <strong>${opts.cleanerNames.join(", ")}</strong>`
+        : "We're finalizing your cleaner assignment.") +
+      btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Reminder: your Cleano cleaning is in 2 days`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.reminders.booking_reminder_2" },
+    logId: opts.logId,
+  });
+}
+
+/** Customer "Never found a provider" notification. */
+export async function sendCustomerNeverFoundProvider(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  startTime: string;
+  logId: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("We weren't able to staff your booking") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, unfortunately we couldn't find a cleaner for your booking on ${fmtDate(opts.startTime)}. The booking has been canceled and you won't be charged.`) +
+      btn("Try a different time", `${appUrl}/book`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `We couldn't staff your Cleano booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.cancel.never_found_provider" },
+    logId: opts.logId,
+  });
+}
+
+/** Customer "Leave a tip" follow-up. */
+export async function sendCustomerLeaveTip(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  cleanerNames: string[];
+  logId: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Care to tip your cleaner?") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, if you enjoyed your cleaning, leaving a tip is a great way to show ${opts.cleanerNames.join(" and ") || "your cleaner"} you appreciated it.`) +
+      btn("Add a tip", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Tip your cleaner for job #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.completed.leave_tip" },
+    logId: opts.logId,
+  });
+}
+
+/** Provider "One day reminder" + "One hour reminder" + unassigned-pool reminder. */
+export async function sendProviderJobReminder(opts: {
+  window: "1d" | "1h" | "unassigned_pool";
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  address: string;
+  logId: string;
+}) {
+  const keyMap = {
+    "1d": "prov.reminders.one_day",
+    "1h": "prov.reminders.one_hour",
+    unassigned_pool: "prov.reminders.unassigned",
+  } as const;
+  const subjMap = {
+    "1d": "Your job tomorrow",
+    "1h": "Job starts in 1 hour",
+    unassigned_pool: "Open jobs available",
+  } as const;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(subjMap[opts.window]) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, ${opts.window === "unassigned_pool" ? "there are unassigned jobs you can pick up." : `you have a job for ${opts.clientName} coming up.`}`) +
+      (opts.window !== "unassigned_pool"
+        ? section([
+            ["Date", fmtDate(opts.startTime)],
+            ["Time", fmtTime(opts.startTime)],
+            ["Address", opts.address],
+          ])
+        : "") +
+      btn("Open in app", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `${subjMap[opts.window]} — Cleano`,
+    html,
+    notification: { recipient: "PROVIDER", key: keyMap[opts.window] },
+    logId: opts.logId,
+  });
+}
+
+/**
+ * Customer email when admin resolves their request (approve / deny, for
+ * cancellation OR reschedule). Reuses the existing catalog rows:
+ *   - cancellation approved → `cust.cancel.booking_cancellation` (separate helper)
+ *   - everything else → `cust.booking.modified` (admin acted on the booking)
+ */
+export async function sendCustomerRequestResolved(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  startTime: string;
+  address: string;
+  serviceType: string | null;
+  kind: "cancellation" | "reschedule";
+  decision: "approve" | "deny";
+  note?: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const title =
+    opts.decision === "approve"
+      ? opts.kind === "cancellation"
+        ? "Your cancellation was approved"
+        : "Your reschedule request was approved"
+      : opts.kind === "cancellation"
+      ? "Your cancellation request was declined"
+      : "Your reschedule request was declined";
+
+  const subject =
+    opts.decision === "approve"
+      ? opts.kind === "cancellation"
+        ? `Cancellation approved — #${opts.jobNumber}`
+        : `Reschedule approved — #${opts.jobNumber}`
+      : opts.kind === "cancellation"
+      ? `Cancellation request declined — #${opts.jobNumber}`
+      : `Reschedule request declined — #${opts.jobNumber}`;
+
+  const lead =
+    opts.decision === "approve"
+      ? opts.kind === "cancellation"
+        ? `Hi ${opts.clientName.split(" ")[0]}, your cancellation has been approved. The booking won't proceed and you won't be charged.`
+        : `Hi ${opts.clientName.split(" ")[0]}, we've received your reschedule request and we'll be in touch shortly to confirm a new time that works for both sides.`
+      : opts.kind === "cancellation"
+      ? `Hi ${opts.clientName.split(" ")[0]}, after reviewing your cancellation request we're not able to cancel this booking. The cleaning will go ahead as planned.`
+      : `Hi ${opts.clientName.split(" ")[0]}, after reviewing your reschedule request we're keeping the original date and time. The cleaning will go ahead as planned.`;
+
+  const html = layout(
+    h1(title) +
+      p(lead) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Date", fmtDate(opts.startTime)],
+        ["Time", fmtTime(opts.startTime)],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.note ? p(`<strong>Note from our team:</strong> ${opts.note}`) : "") +
+      btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+
+  // Catalog mapping:
+  //  - cancellation (approve OR deny) → `cust.cancel.booking_cancellation`
+  //    so the admin's customer-cancel toggle controls both outcomes.
+  //  - reschedule (approve OR deny) → `cust.booking.modified`
+  //    (closest spec row for "we acted on your booking"). Defaults to EMAIL: true.
+  const key =
+    opts.kind === "cancellation"
+      ? "cust.cancel.booking_cancellation"
+      : "cust.booking.modified";
+
+  return deliver({
+    to: opts.to,
+    subject,
+    html,
+    notification: { recipient: "CUSTOMER", key },
+  });
+}
+
+/**
+ * Provider email when their assigned booking is canceled. Picks the
+ * `_after_5pm` variant when the cancel lands after 5 pm the day before.
+ */
+export async function sendProviderBookingCanceled(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  address: string;
+  serviceType: string | null;
+  reason?: string | null;
+}) {
+  const after5 = isAfter5pmDayBefore(new Date(opts.startTime));
+  const key = after5
+    ? "prov.cancel.booking_canceled_after_5pm"
+    : "prov.cancel.booking_canceled";
+  const subject = after5
+    ? `Late cancel (after 5 pm) — ${opts.clientName} (#${opts.jobNumber})`
+    : `Booking canceled — ${opts.clientName} (#${opts.jobNumber})`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+  const html = layout(
+    h1(after5 ? "Your job was canceled (late)" : "Your job was canceled") +
+      p(
+        `Hi ${opts.providerName.split(" ")[0]}, your scheduled job for <strong>${opts.clientName}</strong> has been canceled and is no longer on your schedule.`
+      ) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Customer", opts.clientName],
+        ["Was scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.reason ? p(`<strong>Reason:</strong> ${opts.reason}`) : "") +
+      (after5
+        ? p("Sorry about the short notice — your pay multiplier for late cancellations is honored where applicable.")
+        : "") +
+      btn("Open in app", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+
+  return deliver({
+    to: opts.to,
+    subject,
+    html,
+    notification: { recipient: "PROVIDER", key },
   });
 }

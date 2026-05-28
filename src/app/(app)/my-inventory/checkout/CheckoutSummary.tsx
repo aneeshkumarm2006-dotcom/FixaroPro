@@ -1,7 +1,5 @@
 "use client";
 
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { ShoppingCart, MapPin, Package } from "lucide-react";
 
@@ -37,38 +35,46 @@ export default function CheckoutSummary({
   const totalUnits = items.reduce((acc, i) => acc + i.quantity, 0);
 
   return (
-    <Card variant="default" className="p-6 space-y-5">
-      <div className="flex items-center gap-2">
-        <ShoppingCart className="w-5 h-5 text-[#005F6A]" />
-        <h2 className="text-xl font-[400] text-gray-900">Review & Confirm</h2>
-      </div>
+    <div className="cl-co-section">
+      <h2>
+        <ShoppingCart className="w-5 h-5" />
+        Review &amp; confirm
+      </h2>
 
-      <div className="rounded-xl bg-[#005F6A]/5 p-4">
-        <div className="flex items-center gap-2 text-sm text-[#005F6A]">
-          <MapPin className="w-4 h-4" />
-          <span className="font-[400]">{locationName}</span>
+      <div className="cl-co-summary-loc">
+        <MapPin className="w-4 h-4" style={{ color: "var(--primary)", marginTop: 2 }} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--primary-deep)" }}>
+            {locationName}
+          </div>
+          {locationAddress && (
+            <div style={{ fontSize: 12, color: "var(--primary-50)", marginTop: 2 }}>
+              {locationAddress}
+            </div>
+          )}
         </div>
-        {locationAddress && (
-          <p className="text-xs text-[#005F6A]/70 mt-1 ml-6">
-            {locationAddress}
-          </p>
-        )}
       </div>
 
       <div>
-        <p className="text-xs uppercase tracking-wide text-[#005F6A]/60 mb-2">
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--primary-60)",
+            margin: "0 0 8px",
+          }}>
           Items ({totalItems})
         </p>
-        <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">
+        <div className="cl-co-summary-list">
           {items.map((i) => (
-            <div
-              key={i.productId}
-              className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{i.productName}</span>
-              </div>
-              <span className="text-gray-700">
+            <div key={i.productId} className="cl-co-summary-item">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Package className="w-4 h-4" style={{ color: "var(--primary-50)" }} />
+                <span>{i.productName}</span>
+              </span>
+              <span style={{ color: "var(--primary-60)", fontVariantNumeric: "tabular-nums" }}>
                 {i.quantity} {i.unit}
               </span>
             </div>
@@ -77,8 +83,17 @@ export default function CheckoutSummary({
       </div>
 
       <div>
-        <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
-          Pickup Notes (optional)
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--primary-60)",
+            marginBottom: 8,
+          }}>
+          Pickup notes (optional)
         </label>
         <Input
           variant="form"
@@ -88,29 +103,29 @@ export default function CheckoutSummary({
         />
       </div>
 
-      <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
-        <span className="text-gray-600">Total units</span>
-        <span className="font-[400] text-gray-900">
+      <div className="cl-co-summary-foot">
+        <span style={{ color: "var(--primary-60)" }}>Total units</span>
+        <span className="total" style={{ fontVariantNumeric: "tabular-nums" }}>
           {totalUnits.toFixed(2)}
         </span>
       </div>
 
-      <div className="flex justify-between gap-2 pt-2">
-        <Button
-          variant="ghost"
-          submit={false}
+      <div className="cl-co-actions">
+        <button
+          type="button"
+          className="cl-co-btn-ghost"
           onClick={onBack}
           disabled={submitting}>
           Back
-        </Button>
-        <Button
-          variant="primary"
-          submit={false}
+        </button>
+        <button
+          type="button"
+          className="cl-co-btn-confirm"
           onClick={onConfirm}
           disabled={submitting || items.length === 0}>
-          {submitting ? "Processing..." : "Confirm Pickup"}
-        </Button>
+          {submitting ? "Processing…" : "Confirm pickup"}
+        </button>
       </div>
-    </Card>
+    </div>
   );
 }

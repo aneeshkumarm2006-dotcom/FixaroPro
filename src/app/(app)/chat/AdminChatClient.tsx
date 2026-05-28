@@ -6,6 +6,7 @@ import useSWR from "swr";
 import imageCompression from "browser-image-compression";
 import { getAdminChat, getAdminChatList, sendChatMessage, uploadChatAttachment } from "./actions";
 import type { AdminChatPayload, AdminConversationSummary } from "./types";
+import Receipt from "./Receipt";
 
 interface AdminChatClientProps {
   initialList: AdminConversationSummary[];
@@ -78,6 +79,7 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
   const [uploading, setUploading] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,10 +113,20 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
 
   const grouped = useMemo(() => groupByDay(chat?.messages ?? []), [chat?.messages]);
 
+  // Pin the active conversation to the most recent message. Runs in rAF so
+  // images / attachments that change scrollHeight after first paint don't
+  // leave the view stuck near the top.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    function scrollToBottom() {
+      const el = scrollRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      requestAnimationFrame(scrollToBottom);
+    });
   }, [chat?.messages.length, selectedEmployeeId]);
 
   async function handleSend() {
@@ -138,6 +150,8 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
       createdAt: new Date().toISOString(),
       readByAdminAt: new Date().toISOString(),
       readByEmployeeAt: null,
+      deliveredAt: null,
+      receipt: "SENT" as const,
     };
     await mutateChat(
       (current) => current
@@ -328,11 +342,21 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                         : initials(selectedConv.employeeName)
                       }
                     </span>
-                    <span className="chat-status-dot offline" style={{ width: 12, height: 12 }} />
+                    <span
+                      className={`chat-status-dot ${chat?.otherOnline ? "online" : "offline"}`}
+                      style={{ width: 12, height: 12 }}
+                    />
                   </div>
                   <div className="thread-meta">
                     <div className="thread-name">{selectedConv.employeeName}</div>
-                    <div className="thread-role">Employee</div>
+                    <div className="thread-role">
+                      Employee
+                      {chat?.otherOnline ? (
+                        <span style={{ color: "#059669", marginLeft: 8 }}>· Active now</span>
+                      ) : (
+                        <span style={{ color: "var(--primary-50)", marginLeft: 8 }}>· Offline</span>
+                      )}
+                    </div>
                   </div>
                   <div className="thread-actions">
                     <button className="chat-icon-btn" aria-label="More options">
@@ -378,11 +402,7 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                                 {m.body && <div>{m.body}</div>}
                                 <div className="chat-msg-time">
                                   {timeOnly(m.createdAt)}
-                                  {mine && (
-                                    <svg width="11" height="8" viewBox="0 0 11 8" fill="none" style={{ opacity: 0.8 }}>
-                                      <path d="M1 4l2.5 2.5L6 4m2-3L5.5 6.5 10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                    </svg>
-                                  )}
+                                  {mine && <Receipt state={m.receipt} />}
                                 </div>
                               </div>
                             </div>
@@ -391,6 +411,7 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
                       </div>
                     ))
                   )}
+                  <div ref={bottomRef} aria-hidden="true" />
                 </div>
 
                 {/* Composer */}

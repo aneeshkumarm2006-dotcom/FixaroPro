@@ -5,9 +5,20 @@ export type Frequency =
   | "MONTHLY"
   | "QUARTERLY";
 
+export type RoomType =
+  | "KITCHEN"
+  | "BATHROOM"
+  | "BEDROOM"
+  | "LIVING_ROOM"
+  | "LAUNDRY"
+  | "OUTDOOR"
+  | "WHOLE_HOME";
+
 export interface AddOnSelection {
+  id?: string;
   name: string;
   price: number;
+  roomType?: RoomType;
   selected: boolean;
 }
 
@@ -56,13 +67,9 @@ export const EMPTY_DRAFT: BookingDraft = {
   squareFootage: 0,
   serviceType: "STANDARD",
   frequency: "ONE_TIME",
-  addOns: [
-    { name: "Inside fridge", price: 25, selected: false },
-    { name: "Inside oven", price: 25, selected: false },
-    { name: "Inside cabinets", price: 35, selected: false },
-    { name: "Inside windows", price: 30, selected: false },
-    { name: "Laundry / folding", price: 20, selected: false },
-  ],
+  // Populated from getBookingConfig() on mount — kept empty by default so
+  // the catalog stays admin-managed.
+  addOns: [],
   date: "",
   isFlexible: true,
   timeSlot: "",

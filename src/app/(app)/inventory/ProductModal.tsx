@@ -21,6 +21,8 @@ import createProduct from "../actions/createProduct";
 import { updateProduct } from "../actions/updateProduct";
 import { deleteProduct } from "../actions/deleteProduct";
 
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+
 interface Product {
   id: string;
   name: string;
@@ -29,6 +31,7 @@ interface Product {
   costPerUnit: number;
   stockLevel: number;
   minStock: number;
+  category?: ProductCategory;
 }
 
 interface ProductModalProps {
@@ -45,6 +48,7 @@ const formSchema = z.object({
   costPerUnit: z.coerce.number().min(0, "Cost must be 0 or greater"),
   stockLevel: z.coerce.number().min(0, "Stock level must be 0 or greater"),
   minStock: z.coerce.number().min(0, "Minimum stock must be 0 or greater"),
+  category: z.enum(["LIQUID_SPRAY", "MOP_LIQUID", "DISPOSABLE", "OTHER"]).default("OTHER"),
 });
 
 type FormInput = z.input<typeof formSchema>;
@@ -77,6 +81,7 @@ export function ProductModal({
       costPerUnit: 0,
       stockLevel: 0,
       minStock: 0,
+      category: "OTHER",
     },
   });
 
@@ -90,6 +95,7 @@ export function ProductModal({
         costPerUnit: product?.costPerUnit || 0,
         stockLevel: product?.stockLevel || 0,
         minStock: product?.minStock || 0,
+        category: product?.category || "OTHER",
       });
     }
   }, [isOpen, product, mode, reset]);
@@ -109,6 +115,7 @@ export function ProductModal({
       formData.append("costPerUnit", String(values.costPerUnit));
       formData.append("stockLevel", String(values.stockLevel));
       formData.append("minStock", String(values.minStock));
+      formData.append("category", values.category);
 
       let result;
       if (mode === "create") {
@@ -323,6 +330,25 @@ export function ProductModal({
                 </div>
                 <p className="text-xs text-[#005F6A]/60 mt-1">
                   Optional description for internal reference
+                </p>
+              </div>
+
+              {/* Category — drives the post-job inventory survey UI */}
+              <div>
+                <label className="input-label">
+                  Category <span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  {...register("category")}
+                  disabled={disableForm}
+                  className="w-full px-4 py-3 rounded-xl border border-[#005F6A]/15 bg-white text-[#003C46] text-sm focus:outline-none focus:border-[#005F6A] focus:ring-2 focus:ring-[#005F6A]/10">
+                  <option value="LIQUID_SPRAY">Liquid spray (Windex, all-purpose, CLR…)</option>
+                  <option value="MOP_LIQUID">Mop-based liquid (floor cleaner, Murphy Oil…)</option>
+                  <option value="DISPOSABLE">Disposable (sponges, gloves, paper towels…)</option>
+                  <option value="OTHER">Other</option>
+                </select>
+                <p className="text-xs text-[#005F6A]/60 mt-1">
+                  Determines how cleaners log usage at clock-out.
                 </p>
               </div>
 

@@ -6,6 +6,7 @@ import useSWR from "swr";
 import imageCompression from "browser-image-compression";
 import { getEmployeeChat, sendChatMessage, uploadChatAttachment } from "./actions";
 import type { EmployeeChatPayload } from "./types";
+import Receipt from "./Receipt";
 
 interface EmployeeChatClientProps {
   initial: EmployeeChatPayload;
@@ -48,6 +49,7 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
   const [uploading, setUploading] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,11 +67,23 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
   const conversationId = data?.conversationId ?? initial.conversationId;
   const grouped = useMemo(() => groupByDay(messages), [messages]);
 
+  // Pin the thread to the newest message. Runs in rAF so layout has settled
+  // (covers initial mount + every new message). Also re-runs on visibility
+  // change so re-opening the tab snaps back to the bottom.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+    function scrollToBottom() {
+      const el = scrollRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      // Second rAF — covers layouts that include images/attachments that
+      // mutate scrollHeight after the first paint.
+      requestAnimationFrame(scrollToBottom);
+    });
+  }, [messages.length, data?.conversationId]);
 
   async function handleSend() {
     const body = draft.trim();
@@ -92,6 +106,8 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
       createdAt: new Date().toISOString(),
       readByAdminAt: null,
       readByEmployeeAt: new Date().toISOString(),
+      deliveredAt: null,
+      receipt: "SENT" as const,
     };
     await mutate(
       (current) => current
@@ -205,7 +221,10 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
               }}>
                 <Shield size={20} />
               </div>
-              <span className="chat-status-dot online" style={{ width: 12, height: 12 }} />
+              <span
+                className={`chat-status-dot ${data?.otherOnline ? "online" : "offline"}`}
+                style={{ width: 12, height: 12 }}
+              />
             </div>
             <div className="thread-meta">
               <div className="thread-name">
@@ -214,7 +233,11 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
               </div>
               <div className="thread-role">
                 Operations · Dispatch
-                <span style={{ color: "#059669", marginLeft: 8 }}>· Active now</span>
+                {data?.otherOnline ? (
+                  <span style={{ color: "#059669", marginLeft: 8 }}>· Active now</span>
+                ) : (
+                  <span style={{ color: "var(--primary-50)", marginLeft: 8 }}>· Offline</span>
+                )}
               </div>
             </div>
             <div className="thread-actions">
@@ -281,11 +304,7 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
                           {m.body && <div>{m.body}</div>}
                           <div className="chat-msg-time">
                             {timeOnly(m.createdAt)}
-                            {mine && (
-                              <svg width="11" height="8" viewBox="0 0 11 8" fill="none" style={{ opacity: 0.8 }}>
-                                <path d="M1 4l2.5 2.5L6 4m2-3L5.5 6.5 10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
+                            {mine && <Receipt state={m.receipt} />}
                           </div>
                         </div>
                       </div>
@@ -294,6 +313,7 @@ export default function EmployeeChatClient({ initial, userName }: EmployeeChatCl
                 </div>
               ))
             )}
+            <div ref={bottomRef} aria-hidden="true" />
           </div>
 
           {/* Composer */}

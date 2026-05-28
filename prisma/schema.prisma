@@ -20,6 +20,12 @@ model User {
   emailVerified                Boolean                @default(false)
   payMultiplier                Float                  @default(1.0)
   multiplierLastRecalculatedAt DateTime?
+  lastSeenAt                   DateTime?
+  // Self-wash credit ledger — accumulates as jobs complete; drained when
+  // the cleaner claims a wash payout. See /lib/wash for the rules.
+  ragCredits                   Int                    @default(0)
+  padCredits                   Int                    @default(0)
+  washPayouts                  WashPayout[]
   accounts                     Account[]
   assignedProducts             EmployeeProduct[]
   inventoryRequests            InventoryRequest[]
@@ -89,6 +95,7 @@ model Product {
   costPerUnit       Float
   stockLevel        Float                    @default(0)
   minStock          Float                    @default(0)
+  category          ProductCategory          @default(OTHER)
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
   employeeProducts  EmployeeProduct[]
@@ -275,6 +282,16 @@ model Job {
   bookingSource           String?
   squareFootage           Int?
   halfBathCount           Int?
+  // Rag-wash projection — computed from job specs at completion.
+  // `washCreditsAwarded` flips to true once credits are written to
+  // the assigned cleaner ledger(s), making the award idempotent.
+  washProjectedRags       Int?
+  washProjectedPads       Int?
+  washCappedRags          Int?
+  washCappedPads          Int?
+  washActualRags          Int?
+  washActualPads          Int?
+  washCreditsAwarded      Boolean           @default(false)
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
   employee                User?             @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: SetNull)
@@ -463,6 +480,7 @@ model RagWash {
   employeeId String
   washDate   DateTime @default(now())
   ragCount   Int      @default(0)
+  padCount   Int      @default(0)
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -470,6 +488,31 @@ model RagWash {
 
   @@index([employeeId])
   @@index([washDate])
+}
+
+// Per-spec rag-wash credit-to-cash redemption. Records every payout drain.
+model WashPayout {
+  id              String             @id @default(cuid())
+  employeeId      String
+  ragCreditsUsed  Int                @default(0)
+  padCreditsUsed  Int                @default(0)
+  amount          Float
+  status          WashPayoutStatus   @default(PENDING)
+  stripeTransferId String?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  employee        User               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum WashPayoutStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }
 
 model Budget {
@@ -492,6 +535,47 @@ enum Roles {
   FIELD_LEAD
   EMPLOYEE
   CLIENT
+}
+
+enum ProductCategory {
+  LIQUID_SPRAY
+  MOP_LIQUID
+  DISPOSABLE
+  OTHER
+}
+
+enum NotificationRecipient {
+  ADMIN
+  CUSTOMER
+  PROVIDER
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  APP_PUSH
+}
+
+// Catalog of every notification the system can emit, with per-recipient,
+// per-channel enabled flag. Seeded from the Notification Catalog spec; admin
+// can toggle any row from Settings → Notifications.
+model NotificationSetting {
+  id           String                @id @default(cuid())
+  recipient    NotificationRecipient
+  category     String
+  key          String
+  label        String
+  trigger      String
+  channel      NotificationChannel
+  enabled      Boolean               @default(false)
+  isProposed   Boolean               @default(false)
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([recipient, key, channel])
+  @@index([recipient])
+  @@index([category])
 }
 
 enum JobStatus {
@@ -1117,6 +1201,8 @@ model ChatConversation {
   lastMessageAt         DateTime?
   lastEmployeeMessageAt DateTime?
   lastAdminMessageAt    DateTime?
+  lastAdminEmailAt      DateTime?
+  lastEmployeeEmailAt   DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
   employee              User          @relation("EmployeeChatConversation", fields: [employeeId], references: [id], onDelete: Cascade)
@@ -1136,6 +1222,7 @@ model ChatMessage {
   attachmentName   String?
   readByAdminAt    DateTime?
   readByEmployeeAt DateTime?
+  deliveredAt      DateTime?
   createdAt        DateTime         @default(now())
   conversation     ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender           User             @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -1266,19 +1353,20 @@ model Waitlist {
 }
 
 model EmailLog {
-  id          String      @id @default(cuid())
-  kind        EmailKind
-  recipient   String
-  subject     String?
-  status      EmailStatus @default(PENDING)
-  jobId       String?
-  leadId      String?
-  waitlistId  String?
-  providerId  String?
-  error       String?
-  sentAt      DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  kind            EmailKind
+  recipient       String
+  subject         String?
+  status          EmailStatus @default(PENDING)
+  jobId           String?
+  leadId          String?
+  waitlistId      String?
+  providerId      String?
+  error           String?
+  sentAt          DateTime?
+  notificationKey String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   job         Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   @@index([kind])

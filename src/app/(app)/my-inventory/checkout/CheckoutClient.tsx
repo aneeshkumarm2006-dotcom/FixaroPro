@@ -13,10 +13,7 @@ import {
   Search,
   ShoppingCart,
 } from "lucide-react";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Badge from "@/components/ui/Badge";
 import { getLocationProducts } from "../../actions/getLocationProducts";
 import type { LocationProductEntry } from "../../actions/getLocationProducts.types";
 import { checkoutInventory } from "../../actions/checkoutInventory";
@@ -45,6 +42,7 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     text: string;
@@ -166,49 +164,70 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
         type: "success",
         text: `Pickup confirmed. ${cartItems.length} item(s) added to your inventory.`,
       });
-      setCart({});
-      setNotes("");
-      setTimeout(() => {
-        router.push("/my-inventory");
-        router.refresh();
+      // Keep cart contents on screen so the summary doesn't blank out while we
+      // wait to redirect. `submitted` disables Confirm/Back so the user can't
+      // re-submit.
+      setSubmitted(true);
+
+      // Redirect with a hard fallback — router.push can stall on dev (the
+      // "Rendering…" indicator gets stuck), so guarantee navigation.
+      // The component unmounts on successful navigation, which cancels the
+      // hard fallback.
+      const pushTimer = setTimeout(() => {
+        try {
+          router.push("/my-inventory");
+        } catch {
+          window.location.href = "/my-inventory";
+        }
       }, 900);
+      const hardFallback = setTimeout(() => {
+        window.location.href = "/my-inventory";
+      }, 2500);
+      // Stop the React-warning lint about unused vars
+      void pushTimer;
+      void hardFallback;
     } else {
       setFeedback({ type: "error", text: res.error || "Checkout failed." });
     }
   }
 
   return (
-    <div className="space-y-6">
-      <Card variant="ghost">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              submit={false}
-              href="/my-inventory"
-              className="!px-2 mb-2">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
-            <h1 className="text-3xl font-[400] text-gray-900 flex items-center gap-2">
-              <ShoppingCart className="w-7 h-7 text-[#005F6A]" />
-              Inventory Pickup
-            </h1>
-            <p className="text-sm text-[#005F6A]/70 mt-1">
-              Pick up equipment and supplies from a storage location
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="md"
-            submit={false}
-            href="/my-inventory/history">
-            <History className="w-4 h-4 mr-1.5" />
-            View History
-          </Button>
+    <div className="cl-page-wrap">
+      <div className="cl-page-head">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 4,
+            minWidth: 0,
+          }}>
+          <a
+            href="/my-inventory"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--primary-60)",
+              textDecoration: "none",
+            }}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to inventory
+          </a>
+          <h1 className="cl-page-title" style={{ margin: 0 }}>
+            Pick up from storage
+          </h1>
+          <p className="cl-page-sub" style={{ margin: 0 }}>
+            Grab equipment and supplies before your next job.
+          </p>
         </div>
-      </Card>
+        <a href="/my-inventory/history" className="cl-action-btn">
+          <History className="w-3.5 h-3.5" />
+          View History
+        </a>
+      </div>
 
       <Stepper step={step} />
 
@@ -224,62 +243,67 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
       )}
 
       {step === 1 && (
-        <Card variant="default" className="p-6 space-y-4">
-          <h2 className="text-xl font-[400] text-gray-900">
-            Select a Storage Location
+        <div className="cl-co-section">
+          <h2>
+            <MapPin className="w-5 h-5" />
+            Select a storage location
           </h2>
           {locations.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No storage locations available. Ask an admin to set one up.
-            </p>
+            <div className="cl-empty-block">
+              <div className="icon-bubble">
+                <MapPin className="w-7 h-7" />
+              </div>
+              <div>No storage locations available. Ask an admin to set one up.</div>
+            </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="cl-co-loc-grid">
               {locations.map((l) => (
                 <button
                   key={l.id}
+                  type="button"
                   onClick={() => selectLocation(l.id)}
-                  className={`text-left p-4 rounded-xl border transition-colors ${
-                    locationId === l.id
-                      ? "border-[#005F6A] bg-[#005F6A]/5"
-                      : "border-gray-200 hover:border-[#005F6A]/40 hover:bg-gray-50"
-                  }`}>
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-[#005F6A] mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-[400] text-gray-900">{l.name}</div>
-                      {l.address && (
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {l.address}
-                        </div>
-                      )}
-                    </div>
+                  className={`cl-co-loc${locationId === l.id ? " selected" : ""}`}>
+                  <span className="cl-co-loc-icon">
+                    <MapPin className="w-4 h-4" />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="cl-co-loc-name">{l.name}</div>
+                    {l.address && <div className="cl-co-loc-addr">{l.address}</div>}
                   </div>
                 </button>
               ))}
             </div>
           )}
-        </Card>
+        </div>
       )}
 
       {step === 2 && selectedLocation && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <Card variant="default" className="p-6 space-y-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 text-sm text-[#005F6A]">
+        <div
+          style={{
+            display: "grid",
+            gap: 18,
+            gridTemplateColumns: "minmax(0, 1fr)",
+          }}
+          className="cl-co-step2-grid">
+          <div className="cl-co-section">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--primary)" }}>
                 <MapPin className="w-4 h-4" />
-                <span className="font-[400]">{selectedLocation.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  submit={false}
+                <span style={{ fontWeight: 600 }}>{selectedLocation.name}</span>
+                <button
+                  type="button"
                   onClick={() => setStep(1)}
-                  className="!px-2">
+                  style={{
+                    background: "none", border: 0, padding: "4px 8px",
+                    color: "var(--primary-60)", fontSize: 12, fontWeight: 600,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}>
                   Change
-                </Button>
+                </button>
               </div>
             </div>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div style={{ position: "relative" }}>
+              <Search className="w-4 h-4" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--primary-50)" }} />
               <Input
                 variant="form"
                 value={search}
@@ -290,81 +314,70 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
             </div>
 
             {loading ? (
-              <p className="text-sm text-gray-500 py-8 text-center">
+              <p style={{ fontSize: 13, color: "var(--primary-50)", textAlign: "center", padding: "24px 0" }}>
                 Loading products...
               </p>
             ) : filteredProducts.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-500">
-                <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <div className="cl-empty-block">
+                <div className="icon-bubble">
+                  <Package className="w-7 h-7" />
+                </div>
                 {products.length === 0 ? (
-                  <>
-                    <p className="font-[400] text-gray-900 mb-1">No items in stock at this location</p>
-                    <p>Try selecting a different location, or contact your manager to restock.</p>
-                  </>
+                  <div>
+                    <strong>No items in stock at this location.</strong>
+                    <p style={{ fontSize: 12, color: "var(--primary-50)", margin: "4px 0 0" }}>
+                      Try selecting a different location, or contact your manager to restock.
+                    </p>
+                  </div>
                 ) : (
-                  "No products match your search."
+                  <div>No products match your search.</div>
                 )}
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {filteredProducts.map((p) => {
                   const inCart = cart[p.productId] || 0;
                   return (
-                    <div
-                      key={p.productId}
-                      className="flex items-center justify-between gap-3 py-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-[400] text-gray-900">
-                          {p.productName}
-                        </div>
+                    <div key={p.productId} className="cl-co-prod-row">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cl-co-prod-name">{p.productName}</div>
                         {p.productDescription && (
-                          <div className="text-xs text-gray-500 mt-0.5 truncate">
-                            {p.productDescription}
-                          </div>
+                          <div className="cl-co-prod-desc">{p.productDescription}</div>
                         )}
-                        <div className="mt-1">
-                          <Badge variant="cleano" size="xs" className="!w-fit">
-                            {p.available} {p.unit} available
-                          </Badge>
-                        </div>
+                        <span className="cl-co-prod-avail">
+                          {p.available} {p.unit} available
+                        </span>
                       </div>
-                      <div className="shrink-0">
-                        {inCart > 0 ? (
-                          <Badge variant="cleano" size="sm" className="!w-fit">
-                            {inCart} in cart
-                          </Badge>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            submit={false}
-                            onClick={() => addToCart(p)}>
-                            <Plus className="w-3 h-3 mr-1" />
-                            Add
-                          </Button>
-                        )}
-                      </div>
+                      {inCart > 0 ? (
+                        <span className="cl-co-in-cart">{inCart} in cart</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => addToCart(p)}
+                          className="cl-co-add-btn">
+                          <Plus className="w-3.5 h-3.5" />
+                          Add
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-          </Card>
+          </div>
 
-          <Card variant="default" className="p-5 h-fit lg:sticky lg:top-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-[400] text-gray-900 flex items-center gap-2">
+          <div className="cl-co-cart-card">
+            <div className="cl-co-cart-head">
+              <span className="cl-co-cart-title">
                 <ShoppingCart className="w-4 h-4" />
                 Cart
-              </h3>
-              <span className="text-xs text-gray-500">
+              </span>
+              <span className="cl-co-cart-count">
                 {cartCount} item{cartCount === 1 ? "" : "s"}
               </span>
             </div>
             {cartItems.length === 0 ? (
-              <p className="text-sm text-gray-500 py-6 text-center">
-                Your cart is empty
-              </p>
+              <p className="cl-co-cart-empty">Your cart is empty.</p>
             ) : (
               <div>
                 {cartItems.map((i) => {
@@ -385,21 +398,19 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
               </div>
             )}
             {hasOverLimit && (
-              <p className="text-xs text-red-600 mt-2">
+              <p style={{ fontSize: 12, color: "#dc2626" }}>
                 Some items exceed available stock.
               </p>
             )}
-            <Button
-              variant="primary"
-              size="md"
-              submit={false}
+            <button
+              type="button"
+              className="cl-co-review-btn"
               onClick={() => setStep(3)}
-              disabled={cartItems.length === 0 || hasOverLimit}
-              className="w-full mt-4">
-              Review Pickup
-              <ArrowRight className="w-4 h-4 ml-1.5" />
-            </Button>
-          </Card>
+              disabled={cartItems.length === 0 || hasOverLimit}>
+              Review pickup
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -417,7 +428,7 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
           onNotesChange={setNotes}
           onConfirm={confirmCheckout}
           onBack={() => setStep(2)}
-          submitting={submitting}
+          submitting={submitting || submitted}
         />
       )}
     </div>
@@ -426,37 +437,26 @@ export default function CheckoutClient({ locations }: CheckoutClientProps) {
 
 function Stepper({ step }: { step: Step }) {
   const steps = [
-    { n: 1, label: "Select Location" },
-    { n: 2, label: "Choose Items" },
+    { n: 1, label: "Select location" },
+    { n: 2, label: "Choose items" },
     { n: 3, label: "Confirm" },
   ];
   return (
-    <div className="flex items-center gap-2">
+    <div className="cl-co-stepper">
       {steps.map((s, idx) => {
         const active = step === s.n;
         const done = step > s.n;
         return (
-          <div key={s.n} className="flex items-center gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-[400] transition-colors ${
-                active
-                  ? "bg-[#005F6A] text-white"
-                  : done
-                  ? "bg-[#005F6A]/15 text-[#005F6A]"
-                  : "bg-gray-100 text-gray-500"
-              }`}>
+          <div key={s.n} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span className={`cl-co-step${active ? " active" : done ? " done" : ""}`}>
               {done ? (
                 <CheckCircle2 className="w-3.5 h-3.5" />
               ) : (
-                <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                  {s.n}
-                </span>
+                <span className="cl-co-step-num">{s.n}</span>
               )}
               <span className="hidden sm:inline">{s.label}</span>
-            </div>
-            {idx < steps.length - 1 && (
-              <div className="w-4 sm:w-6 h-px bg-gray-200" />
-            )}
+            </span>
+            {idx < steps.length - 1 && <span className="cl-co-step-divider" />}
           </div>
         );
       })}

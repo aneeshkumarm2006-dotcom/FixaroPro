@@ -12,6 +12,7 @@ import Step5Review from "./steps/Step5Review";
 import { saveLead } from "../actions/saveLead";
 import { getQuote } from "../actions/getQuote";
 import { submitBooking } from "../actions/submitBooking";
+import { getBookingConfig } from "../actions/getBookingConfig";
 import { calculateTax } from "@/lib/tax";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 import CustomerLogo from "@/components/customer/Logo";
@@ -66,6 +67,31 @@ export default function BookPage() {
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedInClient, loggedInUser?.email]);
+
+  // Load admin-managed add-on catalog on first mount.
+  useEffect(() => {
+    let cancelled = false;
+    getBookingConfig().then(({ addOns }) => {
+      if (cancelled) return;
+      setDraft((d) =>
+        d.addOns.length > 0
+          ? d
+          : {
+              ...d,
+              addOns: addOns.map((a) => ({
+                id: a.id,
+                name: a.name,
+                price: a.price,
+                roomType: a.roomType,
+                selected: false,
+              })),
+            }
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Hot-lead incremental save — debounced once email is entered.
   const leadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

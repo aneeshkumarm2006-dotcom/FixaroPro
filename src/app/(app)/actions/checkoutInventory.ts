@@ -75,56 +75,64 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
       }
     }
 
-    const checkout = await db.$transaction(async (tx) => {
-      const created = await tx.inventoryCheckout.create({
-        data: {
-          employeeId: session.user.id,
-          locationId: input.locationId,
-          notes: input.notes ?? null,
-          items: {
-            create: input.items.map((i) => ({
-              productId: i.productId,
-              quantity: i.quantity,
-            })),
-          },
-        },
-      });
-
-      for (const item of input.items) {
-        await tx.inventoryLocationStock.update({
-          where: {
-            locationId_productId: {
-              locationId: input.locationId,
-              productId: item.productId,
+    const checkout = await db.$transaction(
+      async (tx) => {
+        const created = await tx.inventoryCheckout.create({
+          data: {
+            employeeId: session.user.id,
+            locationId: input.locationId,
+            notes: input.notes ?? null,
+            items: {
+              create: input.items.map((i) => ({
+                productId: i.productId,
+                quantity: i.quantity,
+              })),
             },
           },
-          data: { quantity: { decrement: item.quantity } },
         });
 
-        // Keep the global stockLevel admins see in sync with pickups.
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stockLevel: { decrement: item.quantity } },
-        });
+        for (const item of input.items) {
+          await tx.inventoryLocationStock.update({
+            where: {
+              locationId_productId: {
+                locationId: input.locationId,
+                productId: item.productId,
+              },
+            },
+            data: { quantity: { decrement: item.quantity } },
+          });
 
-        await tx.employeeProduct.upsert({
-          where: {
-            employeeId_productId: {
+          // Keep the global stockLevel admins see in sync with pickups.
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stockLevel: { decrement: item.quantity } },
+          });
+
+          await tx.employeeProduct.upsert({
+            where: {
+              employeeId_productId: {
+                employeeId: session.user.id,
+                productId: item.productId,
+              },
+            },
+            update: { quantity: { increment: item.quantity } },
+            create: {
               employeeId: session.user.id,
               productId: item.productId,
+              quantity: item.quantity,
             },
-          },
-          update: { quantity: { increment: item.quantity } },
-          create: {
-            employeeId: session.user.id,
-            productId: item.productId,
-            quantity: item.quantity,
-          },
-        });
-      }
+          });
+        }
 
-      return created;
-    });
+        return created;
+      },
+      {
+        // Each item runs 3 sequential queries; with Supabase round-trip latency
+        // the default 5s window is easy to blow past. Give it room.
+        maxWait: 10_000,
+        timeout: 30_000,
+      }
+    );
 
     revalidatePath("/my-inventory");
     revalidatePath("/my-inventory/checkout");
@@ -132,8 +140,14 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
     revalidatePath("/inventory");
 
     return { success: true, checkoutId: checkout.id };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error during checkout:", error);
-    return { success: false, error: "Failed to complete checkout" };
+    const detail =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error && "message" in error
+        ? String((error as { message: unknown }).message)
+        : String(error ?? "unknown error");
+    return { success: false, error: `Checkout failed: ${detail}` };
   }
 }

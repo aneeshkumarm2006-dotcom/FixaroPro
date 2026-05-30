@@ -9,7 +9,7 @@ This is the consolidated record of everything you confirmed and everything we ha
 ### Notifications
 
 1. **Google Calendar sync**: removed from scope.
-2. **Gift cards**: customer end purchase flow, placed next to the referral code. Details still pending (see "Still open" below).
+2. **Gift cards**: customer-end purchase flow with fixed tiers ($100, $150, $200, $250, $300, $350, $400), account credit redemption, optional scheduled delivery, and seasonal cover photos. Implemented.
 3. **Stripe Connect for cleaners**: not used. Cleaner payouts stay manual, alongside cleaner pay.
 4. **"On the way" notification**: GPS triggered by time only. Fires when ETA falls below the threshold (default 15 minutes).
 5. **Accept and decline workflow for cleaners**: a newly assigned cleaner gets an in-app prompt. Auto declines after 10 minutes and the job returns to unassigned.
@@ -124,7 +124,24 @@ Every new row is in the Notification Catalog and toggleable from Settings → No
 - **Admin inbox** at `/quotes` shows every submission. Each can be moved through NEW → CONTACTED → CONVERTED → ARCHIVED with internal notes.
 - **Confirmation email** to the customer; alert email to all admins.
 
-### I. Reliability and infrastructure
+### I. Gift cards
+
+- **Public purchase page** at `/gift-card` (no login). Buyer picks:
+  - **Tier**: $100, $150, $200, $250, $300, $350, or $400. The page calls out that the minimum job price is $119 so buyers pick a value that comfortably covers a service.
+  - **Cover design**: 8 seasonal/occasion cover slots wired up — Classic, Birthday, Thank You, Holiday, Spring, Summer, Fall, Winter. Each currently renders a gradient fallback. Drop your final images into `public/gift-cards/<key>.jpg` (e.g. `public/gift-cards/birthday.jpg`) and they'll show up automatically in the email and on the purchase page.
+  - **Recipient**: send to self or to someone else (name + email captured separately).
+  - **Personal message**: optional free-text included in the recipient email.
+  - **Scheduled delivery**: optional date picker — email goes out on that date instead of immediately. The existing 5-minute cron sweep handles scheduled deliveries.
+- **Stripe payment**: PaymentIntent created against the buyer's card via Stripe Elements. On success, the card is flipped to ACTIVE and emails fire.
+- **Three emails wired**:
+  - Buyer receipt (immediate).
+  - Recipient delivery (immediate if no scheduled date, otherwise via cron on that date).
+  - Admin alert.
+- **Redemption** at `/gift-card/redeem` (or directly from the "Redeem" button in the recipient email). Recipient signs into their Cleano customer account, pastes the code, and the full value is added to `Client.giftCardBalance`.
+- **Auto-apply at billing**: `chargeJob` now draws down the client's gift card balance before charging the saved card. If the balance covers the booking entirely, Stripe is skipped and a `GIFT_CARD` transaction row is written instead.
+- **Admin inbox** at `/gift-cards` shows every card: filter by status, search by code/buyer/recipient, and click a row for full details. Header tiles show outstanding (unredeemed) value and total redeemed.
+
+### J. Reliability and infrastructure
 
 - **Notification Catalog defaults fallback**: emails do not silently disappear when an admin hasn't seeded the catalog row. The static catalog is the source of truth before seeding.
 - **EmailLog `notificationKey`**: cron-driven notifications are idempotent. Re-running a cron won't double-send.
@@ -132,7 +149,7 @@ Every new row is in the Notification Catalog and toggleable from Settings → No
 - **Resend attachments**: the `deliver` helper now supports email attachments (used by the monthly statement PDF).
 - **All policy values centralized** in `src/lib/policy.ts` so admin can tune without code changes elsewhere.
 
-### J. PWA improvements
+### K. PWA improvements
 
 - Always-available "Install app" entry in the cleaner drawer.
 - PWA banner re-shows after 14 days.
@@ -153,6 +170,7 @@ All four migrations have been applied to your Supabase production database. Sche
 7. `20260530130000_quote_requests` — QuoteRequest table.
 8. `20260530140000_job_assignment_invites` — JobAssignmentInvite table.
 9. `20260530150000_card_holds` — Job hold lifecycle columns.
+10. `20260530160000_gift_cards` — GiftCard table + Client.giftCardBalance.
 
 All are additive (no destructive changes).
 
@@ -186,18 +204,15 @@ All authorized with `Bearer ${CRON_SECRET}`.
 
 ## 6. Still open / pending your input
 
-1. **Gift cards**: held until you confirm:
-   - Redemption mechanism (account credit vs single-use code).
-   - Denominations (free amount vs fixed tiers).
-   - Recipient delivery (Cleano emails the recipient, or buyer forwards a code).
-
-2. **Twilio credentials**: code is wired and ready. We need from you:
+1. **Twilio credentials**: code is wired and ready. We need from you:
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
    - `TWILIO_FROM_NUMBER` (E.164) or `TWILIO_MESSAGING_SERVICE_SID`
    - For US customers: A2P 10DLC business registration in the Twilio console.
    Paste them into `.env.local` and the Vercel project's environment variables and the SMS sender will start delivering.
 
-3. **"On the way" GPS trigger**: deferred until you provide a Google Maps API key (needed for the Distance Matrix API). Once added to env as `GOOGLE_MAPS_API_KEY`, we will wire the ETA computation and the trigger.
+2. **"On the way" GPS trigger**: deferred until you provide a Google Maps API key (needed for the Distance Matrix API). Once added to env as `GOOGLE_MAPS_API_KEY`, we will wire the ETA computation and the trigger.
+
+3. **Gift card cover images**: the gift card system is fully built, but the cover photos currently render gradient placeholders. Drop your final cover images into `public/gift-cards/<key>.jpg` (or `.png` / `.webp` — keep extensions consistent) for keys: `default`, `birthday`, `thankyou`, `holiday`, `spring`, `summer`, `fall`, `winter`. They will appear automatically in both the purchase page and the recipient email. Recommended size 600 x 400 px.
 
 Everything else from your decision list is implemented and running.

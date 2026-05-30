@@ -31,13 +31,68 @@ export async function chargeJob(jobId: string) {
   if (job.isCashJob) return { success: false, error: "This is a cash job — mark payment manually" };
 
   const client = job.client;
-  if (!client?.stripeCustomerId || !client?.defaultPaymentMethodId) {
-    return { success: false, error: "No saved card on file for this client" };
+  if (!client) return { success: false, error: "No client on this job" };
+
+  const totalAmount = (job.price ?? 0) - (job.discountAmount ?? 0);
+  if (totalAmount <= 0) {
+    return { success: false, error: "Invalid charge amount" };
   }
 
-  const amountCents = Math.round(((job.price ?? 0) - (job.discountAmount ?? 0)) * 100);
-  if (amountCents <= 0) {
-    return { success: false, error: "Invalid charge amount" };
+  // Auto-apply gift card balance before hitting Stripe. We draw the
+  // balance down to zero (or until the booking total is satisfied),
+  // whichever comes first.
+  const giftCardApplied = Math.min(client.giftCardBalance, totalAmount);
+  const remainingDue = Math.max(0, totalAmount - giftCardApplied);
+  const amountCents = Math.round(remainingDue * 100);
+
+  // If gift card credit covers the booking entirely, skip Stripe.
+  if (amountCents === 0) {
+    await db.$transaction([
+      db.job.update({
+        where: { id: jobId },
+        data: { paymentReceived: true, paidAt: new Date() },
+      }),
+      db.client.update({
+        where: { id: client.id },
+        data: { giftCardBalance: { decrement: giftCardApplied } },
+      }),
+      db.transaction.create({
+        data: {
+          date: new Date(),
+          category: "REVENUE",
+          amount: giftCardApplied,
+          description: `Gift card credit applied — job #${job.jobNumber}`,
+          jobId,
+          source: "GIFT_CARD",
+          isAuto: true,
+        },
+      }),
+      db.jobLog.create({
+        data: {
+          jobId,
+          userId: session.user.id,
+          action: "PAYMENT_RECEIVED",
+          description: `Booking fully covered by gift card credit ($${giftCardApplied.toFixed(2)}).`,
+        },
+      }),
+    ]);
+
+    queueAndSendReceipt(jobId).catch(() => {});
+
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath("/jobs");
+    revalidatePath("/finances");
+    return {
+      success: true,
+      amount: totalAmount,
+      giftCardApplied,
+      stripeCharged: 0,
+    };
+  }
+
+  // Stripe path is required for the remaining amount.
+  if (!client.stripeCustomerId || !client.defaultPaymentMethodId) {
+    return { success: false, error: "No saved card on file for this client" };
   }
 
   try {
@@ -52,6 +107,7 @@ export async function chargeJob(jobId: string) {
       metadata: { jobId, jobNumber: String(job.jobNumber) },
     });
 
+    const stripeAmount = amountCents / 100;
     await db.$transaction([
       db.job.update({
         where: { id: jobId },
@@ -61,11 +117,31 @@ export async function chargeJob(jobId: string) {
           stripePaymentIntentId: paymentIntent.id,
         },
       }),
+      // Decrement gift card balance if used.
+      ...(giftCardApplied > 0
+        ? [
+            db.client.update({
+              where: { id: client.id },
+              data: { giftCardBalance: { decrement: giftCardApplied } },
+            }),
+            db.transaction.create({
+              data: {
+                date: new Date(),
+                category: "REVENUE" as const,
+                amount: giftCardApplied,
+                description: `Gift card credit applied — job #${job.jobNumber}`,
+                jobId,
+                source: "GIFT_CARD" as const,
+                isAuto: true,
+              },
+            }),
+          ]
+        : []),
       db.transaction.create({
         data: {
           date: new Date(),
           category: "REVENUE",
-          amount: amountCents / 100,
+          amount: stripeAmount,
           description: `Stripe charge — job #${job.jobNumber}`,
           jobId,
           source: "CREDIT_CARD",
@@ -77,7 +153,9 @@ export async function chargeJob(jobId: string) {
           jobId,
           userId: session.user.id,
           action: "PAYMENT_RECEIVED",
-          description: `Charged $${(amountCents / 100).toFixed(2)} via Stripe (PI: ${paymentIntent.id})`,
+          description: giftCardApplied > 0
+            ? `Charged $${stripeAmount.toFixed(2)} via Stripe + $${giftCardApplied.toFixed(2)} gift card credit (PI: ${paymentIntent.id}).`
+            : `Charged $${stripeAmount.toFixed(2)} via Stripe (PI: ${paymentIntent.id}).`,
         },
       }),
     ]);
@@ -92,7 +170,7 @@ export async function chargeJob(jobId: string) {
         clientName: client.name,
         jobId,
         jobNumber: job.jobNumber,
-        amount: amountCents / 100,
+        amount: stripeAmount,
         paymentMethod: "Card on file",
       }).catch((e) => console.error("customer booking-charged email", e));
     }
@@ -101,7 +179,12 @@ export async function chargeJob(jobId: string) {
     revalidatePath("/jobs");
     revalidatePath("/finances");
 
-    return { success: true, amount: amountCents / 100 };
+    return {
+      success: true,
+      amount: totalAmount,
+      giftCardApplied,
+      stripeCharged: stripeAmount,
+    };
   } catch (err: any) {
     const failureReason = err?.raw?.message ?? err?.message ?? "Charge failed";
 

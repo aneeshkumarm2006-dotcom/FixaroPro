@@ -735,6 +735,11 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.placed", label: "Card hold placed", trigger: "A pre-authorisation hold for the full job price was placed on the customer's card at booking time.", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.released", label: "Card hold released", trigger: "Hold was released without capture (booking canceled).", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.capture_failed", label: "Capture failed", trigger: "Capturing the hold at job completion failed and the card needs attention.", channels: { EMAIL: true } },
+  // Gift cards
+  { recipient: "CUSTOMER", category: "Gift cards", key: "cust.gift.purchase_receipt", label: "Gift card purchase receipt", trigger: "Buyer's receipt after a successful gift card purchase.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Gift cards", key: "cust.gift.delivery", label: "Gift card delivery", trigger: "Recipient receives the gift card via email.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Gift cards", key: "cust.gift.redeemed", label: "Gift card redeemed", trigger: "Recipient redeemed the code; account credit added.", channels: { EMAIL: true } },
+  { recipient: "ADMIN", category: "Gift cards", key: "admin.gift.purchased", label: "Gift card purchased", trigger: "A new gift card was purchased.", channels: { EMAIL: true } },
   // Customer no-show
   { recipient: "CUSTOMER", category: "Booking fee charged & refund", key: "cust.fee.no_show", label: "No-show fee charged", trigger: "Customer was a no-show; $25 fee charged and auto 1-star applied.", channels: { EMAIL: true } },
   // Late arrival penalty

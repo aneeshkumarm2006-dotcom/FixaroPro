@@ -276,6 +276,9 @@ export default function Sidebar({
                 <NavLink href="/quotes" icon="leads" expanded={expanded}>
                   Quotes
                 </NavLink>
+                <NavLink href="/gift-cards" icon="sales" expanded={expanded}>
+                  Gift Cards
+                </NavLink>
                 <NavLink href="/sales" icon="sales" expanded={expanded}>
                   Sales
                 </NavLink>

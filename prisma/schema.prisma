@@ -202,6 +202,9 @@ model Client {
   defaultPaymentMethodId String?
   referralCode           String?           @unique
   referralCredit         Float             @default(0)
+  // Account credit from redeemed gift cards. Auto-applies at chargeJob time
+  // (drains down to zero before the card-on-file is charged).
+  giftCardBalance        Float             @default(0)
   // No-show tracking: incremented on each admin-confirmed no-show. The
   // automatic 1-star is captured here (count + timestamp) rather than as
   // a Client-side rating row, because the existing review system only
@@ -1323,6 +1326,48 @@ enum JobInviteDecision {
   ACCEPTED
   DECLINED
   EXPIRED
+}
+
+enum GiftCardStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  REDEEMED
+  REFUNDED
+  CANCELLED
+}
+
+model GiftCard {
+  id                    String         @id @default(cuid())
+  code                  String         @unique
+  amount                Float
+  status                GiftCardStatus @default(PENDING_PAYMENT)
+  // Buyer
+  purchaserName         String
+  purchaserEmail        String
+  purchaserClientId     String?
+  // Recipient (buyer can also be the recipient = same as purchaser fields)
+  recipientName         String
+  recipientEmail        String
+  personalMessage       String?
+  // Optional scheduled delivery; if null we send right after purchase.
+  scheduledDeliveryDate DateTime?
+  deliveredAt           DateTime?
+  // Cover photo key (e.g. "birthday", "holiday", "thankyou", "default").
+  // The actual image URL lives in src/lib/gift-cards/covers.ts.
+  coverKey              String         @default("default")
+  // Stripe purchase PaymentIntent.
+  stripePaymentIntentId String?
+  // Redemption tracking
+  redeemedAt            DateTime?
+  redeemedByClientId    String?
+  // Audit
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([status])
+  @@index([recipientEmail])
+  @@index([scheduledDeliveryDate])
+  @@index([createdAt])
 }
 
 model JobAssignmentInvite {

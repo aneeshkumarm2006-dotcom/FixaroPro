@@ -21,6 +21,8 @@ function SetupForm() {
 
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [name, setName] = useState(searchParams.get("name") ?? "");
+  const [phone, setPhone] = useState(searchParams.get("phone") ?? "");
+  const [address, setAddress] = useState(searchParams.get("address") ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +44,14 @@ function SetupForm() {
     }
     if (!email.includes("@")) {
       setError("Please enter a valid email address.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Please enter a mobile number so our team can reach you.");
+      return;
+    }
+    if (!address.trim()) {
+      setError("Please enter your address so we know where to clean.");
       return;
     }
     if (password.length < 8) {
@@ -68,7 +78,10 @@ function SetupForm() {
         setLoading(false);
         return;
       }
-      const link = await linkClientAccount();
+      const link = await linkClientAccount({
+        phone: phone.trim(),
+        address: address.trim(),
+      });
       if (!link.success) {
         setError(
           link.error ?? "Account created but linking failed. Please contact us."
@@ -122,6 +135,28 @@ function SetupForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
+
+        <Field label="Mobile number" htmlFor="setup-phone">
+          <Input
+            id="setup-phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+            placeholder="(514) 555-0123"
+          />
+        </Field>
+
+        <Field label="Address" htmlFor="setup-address">
+          <Input
+            id="setup-address"
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            autoComplete="street-address"
+            placeholder="Street, city, postal code"
           />
         </Field>
 

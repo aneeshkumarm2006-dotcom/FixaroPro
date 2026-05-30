@@ -20,6 +20,7 @@ import {
   sendCustomerNeverFoundProvider,
   sendCustomerLeaveTip,
   sendProviderJobReminder,
+  sendGiftCardToRecipient,
 } from "@/lib/email";
 
 const MINUTE = 60_000;
@@ -517,10 +518,44 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Scheduled gift card deliveries ───────────────────────────────
+  // Gift cards with a scheduled date now in the past (or exactly now)
+  // that haven't been delivered yet.
+  const dueGiftCards = await db.giftCard.findMany({
+    where: {
+      status: "ACTIVE",
+      deliveredAt: null,
+      scheduledDeliveryDate: { lte: now },
+    },
+    take: 50,
+  });
+  let giftCardsDelivered = 0;
+  for (const card of dueGiftCards) {
+    try {
+      await sendGiftCardToRecipient({
+        to: card.recipientEmail,
+        recipientName: card.recipientName,
+        purchaserName: card.purchaserName,
+        amount: card.amount,
+        code: card.code,
+        personalMessage: card.personalMessage,
+        coverKey: card.coverKey,
+      });
+      await db.giftCard.update({
+        where: { id: card.id },
+        data: { deliveredAt: new Date() },
+      });
+      giftCardsDelivered++;
+    } catch (e) {
+      console.error("scheduled gift card delivery failed", card.id, e);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     at: now.toISOString(),
     counts,
     expiredInvites: expiredInvites.length,
+    giftCardsDelivered,
   });
 }

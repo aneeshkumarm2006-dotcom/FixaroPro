@@ -10,6 +10,7 @@ const PUBLIC_EXACT = new Set<string>([
   '/portal/setup',
   '/book',
   '/quote',
+  '/gift-card',
   '/apple-icon', // PWA icon for iOS home screen
 ])
 
@@ -18,6 +19,7 @@ const PUBLIC_PREFIXES = [
   '/book/', // includes /book and any nested segments
   '/rate/', // /rate/[token]
   '/p/', // existing landing pages
+  '/gift-card/', // gift card purchase + redemption flow
   '/api/auth/', // Better Auth endpoints
   '/api/post-signin', // role-aware redirect endpoint
   '/icon/', // PWA install icons (32/192/512) — Chrome fetches without a session

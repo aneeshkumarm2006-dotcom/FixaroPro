@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { db } from "@/db";
 import { isNotificationEnabled } from "@/lib/notifications";
+import { coverFor } from "@/lib/gift-cards/covers";
 
 /**
  * Identifies the catalog row that gates a given email send.
@@ -2185,6 +2186,128 @@ export async function sendProviderLateArrival(opts: {
     html,
     notification: { recipient: "PROVIDER", key: "prov.clock.late_arrival" },
   });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Gift card helpers                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Recipient delivery: branded card with optional personal message + code. */
+export async function sendGiftCardToRecipient(opts: {
+  to: string;
+  recipientName: string;
+  purchaserName: string;
+  amount: number;
+  code: string;
+  personalMessage: string | null;
+  coverKey: string;
+}) {
+  const cover = coverFor(opts.coverKey);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const imageUrl = appUrl ? `${appUrl}${cover.imagePath}` : cover.imagePath;
+  const html = layout(
+    `<div style="margin-bottom:24px;border-radius:14px;overflow:hidden;background:${cover.gradient};min-height:180px;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;padding:36px 24px;">
+      <img src="${imageUrl}" alt="" style="display:none;max-width:100%;height:auto;" />
+      <div>
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.9;">Cleano gift card</div>
+        <div style="margin-top:10px;font-size:42px;font-weight:700;">$${opts.amount.toFixed(0)}</div>
+      </div>
+    </div>` +
+      h1(`${opts.recipientName.split(" ")[0]}, you've got a Cleano gift card.`) +
+      p(`<strong>${opts.purchaserName}</strong> sent you a $${opts.amount.toFixed(2)} Cleano gift card. It can be applied to any cleaning booking. Our minimum job price is $119, and the balance carries forward if there is any left.`) +
+      (opts.personalMessage
+        ? p(`<em>"${opts.personalMessage}"</em>`)
+        : "") +
+      section([["Gift card code", `<code style="font-family:monospace;font-size:16px;letter-spacing:0.06em;">${opts.code}</code>`]]) +
+      btn("Redeem your gift card", `${appUrl}/gift-card/redeem?code=${encodeURIComponent(opts.code)}`) +
+      p(`<small>You can redeem it now to add credit to your Cleano account, then apply it next time you book.</small>`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `${opts.purchaserName.split(" ")[0]} sent you a Cleano gift card`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.gift.delivery" },
+  });
+}
+
+/** Purchaser receipt right after a successful gift card payment. */
+export async function sendGiftCardPurchaserReceipt(opts: {
+  to: string;
+  purchaserName: string;
+  recipientName: string;
+  recipientEmail: string;
+  amount: number;
+  scheduledDeliveryDate: string | null;
+}) {
+  const sentLine = opts.scheduledDeliveryDate
+    ? `We'll deliver it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) on <strong>${new Date(opts.scheduledDeliveryDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</strong>.`
+    : `We've sent it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) just now.`;
+  const html = layout(
+    h1(`Thanks for your gift card purchase`) +
+      p(`Hi ${opts.purchaserName.split(" ")[0]}, your $${opts.amount.toFixed(2)} Cleano gift card is paid and confirmed. ${sentLine}`) +
+      p(`If you need to make changes (recipient address, scheduled date), reply to this email and we'll sort it.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Your Cleano gift card receipt`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.gift.purchase_receipt" },
+  });
+}
+
+/** Confirmation to whoever redeemed the code. */
+export async function sendGiftCardRedeemedConfirmation(opts: {
+  to: string;
+  recipientName: string;
+  amount: number;
+  newBalance: number;
+}) {
+  const html = layout(
+    h1(`Gift card redeemed`) +
+      p(`Hi ${opts.recipientName.split(" ")[0]}, we've added <strong>$${opts.amount.toFixed(2)}</strong> to your Cleano account. Your current credit balance is <strong>$${opts.newBalance.toFixed(2)}</strong>, and it will auto-apply the next time you're charged for a booking.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Gift card credit applied — $${opts.amount.toFixed(2)}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.gift.redeemed" },
+  });
+}
+
+/** Admin alert when a gift card is purchased. */
+export async function sendAdminGiftCardPurchased(opts: {
+  purchaserName: string;
+  purchaserEmail: string;
+  recipientName: string;
+  recipientEmail: string;
+  amount: number;
+  scheduledDeliveryDate: string | null;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const html = layout(
+    h1(`New gift card — $${opts.amount.toFixed(2)}`) +
+      section([
+        ["From", `${opts.purchaserName} (${opts.purchaserEmail})`],
+        ["To", `${opts.recipientName} (${opts.recipientEmail})`],
+        ["Amount", `$${opts.amount.toFixed(2)}`],
+        ["Delivery", opts.scheduledDeliveryDate
+          ? `Scheduled for ${new Date(opts.scheduledDeliveryDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+          : "Immediate"],
+      ])
+  );
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `Gift card purchased — $${opts.amount.toFixed(2)}`,
+        html,
+        notification: { recipient: "ADMIN", key: "admin.gift.purchased" },
+      });
+    } catch (e) {
+      console.error("admin gift card email", admin.email, e);
+    }
+  }
 }
 
 /** Customer email when admin places a pre-auth hold on the card. */

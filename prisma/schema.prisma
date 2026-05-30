@@ -32,6 +32,7 @@ model User {
   jobs                         Job[]                  @relation("EmployeeJobs")
   sessions                     Session[]
   cleaningJobs                 Job[]                  @relation("JobCleaners")
+  jobInvites                   JobAssignmentInvite[]
   jobLogs                      JobLog[]               @relation("UserJobLogs")
   payouts                      Payout[]
   approvedPeriods              PayPeriod[]            @relation("PayPeriodApprover")
@@ -201,6 +202,12 @@ model Client {
   defaultPaymentMethodId String?
   referralCode           String?           @unique
   referralCredit         Float             @default(0)
+  // No-show tracking: incremented on each admin-confirmed no-show. The
+  // automatic 1-star is captured here (count + timestamp) rather than as
+  // a Client-side rating row, because the existing review system only
+  // models cleaner ratings.
+  noShowCount            Int               @default(0)
+  lastNoShowAt           DateTime?
   referredByClientId     String?
   userId                 String?           @unique
   createdAt              DateTime          @default(now())
@@ -292,6 +299,24 @@ model Job {
   washActualRags          Int?
   washActualPads          Int?
   washCreditsAwarded      Boolean           @default(false)
+  // No-show + late-arrival event timestamps (admin action + clock-in watcher).
+  noShowAt                DateTime?
+  lateArrivalAt           DateTime?
+  // Rating cap applied to the cleaner for this job because they were late.
+  // 4 stars at +10 min; -0.5 stars per additional 5 min (see src/lib/policy.ts).
+  lateArrivalRatingCap    Float?
+  // Manager override for the Rag Wash review flag.
+  washReviewOverrideAt    DateTime?
+  washReviewOverrideBy    String?
+  // Card hold lifecycle. `holdPaymentIntentId` is set when admin (or the
+  // booking flow) places a manual-capture PI for the full job price.
+  holdPaymentIntentId     String?
+  holdPlacedAt            DateTime?
+  holdAmount              Float?
+  holdCapturedAt          DateTime?
+  holdReleasedAt          DateTime?
+  holdCaptureFailedAt     DateTime?
+  holdCaptureFailReason   String?
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
   employee                User?             @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: SetNull)
@@ -300,6 +325,7 @@ model Job {
   childJobs               Job[]             @relation("JobRecurrence")
   productUsage            JobProductUsage[]
   cleaners                User[]            @relation("JobCleaners")
+  assignmentInvites       JobAssignmentInvite[]
   logs                    JobLog[]
   addOns                  JobAddOn[]
   transactions            Transaction[]
@@ -1283,6 +1309,65 @@ enum EmailStatus {
   PENDING
   SENT
   FAILED
+}
+
+enum QuoteRequestStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  ARCHIVED
+}
+
+enum JobInviteDecision {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model JobAssignmentInvite {
+  id            String            @id @default(cuid())
+  jobId         String
+  cleanerId     String
+  decision      JobInviteDecision @default(PENDING)
+  sentAt        DateTime          @default(now())
+  respondedAt   DateTime?
+  expiresAt     DateTime
+  declineReason String?
+  // If true, this invite was created as part of a last-minute reposting
+  // and the cleaner who accepts earns the configured bonus.
+  isLastMinute  Boolean           @default(false)
+  bonusUsd      Float             @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  job           Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cleaner       User              @relation(fields: [cleanerId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, cleanerId])
+  @@index([cleanerId, decision])
+  @@index([expiresAt])
+}
+
+model QuoteRequest {
+  id            String             @id @default(cuid())
+  name          String
+  email         String
+  phone         String?
+  address       String?
+  serviceType   String?
+  bedCount      Int?
+  bathCount     Int?
+  squareFootage Int?
+  preferredDate DateTime?
+  message       String?
+  status        QuoteRequestStatus @default(NEW)
+  source        String?
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model ServiceArea {

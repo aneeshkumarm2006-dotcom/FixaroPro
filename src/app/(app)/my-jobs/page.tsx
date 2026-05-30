@@ -8,6 +8,7 @@ import { JobsLoadingProvider } from "./JobsLoadingContext";
 import { ClearLoadingOnMount } from "./ClearLoadingOnMount";
 import { JobRow } from "./JobRow";
 import { Calendar } from "lucide-react";
+import PendingInvitesPanel from "./PendingInvitesPanel";
 
 type SearchParams = Promise<{
   [key: string]: string | string[] | undefined;
@@ -301,6 +302,38 @@ export default async function MyJobsPage({
     }
   }
 
+  // Pending accept/decline invites for this cleaner.
+  const pendingInviteRows = await db.jobAssignmentInvite.findMany({
+    where: {
+      cleanerId: session.user.id,
+      decision: "PENDING",
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { expiresAt: "asc" },
+    include: {
+      job: {
+        select: {
+          jobNumber: true,
+          clientName: true,
+          startTime: true,
+          location: true,
+        },
+      },
+    },
+  });
+
+  const pendingInvites = pendingInviteRows.map((inv) => ({
+    id: inv.id,
+    jobId: inv.jobId,
+    jobNumber: inv.job.jobNumber,
+    clientName: inv.job.clientName,
+    startTime: inv.job.startTime.toISOString(),
+    address: inv.job.location,
+    expiresAt: inv.expiresAt.toISOString(),
+    isLastMinute: inv.isLastMinute,
+    bonusUsd: inv.bonusUsd,
+  }));
+
   return (
     <JobsLoadingProvider>
       <ClearLoadingOnMount dataKey={dataKey} />
@@ -314,6 +347,8 @@ export default async function MyJobsPage({
             </p>
           </div>
         </div>
+
+        <PendingInvitesPanel invites={pendingInvites} />
 
         {/* Filters */}
         <JobsFilters />

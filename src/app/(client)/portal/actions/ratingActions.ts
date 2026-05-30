@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { sendCustomerPoorRatingFollowUp } from "@/lib/email";
+import { POOR_RATING_FOLLOWUP_STARS } from "@/lib/policy";
 
 export interface PendingRatingJob {
   jobId: string;
@@ -80,10 +82,16 @@ export async function submitCustomerRating(
   const client = await db.client.findFirst({ where: { email }, select: { id: true } });
   if (!client) return { success: false, error: "Client not found" };
 
-  const job = await db.job.findUnique({ where: { id: jobId }, select: { clientId: true } });
+  const job = await db.job.findUnique({
+    where: { id: jobId },
+    select: { clientId: true, lateArrivalRatingCap: true },
+  });
   if (!job || job.clientId !== client.id) {
     return { success: false, error: "Not authorized" };
   }
+  const effectiveStars = job.lateArrivalRatingCap
+    ? Math.min(stars, Math.floor(job.lateArrivalRatingCap))
+    : stars;
 
   if (skipped) {
     await db.employeeRating.create({
@@ -98,18 +106,60 @@ export async function submitCustomerRating(
   } else {
     if (stars < 1 || stars > 5) return { success: false, error: "Invalid rating" };
 
-    // Map 1-5 star input to 4.0-5.0 display range
-    const mappedRating = Math.round((4 + ((stars - 1) / 4)) * 10) / 10;
+    // Map 1-5 star input to 4.0-5.0 display range. Late-arrival cap is
+    // applied on the raw star count before the mapping.
+    const mappedRating =
+      Math.round((4 + ((effectiveStars - 1) / 4)) * 10) / 10;
 
     await db.employeeRating.create({
       data: {
         employeeId: cleanerId,
         jobId,
         rating: mappedRating,
-        notes: `customer:${stars}`,
+        notes:
+          effectiveStars !== stars
+            ? `customer:${stars} (capped to ${effectiveStars} by late arrival)`
+            : `customer:${stars}`,
         ratedBy: session.user.id,
       },
     });
+
+    // 1-star follow-up: email + admin alert
+    if (stars <= POOR_RATING_FOLLOWUP_STARS) {
+      const fullJob = await db.job.findUnique({
+        where: { id: jobId },
+        select: {
+          id: true,
+          jobNumber: true,
+          clientName: true,
+          client: { select: { email: true, name: true } },
+        },
+      });
+      const clientEmail = fullJob?.client?.email ?? email;
+      const clientName =
+        fullJob?.client?.name ?? fullJob?.clientName ?? "the customer";
+      if (clientEmail && fullJob) {
+        sendCustomerPoorRatingFollowUp({
+          to: clientEmail,
+          clientName,
+          jobNumber: fullJob.jobNumber,
+        }).catch((e) => console.error("poor-rating follow-up email", e));
+      }
+      if (fullJob) {
+        await db.alert
+          .create({
+            data: {
+              type: "CLIENT_COMPLAINT",
+              severity: "CRITICAL",
+              title: `1-star rating — ${clientName}`,
+              message: `Booking #${fullJob.jobNumber} received a 1-star rating. Customer was promised a follow-up; reach out with compensation.`,
+              relatedId: fullJob.id,
+              relatedType: "Job",
+            },
+          })
+          .catch((e) => console.error("poor-rating admin alert", e));
+      }
+    }
   }
 
   revalidatePath("/portal");

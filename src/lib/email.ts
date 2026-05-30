@@ -86,6 +86,7 @@ async function deliver(opts: {
   html: string;
   logId?: string;
   notification?: NotificationGate;
+  attachments?: Array<{ filename: string; content: Buffer | string }>;
 }) {
   // Respect admin's notification toggles (Settings → Notifications).
   // If the EMAIL channel for this catalog row is off, we skip the send
@@ -124,6 +125,9 @@ async function deliver(opts: {
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
+      ...(opts.attachments && opts.attachments.length > 0
+        ? { attachments: opts.attachments }
+        : {}),
     });
     if (opts.logId) {
       if (error) {
@@ -1009,6 +1013,29 @@ export async function sendCustomerRateUs(opts: {
     subject: `Rate your Cleano cleaning — job #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.rating.rate_us" },
+  });
+}
+
+/**
+ * Customer email triggered when they leave a 1-star rating. Promises a
+ * follow-up from our ops team. Paired with a CRITICAL admin alert that
+ * surfaces in the alerts inbox so ops can reach out with compensation.
+ */
+export async function sendCustomerPoorRatingFollowUp(opts: {
+  to: string;
+  clientName: string;
+  jobNumber: number;
+}) {
+  const html = layout(
+    h1(`We want to make this right`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, thank you for sharing your honest feedback on booking #${opts.jobNumber}. A representative from our team will reach out to you shortly to resolve your issue and make it right.`) +
+      p(`You don't need to do anything in the meantime — we'll be in touch by email or phone within one business day.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `We want to make this right — booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.rating.poor" },
   });
 }
 
@@ -1941,10 +1968,10 @@ export async function sendCustomerRequestResolved(opts: {
     opts.decision === "approve"
       ? opts.kind === "cancellation"
         ? `Hi ${opts.clientName.split(" ")[0]}, your cancellation has been approved. The booking won't proceed and you won't be charged.`
-        : `Hi ${opts.clientName.split(" ")[0]}, we've received your reschedule request and we'll be in touch shortly to confirm a new time that works for both sides.`
+        : `Hi ${opts.clientName.split(" ")[0]}, we've received your reschedule request and we'll be in touch shortly to confirm a new time that works for both sides. There is no reschedule fee, and your deposit carries over to the rescheduled booking.`
       : opts.kind === "cancellation"
       ? `Hi ${opts.clientName.split(" ")[0]}, after reviewing your cancellation request we're not able to cancel this booking. The cleaning will go ahead as planned.`
-      : `Hi ${opts.clientName.split(" ")[0]}, after reviewing your reschedule request we're keeping the original date and time. The cleaning will go ahead as planned.`;
+      : `Hi ${opts.clientName.split(" ")[0]}, after reviewing your reschedule request we're keeping the original date and time. The cleaning will go ahead as planned. There is no reschedule fee, and your deposit stays on the booking.`;
 
   const html = layout(
     h1(title) +
@@ -2026,5 +2053,346 @@ export async function sendProviderBookingCanceled(opts: {
     subject,
     html,
     notification: { recipient: "PROVIDER", key },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Weekly + no-show + last-minute helpers (medium batch additions)   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Weekly performance email to a single cleaner. Covers their last 7 days:
+ * hours worked, jobs completed, average rating, and tip total.
+ */
+export async function sendProviderWeeklyPerformance(opts: {
+  to: string;
+  providerName: string;
+  weekLabel: string;
+  hours: number;
+  jobsCompleted: number;
+  avgRating: number | null;
+  tipsTotal: number;
+}) {
+  const html = layout(
+    h1(`Your week with Cleano`) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, here's a quick look at ${opts.weekLabel}.`) +
+      section([
+        ["Jobs completed", String(opts.jobsCompleted)],
+        ["Hours worked", opts.hours.toFixed(1)],
+        ["Average rating", opts.avgRating ? `${opts.avgRating.toFixed(1)} / 5` : "No ratings"],
+        ["Tips received", fmt(opts.tipsTotal)],
+      ]) +
+      p(`Keep up the great work. You can see the full breakdown in the app.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Your week at Cleano — ${opts.weekLabel}`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.report.weekly_performance" },
+  });
+}
+
+/**
+ * Weekly Rag Wash dashboard email to all admin recipients. Summarises the
+ * last 7 days: rags credited, payouts issued, and jobs flagged for review.
+ */
+export async function sendAdminWeeklyRagWashDashboard(opts: {
+  weekLabel: string;
+  ragsCredited: number;
+  padsCredited: number;
+  payoutsCount: number;
+  payoutsTotal: number;
+  flaggedJobsCount: number;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Weekly Rag Wash — ${opts.weekLabel}`) +
+      section([
+        ["Rags credited", String(opts.ragsCredited)],
+        ["Pads credited", String(opts.padsCredited)],
+        ["Payouts issued", String(opts.payoutsCount)],
+        ["Payout total", fmt(opts.payoutsTotal)],
+        ["Jobs flagged for review", String(opts.flaggedJobsCount)],
+      ]) +
+      btn("Open wash payouts", `${appUrl}/wash-payouts`)
+  );
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `Weekly Rag Wash dashboard — ${opts.weekLabel}`,
+        html,
+        notification: { recipient: "ADMIN", key: "admin.report.weekly_ragwash" },
+      });
+    } catch (e) {
+      console.error("Weekly Rag Wash email failed for", admin.email, e);
+    }
+  }
+}
+
+/** Admin email when a cleaner arrives late and the rating cap kicks in. */
+export async function sendAdminLateArrival(opts: {
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  cleanerName: string;
+  minutesLate: number;
+  ratingCap: number;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Late arrival — ${opts.cleanerName}`) +
+      p(`<strong>${opts.cleanerName}</strong> clocked in <strong>${opts.minutesLate} min late</strong> for booking #${opts.jobNumber} (${opts.clientName}). The maximum rating for this job is now capped at <strong>${opts.ratingCap} stars</strong>.`) +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `Late arrival — ${opts.cleanerName} (#${opts.jobNumber})`,
+        html,
+        notification: { recipient: "ADMIN", key: "admin.clock.late_arrival" },
+      });
+    } catch (e) {
+      console.error("late-arrival admin email", admin.email, e);
+    }
+  }
+}
+
+/** Cleaner email when their own late arrival caps their job rating. */
+export async function sendProviderLateArrival(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  minutesLate: number;
+  ratingCap: number;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Late arrival on booking #${opts.jobNumber}`) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, you clocked in <strong>${opts.minutesLate} min late</strong>. As per our service standards, the maximum rating for this job is capped at <strong>${opts.ratingCap} stars</strong>.`) +
+      p(`To avoid this in future, please clock in within 10 minutes of the booking start time.`) +
+      btn("Open job", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Late arrival on booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.clock.late_arrival" },
+  });
+}
+
+/** Customer email when admin places a pre-auth hold on the card. */
+export async function sendCustomerHoldPlaced(opts: {
+  to: string;
+  clientName: string;
+  jobNumber: number;
+  amountUsd: number;
+}) {
+  const html = layout(
+    h1(`We placed a hold on your card`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we've placed a temporary <strong>${fmt(opts.amountUsd)}</strong> authorization on your card for booking #${opts.jobNumber}. This is not a charge — it secures the funds until the cleaning is complete, at which point we'll capture the final amount.`) +
+      p(`If your booking is cancelled before the cleaning, the hold is released and nothing is charged.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Hold placed for booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.hold.placed" },
+  });
+}
+
+/** Customer email when a hold is released without capture. */
+export async function sendCustomerHoldReleased(opts: {
+  to: string;
+  clientName: string;
+  jobNumber: number;
+}) {
+  const html = layout(
+    h1(`Your hold has been released`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, the pre-authorization hold for booking #${opts.jobNumber} has been released. Depending on your bank, the funds will return to your available balance within a few business days. You have not been charged.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Hold released for booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.hold.released" },
+  });
+}
+
+/** Customer email when the capture at completion fails. */
+export async function sendCustomerHoldCaptureFailed(opts: {
+  to: string;
+  clientName: string;
+  jobNumber: number;
+  reason: string;
+}) {
+  const html = layout(
+    h1(`Action needed on your card`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we tried to capture the payment for booking #${opts.jobNumber} but the card declined: <strong>${opts.reason}</strong>.`) +
+      p(`Please update your card on file and we'll re-try the charge. The hold may have already been released depending on your bank.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Action needed — booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.hold.capture_failed" },
+  });
+}
+
+/** Customer-facing confirmation that we received their quote request. */
+export async function sendCustomerQuoteReceived(opts: {
+  to: string;
+  clientName: string;
+  quoteId: string;
+}) {
+  const html = layout(
+    h1(`We got your request`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, thanks for reaching out. We've received your quote request and a member of our team will follow up within one business day with pricing and next steps.`) +
+      p(`If you need to add anything in the meantime, just reply to this email.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Cleano quote request received`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.quote.received" },
+  });
+}
+
+/** Admin alert that a new quote landed in the inbox. */
+export async function sendAdminQuoteRequest(opts: {
+  quoteId: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  serviceType: string | null;
+  message: string | null;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`New quote request — ${opts.name}`) +
+      section([
+        ["Name", opts.name],
+        ["Email", opts.email],
+        ["Phone", opts.phone ?? "—"],
+        ["Service", opts.serviceType ?? "—"],
+      ]) +
+      (opts.message ? p(`<strong>Message:</strong> ${opts.message}`) : "") +
+      btn("Open quote inbox", `${appUrl}/quotes`)
+  );
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `New quote request — ${opts.name}`,
+        html,
+        notification: { recipient: "ADMIN", key: "admin.quote.new_request" },
+      });
+    } catch (e) {
+      console.error("admin quote email failed for", admin.email, e);
+    }
+  }
+}
+
+/**
+ * 1st-of-month statement: HTML summary + PDF attachment of the previous
+ * month's bookings.
+ */
+export async function sendCustomerMonthlyStatement(opts: {
+  to: string;
+  clientName: string;
+  monthLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  totalBilled: number;
+  totalPaid: number;
+  totalOutstanding: number;
+  bookingsCount: number;
+  pdf: Buffer;
+}) {
+  const html = layout(
+    h1(`Your ${opts.monthLabel} statement`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, here's a summary of your activity from ${opts.periodStart} to ${opts.periodEnd}. The full statement is attached as a PDF.`) +
+      section([
+        ["Bookings", String(opts.bookingsCount)],
+        ["Total billed", fmt(opts.totalBilled)],
+        ["Total paid", fmt(opts.totalPaid)],
+        ["Outstanding", fmt(opts.totalOutstanding)],
+      ]) +
+      p(`Thanks for being a Cleano customer.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Your ${opts.monthLabel} Cleano statement`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.reports.monthly_statement" },
+    attachments: [
+      {
+        filename: `cleano-statement-${opts.monthLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        content: opts.pdf,
+      },
+    ],
+  });
+}
+
+/** Customer email for a no-show fee with auto-1-star rating. */
+export async function sendCustomerNoShowFee(opts: {
+  to: string;
+  clientName: string;
+  jobNumber: number;
+  feeUsd: number;
+}) {
+  const html = layout(
+    h1(`No-show fee — booking #${opts.jobNumber}`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, our cleaner arrived for booking #${opts.jobNumber} but no one was there to provide access. As outlined in our cancellation policy, a $${opts.feeUsd.toFixed(2)} no-show fee has been charged to your card on file.`) +
+      p(`If you believe this was an error, please reply to this email and we'll review.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `No-show fee charged — booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.fee.no_show" },
+  });
+}
+
+/**
+ * Provider broadcast email when a job is reposted to the unassigned pool
+ * because the assigned cleaner cancelled last minute. Whoever claims it
+ * first gets the configured bonus on top of their normal pay.
+ */
+export async function sendProviderLastMinuteOpening(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  startTime: string;
+  address: string;
+  bonusUsd: number;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`Last minute booking — $${opts.bonusUsd.toFixed(0)} bonus`) +
+      p(`Hi ${opts.providerName.split(" ")[0]}, a booking just opened up. Whoever picks it up first gets a $${opts.bonusUsd.toFixed(2)} bonus on top of regular pay.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Client", opts.clientName],
+        ["When", `${fmtDate(opts.startTime)} · ${fmtTime(opts.startTime)}`],
+        ["Address", opts.address],
+      ]) +
+      btn("Claim this booking", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Last minute booking — $${opts.bonusUsd.toFixed(0)} bonus`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.unassigned.last_minute" },
   });
 }

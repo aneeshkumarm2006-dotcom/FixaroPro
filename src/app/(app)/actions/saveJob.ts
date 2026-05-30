@@ -18,6 +18,7 @@ import {
   sendProviderBookingCanceled,
 } from "@/lib/email";
 import { isNotificationEnabled } from "@/lib/notifications";
+import { createAssignmentInvites } from "@/lib/invites";
 
 const VALID_PAYMENT_TYPES = [
   "CASH",
@@ -286,6 +287,14 @@ export async function saveJob(formData: FormData) {
           }
         }
 
+        // Accept/decline invite for newly assigned cleaners.
+        if (cleanersAdded.length > 0) {
+          await createAssignmentInvites({
+            jobId: editingJobId,
+            cleanerIds: cleanersAdded,
+          });
+        }
+
         // Provider app-push for newly assigned cleaners ("New booking" for them).
         for (const cleanerId of cleanersAdded) {
           if (await isNotificationEnabled("PROVIDER", "prov.booking.new", "APP_PUSH")) {
@@ -430,6 +439,14 @@ export async function saveJob(formData: FormData) {
       }
 
       const newJob = await db.job.create({ data: jobData });
+
+      // Accept/decline invite for any cleaners assigned at creation.
+      if (cleanerIds.length > 0) {
+        await createAssignmentInvites({
+          jobId: newJob.id,
+          cleanerIds,
+        });
+      }
 
       // If created with no cleaners, this lands in the unassigned folder.
       if (cleanerIds.length === 0 && jobData.startTime) {

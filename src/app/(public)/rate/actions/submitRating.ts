@@ -1,7 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { sendAdminNewReview, sendProviderNewReview } from "@/lib/email";
+import {
+  sendAdminNewReview,
+  sendProviderNewReview,
+  sendCustomerPoorRatingFollowUp,
+} from "@/lib/email";
+import { POOR_RATING_FOLLOWUP_STARS } from "@/lib/policy";
 
 interface SubmitRatingInput {
   token: string;
@@ -30,6 +35,11 @@ export async function submitRating(input: SubmitRatingInput) {
         },
       },
     });
+    // Apply the late-arrival rating cap if one was set on the job at
+    // clock-in. We clamp the incoming stars down (never up).
+    const effectiveStars = tokenRow?.job?.lateArrivalRatingCap
+      ? Math.min(input.stars, Math.floor(tokenRow.job.lateArrivalRatingCap))
+      : input.stars;
 
     if (!tokenRow) return { success: false, error: "Invalid rating link" };
     if (tokenRow.usedAt) {
@@ -58,8 +68,11 @@ export async function submitRating(input: SubmitRatingInput) {
           data: {
             jobId: tokenRow.jobId,
             employeeId,
-            rating: input.stars,
-            notes: input.comment?.trim() || null,
+            rating: effectiveStars,
+            notes:
+              effectiveStars !== input.stars
+                ? `${input.comment?.trim() ?? ""}${input.comment?.trim() ? " | " : ""}Late-arrival cap applied (${input.stars} → ${effectiveStars})`.trim()
+                : input.comment?.trim() || null,
             ratedBy: "client-link",
           },
         })
@@ -74,8 +87,43 @@ export async function submitRating(input: SubmitRatingInput) {
     // `overall_dropped` check.
     const job = await db.job.findUnique({
       where: { id: tokenRow.jobId },
-      select: { id: true, jobNumber: true },
+      select: {
+        id: true,
+        jobNumber: true,
+        clientName: true,
+        client: { select: { email: true, name: true } },
+      },
     });
+
+    // 1-star follow-up: email the customer + create a CRITICAL admin alert.
+    if (input.stars <= POOR_RATING_FOLLOWUP_STARS) {
+      const clientEmail = job?.client?.email ?? null;
+      const clientName =
+        job?.client?.name ?? job?.clientName ?? "the customer";
+      if (clientEmail && job) {
+        sendCustomerPoorRatingFollowUp({
+          to: clientEmail,
+          clientName,
+          jobNumber: job.jobNumber,
+        }).catch((e) => console.error("poor-rating follow-up email", e));
+      }
+      if (job) {
+        await db.alert
+          .create({
+            data: {
+              type: "CLIENT_COMPLAINT",
+              severity: "CRITICAL",
+              title: `1-star rating — ${clientName}`,
+              message: `Booking #${job.jobNumber} received a 1-star rating${
+                input.comment?.trim() ? `: "${input.comment.trim()}"` : "."
+              } Customer was promised a follow-up; reach out with compensation.`,
+              relatedId: job.id,
+              relatedType: "Job",
+            },
+          })
+          .catch((e) => console.error("poor-rating admin alert", e));
+      }
+    }
     for (const employeeId of cleanerIds) {
       const cleaner = await db.user.findUnique({
         where: { id: employeeId },
@@ -91,7 +139,7 @@ export async function submitRating(input: SubmitRatingInput) {
         jobId: job?.id ?? null,
         jobNumber: job?.jobNumber ?? null,
         employeeName: cleaner.name,
-        rating: input.stars,
+        rating: effectiveStars,
         notes: input.comment?.trim() || null,
         overallRating: overall,
       }).catch((e) => console.error("admin new-review email", e));
@@ -101,7 +149,7 @@ export async function submitRating(input: SubmitRatingInput) {
           employeeName: cleaner.name,
           jobId: job?.id ?? null,
           jobNumber: job?.jobNumber ?? null,
-          rating: input.stars,
+          rating: effectiveStars,
           notes: input.comment?.trim() || null,
         }).catch((e) => console.error("provider new-review email", e));
       }

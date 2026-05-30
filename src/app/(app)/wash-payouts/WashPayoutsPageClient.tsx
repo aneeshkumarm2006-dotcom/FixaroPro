@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   Sparkles,
   Wallet,
@@ -11,6 +11,7 @@ import {
   Clock,
   XCircle,
 } from "lucide-react";
+import { overrideRagWashFlag } from "../actions/overrideRagWashFlag";
 
 type Status = "PENDING" | "COMPLETED" | "FAILED";
 
@@ -69,6 +70,19 @@ export default function WashPayoutsPageClient({
 }: Props) {
   const [tab, setTab] = useState<Tab>("ledger");
   const [search, setSearch] = useState("");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [, startReview] = useTransition();
+
+  function handleOverride(jobId: string) {
+    setReviewingId(jobId);
+    startReview(async () => {
+      const result = await overrideRagWashFlag(jobId);
+      setReviewingId(null);
+      if (!result.success) {
+        alert(result.error ?? "Failed to clear flag");
+      }
+    });
+  }
 
   const filteredCleaners = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -331,6 +345,7 @@ export default function WashPayoutsPageClient({
                   <th style={th}>Projected</th>
                   <th style={th}>Actual</th>
                   <th style={th}>Completed</th>
+                  <th style={th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -353,6 +368,24 @@ export default function WashPayoutsPageClient({
                     </td>
                     <td style={{ ...td, fontSize: 12, color: "var(--primary-60)" }}>
                       {fmt(j.clockOutTime)}
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <button
+                        type="button"
+                        disabled={reviewingId === j.id}
+                        onClick={() => handleOverride(j.id)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          background: reviewingId === j.id ? "var(--primary-30)" : "var(--primary)",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          border: "none",
+                          cursor: reviewingId === j.id ? "default" : "pointer",
+                        }}>
+                        {reviewingId === j.id ? "Clearing…" : "Mark reviewed"}
+                      </button>
                     </td>
                   </tr>
                 ))}

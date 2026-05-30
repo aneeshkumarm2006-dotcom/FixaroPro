@@ -9,6 +9,7 @@ const PUBLIC_EXACT = new Set<string>([
   '/portal/login',
   '/portal/setup',
   '/book',
+  '/quote',
   '/apple-icon', // PWA icon for iOS home screen
 ])
 

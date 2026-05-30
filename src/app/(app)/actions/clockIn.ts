@@ -4,7 +4,12 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { sendAdminClockedIn } from "@/lib/email";
+import {
+  sendAdminClockedIn,
+  sendAdminLateArrival,
+  sendProviderLateArrival,
+} from "@/lib/email";
+import { computeLateArrivalRatingCap } from "@/lib/policy";
 
 export async function clockIn(jobId: string) {
   const session = await auth.api.getSession({
@@ -46,12 +51,22 @@ export async function clockIn(jobId: string) {
 
     const now = new Date();
 
-    // Update the job with clock in time
+    // Late-arrival detection: minutes between scheduled start and clock-in.
+    const minutesLate = Math.max(
+      0,
+      Math.floor((now.getTime() - job.startTime.getTime()) / 60_000)
+    );
+    const ratingCap = computeLateArrivalRatingCap(minutesLate);
+
+    // Update the job with clock in time and the rating cap when applicable.
     await db.job.update({
       where: { id: jobId },
       data: {
         clockInTime: now,
         status: "IN_PROGRESS",
+        ...(ratingCap !== null
+          ? { lateArrivalAt: now, lateArrivalRatingCap: ratingCap }
+          : {}),
       },
     });
 
@@ -86,10 +101,43 @@ export async function clockIn(jobId: string) {
       cleanerName: session.user.name ?? "Cleaner",
     }).catch((e) => console.error("admin clocked-in email", e));
 
+    // Late-arrival emails (admin + cleaner) when the cap is in effect.
+    if (ratingCap !== null) {
+      sendAdminLateArrival({
+        jobId,
+        jobNumber: job.jobNumber,
+        clientName: job.clientName,
+        cleanerName: session.user.name ?? "Cleaner",
+        minutesLate,
+        ratingCap,
+      }).catch((e) => console.error("admin late-arrival email", e));
+
+      const sessionEmail = session.user.email;
+      if (sessionEmail) {
+        sendProviderLateArrival({
+          to: sessionEmail,
+          providerName: session.user.name ?? "Cleaner",
+          jobId,
+          jobNumber: job.jobNumber,
+          minutesLate,
+          ratingCap,
+        }).catch((e) => console.error("provider late-arrival email", e));
+      }
+
+      await db.jobLog.create({
+        data: {
+          jobId,
+          userId: session.user.id,
+          action: "NOTE_ADDED",
+          description: `Late arrival: clocked in ${minutesLate} min after scheduled start. Rating cap for this job set to ${ratingCap} stars.`,
+        },
+      });
+    }
+
     revalidatePath("/my-jobs");
     revalidatePath(`/jobs/${jobId}`);
 
-    return { success: true };
+    return { success: true, minutesLate, ratingCap };
   } catch (error) {
     console.error("Error clocking in:", error);
     return { success: false, error: "Failed to clock in" };

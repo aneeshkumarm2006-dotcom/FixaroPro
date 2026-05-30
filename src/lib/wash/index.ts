@@ -1,12 +1,17 @@
 /**
- * Cleano Self-Wash System — projection, caps, and credit math.
- * Implements the rules in the Rag Wash System spec (Job-Based Model).
+ * Cleano Self-Wash System — projection and credit math.
  *
  *  Projected rags  = 8 + (bedrooms × 4) + (bathrooms × 3) + add-on rag delta
  *  Projected pads  = 1 + add-on pad delta
- *  Capped against per-category hard caps (Studio 20/2, 1-2BR 30/3, 3+BR 35/4)
- *  Credits awarded = capped amounts (1 credit per rag, 2 credits per pad)
- *  Payouts:        50 rag credits → $3.00, 20 pad credits → $2.00
+ *  Credits awarded = projected amounts (the formula is the expected average
+ *                    for a job of that size, so no hard cap is applied).
+ *                    1 credit per rag, 2 credits per pad.
+ *  Per-category reference ranges still exist as a soft signal: when the
+ *  projection exceeds the range, `ragsHitCap`/`padsHitCap` is set so admin
+ *  can flag the job for review (manager override clears the flag without
+ *  changing the credit).
+ *  Payouts: 50 rag credits → $3.00, 20 pad credits → $2.00 (paid manually
+ *  alongside the cleaner's regular pay, not via Stripe).
  */
 
 export interface ProjectionInput {
@@ -17,15 +22,19 @@ export interface ProjectionInput {
 }
 
 export interface ProjectionResult {
-  /** Pre-cap projection from the formula. */
+  /** Raw projection from the formula. */
   projectedRags: number;
   projectedPads: number;
-  /** Final amount after the per-category hard cap. */
+  /** Amount credited to the cleaner. Equals the projection (the formula is
+   *  itself the expected average), kept under the legacy name so call sites
+   *  do not need to change. */
   cappedRags: number;
   cappedPads: number;
-  /** Which job category we used to apply the cap. */
+  /** Which job category the reference range came from. */
   category: JobCategory;
-  /** Did the projection hit the cap? Helps the admin auto-flag oversize jobs. */
+  /** True when the projection exceeds the per-category reference range.
+   *  Used to flag oversize jobs for admin review; the credited amount is
+   *  unaffected. */
   ragsHitCap: boolean;
   padsHitCap: boolean;
 }
@@ -53,6 +62,9 @@ const ADD_ON_RULES: AddOnRule[] = [
   { patterns: ["couch", "upholstery", "sofa"], rags: 1, pads: 0 },
 ];
 
+/** Per-category reference ranges. The projection is no longer clamped to
+ *  these (we credit the formula's output directly), but a projection above
+ *  the range raises the review flag. */
 const CAPS: Record<JobCategory, { rags: number; pads: number }> = {
   STUDIO: { rags: 20, pads: 2 },
   ONE_TWO_BR: { rags: 30, pads: 3 },
@@ -106,19 +118,18 @@ export function projectWashables(input: ProjectionInput): ProjectionResult {
   }
 
   const category = categorize(bedrooms, input.jobType);
-  const cap = CAPS[category];
+  const range = CAPS[category];
 
-  const cappedRags = Math.min(projectedRags, cap.rags);
-  const cappedPads = Math.min(projectedPads, cap.pads);
-
+  // Credit the projection directly. The category range is only used to flag
+  // jobs that fall outside the typical envelope so admin can review.
   return {
     projectedRags,
     projectedPads,
-    cappedRags,
-    cappedPads,
+    cappedRags: projectedRags,
+    cappedPads: projectedPads,
     category,
-    ragsHitCap: projectedRags > cap.rags,
-    padsHitCap: projectedPads > cap.pads,
+    ragsHitCap: projectedRags > range.rags,
+    padsHitCap: projectedPads > range.pads,
   };
 }
 

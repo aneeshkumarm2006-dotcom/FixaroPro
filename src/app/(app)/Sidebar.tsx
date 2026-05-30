@@ -238,6 +238,12 @@ export default function Sidebar({
                   Rag Wash
                 </NavLink>
                 <NavLink
+                  href="/inventory/kits"
+                  icon="my-inventory"
+                  expanded={expanded}>
+                  Cleaner Kits
+                </NavLink>
+                <NavLink
                   href="/wash-payouts"
                   icon="rag-wash"
                   expanded={expanded}>
@@ -263,6 +269,12 @@ export default function Sidebar({
                 </NavLink>
                 <NavLink href="/invoices" icon="invoices" expanded={expanded}>
                   Invoices
+                </NavLink>
+                <NavLink href="/bulk-charge" icon="payouts" expanded={expanded}>
+                  Bulk Charge
+                </NavLink>
+                <NavLink href="/quotes" icon="leads" expanded={expanded}>
+                  Quotes
                 </NavLink>
                 <NavLink href="/sales" icon="sales" expanded={expanded}>
                   Sales

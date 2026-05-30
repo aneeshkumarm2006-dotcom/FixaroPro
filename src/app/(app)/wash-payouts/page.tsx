@@ -28,6 +28,8 @@ export default async function WashPayoutsPage() {
         status: "COMPLETED",
         washCreditsAwarded: true,
         washActualRags: { not: null },
+        // Hide jobs a manager has already reviewed.
+        washReviewOverrideAt: null,
       },
       orderBy: { clockOutTime: "desc" },
       take: 50,

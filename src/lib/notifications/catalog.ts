@@ -588,16 +588,17 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   // New & modified booking
   { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.receipt_ot", label: "Receipt email OT", trigger: "Customer books a one-time booking using card or cash/check.", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.receipt_rec", label: "Receipt email REC", trigger: "Customer books a recurring booking using card or cash/check.", channels: { EMAIL: true } },
-  { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.confirmed", label: "Booking confirmed", trigger: "Booking is confirmed by pairing a provider with that booking.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.confirmed", label: "Booking confirmed", trigger: "Booking is confirmed by pairing a provider with that booking.", channels: { EMAIL: true, SMS: true } },
   { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.modified", label: "Booking modified", trigger: "Customer booking is modified.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "New & modified booking", key: "cust.booking.on_the_way", label: "Cleaner on the way", trigger: "Cleaner ETA drops below the configured threshold (15 min by default).", channels: { EMAIL: false, SMS: true, APP_PUSH: true } },
   // Canceled booking
-  { recipient: "CUSTOMER", category: "Canceled booking", key: "cust.cancel.booking_cancellation", label: "Booking cancellation", trigger: "Customer booking is canceled.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Canceled booking", key: "cust.cancel.booking_cancellation", label: "Booking cancellation", trigger: "Customer booking is canceled.", channels: { EMAIL: true, SMS: true } },
   { recipient: "CUSTOMER", category: "Canceled booking", key: "cust.cancel.card_hold_failure", label: "Booking canceled due to card hold failure", trigger: "Booking canceled due to debit/credit card hold failure.", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "Canceled booking", key: "cust.cancel.never_found_provider", label: "Never found a provider", trigger: "A provider was not found for the customer booking.", channels: { EMAIL: false } },
   { recipient: "CUSTOMER", category: "Canceled booking", key: "cust.cancel.fee_authentication", label: "Cancellation fee authentication", trigger: "Customer must authenticate card for cancellation fee.", channels: { EMAIL: true } },
   // Reminders
   { recipient: "CUSTOMER", category: "Reminders", key: "cust.reminders.booking_reminder", label: "Booking reminder", trigger: "Customer reminded ~24h before service.", channels: { EMAIL: false } },
-  { recipient: "CUSTOMER", category: "Reminders", key: "cust.reminders.booking_reminder_2", label: "Booking reminder 2", trigger: "Customer reminded ~48h before service.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Reminders", key: "cust.reminders.booking_reminder_2", label: "Booking reminder 2", trigger: "Customer reminded ~48h before service.", channels: { EMAIL: true, SMS: true } },
   // Completed booking
   { recipient: "CUSTOMER", category: "Completed booking", key: "cust.completed.leave_tip", label: "Leave tip", trigger: "Customer is asked to leave a tip.", channels: { EMAIL: false } },
   // Booking fee charged & refund
@@ -621,7 +622,7 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "CUSTOMER", category: "Rating & review", key: "cust.rating.happy_ot_v2", label: "Happy rating (OT v2)", trigger: "Happy 4/5+ rating, thank-you.", channels: { EMAIL: false } },
   { recipient: "CUSTOMER", category: "Rating & review", key: "cust.rating.happy_rec", label: "Happy rating (REC)", trigger: "Recurring customer leaves happy 4/5+ rating.", channels: { EMAIL: false } },
   { recipient: "CUSTOMER", category: "Rating & review", key: "cust.rating.average", label: "Average rating", trigger: "Customer leaves average 3/5 rating.", channels: { EMAIL: false } },
-  { recipient: "CUSTOMER", category: "Rating & review", key: "cust.rating.poor", label: "Poor rating", trigger: "Customer leaves poor 2/5 or lower rating.", channels: { EMAIL: false } },
+  { recipient: "CUSTOMER", category: "Rating & review", key: "cust.rating.poor", label: "Poor rating", trigger: "Customer leaves a 1-star rating; ops follow-up promised.", channels: { EMAIL: true } },
   // Gift card & referral
   { recipient: "CUSTOMER", category: "Gift card & referral", key: "cust.gift.receipt", label: "Gift card receipt", trigger: "Customer purchases a gift card.", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "Gift card & referral", key: "cust.gift.new", label: "New gift card", trigger: "Customer receives a new gift card.", channels: { EMAIL: true } },
@@ -722,4 +723,23 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   // Provider reporting
   { recipient: "PROVIDER", category: "Provider reporting (proposed)", key: "prov.report.monthly_breakdown", label: "Monthly provider breakdown", trigger: "Provider's individual monthly breakdown of jobs, earnings, tips, deductions, ratings, and adjustments.", channels: { EMAIL: true }, isProposed: true },
   { recipient: "ADMIN", category: "Provider reporting (proposed)", key: "admin.report.monthly_generated", label: "Monthly provider breakdown generated", trigger: "Monthly provider breakdowns have been generated and sent.", channels: { EMAIL: true }, isProposed: true },
+  // Weekly reports
+  { recipient: "PROVIDER", category: "Provider reporting (proposed)", key: "prov.report.weekly_performance", label: "Weekly performance report", trigger: "Weekly summary of hours, jobs, and ratings for each provider.", channels: { EMAIL: true } },
+  { recipient: "ADMIN", category: "Provider reporting (proposed)", key: "admin.report.weekly_ragwash", label: "Weekly Rag Wash dashboard", trigger: "Weekly summary of total rags used, payouts issued, and flagged jobs.", channels: { EMAIL: true } },
+  // Monthly customer statement
+  { recipient: "CUSTOMER", category: "Reports", key: "cust.reports.monthly_statement", label: "Monthly statement", trigger: "1st of every month: HTML email + PDF attachment of the previous month's bookings and payments.", channels: { EMAIL: true } },
+  // Quote requests (public landing page)
+  { recipient: "CUSTOMER", category: "Quotes", key: "cust.quote.received", label: "Quote request received", trigger: "Customer submits a quote request via the public landing page.", channels: { EMAIL: true } },
+  { recipient: "ADMIN", category: "Quotes", key: "admin.quote.new_request", label: "New quote request", trigger: "A new quote request landed in the admin inbox.", channels: { EMAIL: true, APP_PUSH: true } },
+  // Card hold lifecycle
+  { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.placed", label: "Card hold placed", trigger: "A pre-authorisation hold for the full job price was placed on the customer's card at booking time.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.released", label: "Card hold released", trigger: "Hold was released without capture (booking canceled).", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Card holds", key: "cust.hold.capture_failed", label: "Capture failed", trigger: "Capturing the hold at job completion failed and the card needs attention.", channels: { EMAIL: true } },
+  // Customer no-show
+  { recipient: "CUSTOMER", category: "Booking fee charged & refund", key: "cust.fee.no_show", label: "No-show fee charged", trigger: "Customer was a no-show; $25 fee charged and auto 1-star applied.", channels: { EMAIL: true } },
+  // Late arrival penalty
+  { recipient: "ADMIN", category: "Clock in / clock out", key: "admin.clock.late_arrival", label: "Cleaner arrived late", trigger: "Cleaner clocked in more than 10 minutes after scheduled start time.", channels: { EMAIL: true, APP_PUSH: true } },
+  { recipient: "PROVIDER", category: "Clock in / clock out", key: "prov.clock.late_arrival", label: "You arrived late", trigger: "Cleaner clocked in more than 10 minutes after scheduled start time; rating cap applied.", channels: { EMAIL: true, APP_PUSH: true } },
+  // Last-minute reassignment
+  { recipient: "PROVIDER", category: "Unassigned booking", key: "prov.unassigned.last_minute", label: "Last minute booking", trigger: "A cleaner cancelled last minute and the job is open for claim with a $10 bonus.", channels: { EMAIL: true, APP_PUSH: true, SMS: true } },
 ];

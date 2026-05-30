@@ -10,6 +10,7 @@ import {
   sendCustomerBookingModified,
 } from "@/lib/email";
 import { isNotificationEnabled } from "@/lib/notifications";
+import { createAssignmentInvites } from "@/lib/invites";
 
 /**
  * Focused cleaner-assignment action used from the Team card on the Job
@@ -103,6 +104,14 @@ export async function assignCleaners(input: {
           to: job.client.email,
         }).catch((e) => console.error("customer modified email", e));
       }
+    }
+
+    // Accept/decline invites for newly added cleaners.
+    if (newlyAdded.length > 0) {
+      await createAssignmentInvites({
+        jobId: input.jobId,
+        cleanerIds: newlyAdded,
+      });
     }
 
     // Provider app-push alert for newly assigned cleaners.

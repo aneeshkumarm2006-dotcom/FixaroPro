@@ -4,9 +4,14 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { createAssignmentInvites } from "@/lib/invites";
+import { sendProviderLastMinuteOpening } from "@/lib/email";
+import { LAST_MINUTE_CLAIM_BONUS_USD } from "@/lib/policy";
 
 const LATE_CANCEL_HOURS = 24;
 const LATE_CANCEL_FEE = 20;
+/** Inside this window the cleaner cancel triggers the last-minute repost. */
+const LAST_MINUTE_HOURS = 24;
 
 export async function cancelShift(jobId: string): Promise<{ success: true; penaltyApplied: boolean } | { success: false; error: string }> {
   try {
@@ -99,6 +104,56 @@ export async function cancelShift(jobId: string): Promise<{ success: true; penal
         }
       }
     });
+
+    // Last-minute repost: if the cancellation happened within the
+    // last-minute window AND the job no longer has any cleaners assigned,
+    // fan out a bonus invite to other EMPLOYEEs.
+    if (hoursUntilShift > 0 && hoursUntilShift < LAST_MINUTE_HOURS) {
+      const refreshed = await db.job.findUnique({
+        where: { id: jobId },
+        select: {
+          id: true,
+          jobNumber: true,
+          clientName: true,
+          startTime: true,
+          location: true,
+          cleaners: { select: { id: true } },
+        },
+      });
+      if (refreshed && refreshed.cleaners.length === 0) {
+        const broadcast = (
+          await db.user.findMany({
+            where: {
+              role: { in: ["EMPLOYEE", "FIELD_LEAD"] },
+              id: { not: employeeId },
+            },
+            select: { id: true, name: true, email: true },
+          })
+        ).filter((u) => !!u.email);
+
+        if (broadcast.length > 0) {
+          await createAssignmentInvites({
+            jobId,
+            cleanerIds: broadcast.map((u) => u.id),
+            isLastMinute: true,
+            bonusUsd: LAST_MINUTE_CLAIM_BONUS_USD,
+          });
+          for (const u of broadcast) {
+            if (!u.email) continue;
+            sendProviderLastMinuteOpening({
+              to: u.email,
+              providerName: u.name,
+              jobId,
+              jobNumber: refreshed.jobNumber,
+              clientName: refreshed.clientName,
+              startTime: refreshed.startTime.toISOString(),
+              address: refreshed.location ?? "",
+              bonusUsd: LAST_MINUTE_CLAIM_BONUS_USD,
+            }).catch((e) => console.error("last-minute opening email", e));
+          }
+        }
+      }
+    }
 
     revalidatePath("/my-jobs");
     revalidatePath(`/my-jobs/${jobId}`);

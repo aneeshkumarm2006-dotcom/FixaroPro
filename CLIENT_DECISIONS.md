@@ -1,0 +1,203 @@
+# Cleano: Decisions Confirmed and Features Shipped
+
+This is the consolidated record of everything you confirmed and everything we have now built. Companion document to `CLIENT_SUMMARY.md`.
+
+---
+
+## 1. Decisions you confirmed
+
+### Notifications
+
+1. **Google Calendar sync**: removed from scope.
+2. **Gift cards**: customer end purchase flow, placed next to the referral code. Details still pending (see "Still open" below).
+3. **Stripe Connect for cleaners**: not used. Cleaner payouts stay manual, alongside cleaner pay.
+4. **"On the way" notification**: GPS triggered by time only. Fires when ETA falls below the threshold (default 15 minutes).
+5. **Accept and decline workflow for cleaners**: a newly assigned cleaner gets an in-app prompt. Auto declines after 10 minutes and the job returns to unassigned.
+6. **Card hold lifecycle**: hold for the full job price, placed at booking time. Customer is emailed for hold placed, hold released, and capture failed.
+7. **Cash or cheque**: not offered to customers. Only the admin can record cash or cheque on a booking.
+8. **Charge per cleaner**: client is charged one combined amount. Cleaner pay is split equally into each cleaner's wallet for that job.
+9. **Quotes**: public landing page with a "request a quote" form. Submissions appear in an admin inbox.
+10. **Bulk charge**: admin can select all completed-and-unpaid bookings and charge them in one batch.
+11. **Reschedule fee**: no fee. The deposit is retained on the rescheduled booking.
+12. **Customer to cleaner chat**: enabled once a booking is confirmed, with email fallback.
+13. **Subscription plan limits**: not in the current system. Dropped from scope.
+14. **Monthly statement**: sent on the 1st of every month, as both inline HTML email and PDF attachment.
+15. **No show fee**: $25 charged to the customer plus an automatic 1-star strike on the client profile.
+16. **Cleaner late penalty**:
+    - Over 10 minutes late: admin and cleaner both notified, max rating capped at 4 stars.
+    - Every additional 5 minutes: another 0.5 stars off the max.
+17. **Re-assignment flow**: when a cleaner cancels last minute, the job is auto-reposted to available cleaners with a "Last minute booking" notification. The cleaner who claims it earns a $10 bonus.
+18. **Customer rating thresholds**: a 1-star rating triggers a "we want to make this right" email to the customer plus a CRITICAL admin alert so ops can reach out with compensation.
+19. **Provider performance reports**: weekly report email to each cleaner with hours, jobs, and ratings.
+20. **Marketing emails**: not in scope.
+21. **SMS via Twilio**: SMS will be sent for booking confirmation, on the way, reminders, and cancellation.
+
+### Rag Wash credit system
+
+1. **Payout rail**: manual, alongside the cleaner's regular pay. Stripe Connect is not used.
+2. **Cleaner reported actuals**: cleaners do not enter actuals. The formula projection is credited directly.
+3. **Median, not cap**: the per-category hard caps were dropped. The formula (Base 8 + bedrooms x 4 + bathrooms x 3 + addons) is credited as-is.
+4. **Manager override**: managers can clear the review flag on oversized jobs without changing the credit.
+5. **Weekly dashboard**: weekly summary email of rags credited, payouts issued, and flagged jobs.
+6. **Efficiency bonus**: deferred for now.
+
+### Inventory rules
+
+1. **Auto seed product list**: not auto seeded. Admin enters products manually.
+2. **Refill threshold defaults**: default low-stock threshold is 10 for every product.
+3. **Supplier integration**: no supplier integration. Restock emails go to admin only.
+4. **Cleaner kit allocation**: each cleaner has their own kit count attached to the master inventory.
+    - Adding an item to a cleaner's kit does NOT reduce master stock.
+    - Marking an item as damaged or broken on a cleaner's kit reduces BOTH the cleaner's kit and master stock, and creates an admin alert.
+
+---
+
+## 2. Features implemented and live
+
+Everything below is wired end to end. Code, server actions, emails, cron jobs, database tables, and UI surfaces are all in place. The database has been migrated to match.
+
+### A. Notifications and emails
+
+Around 75 of the 120 catalog rows are wired (booking lifecycle, payments, account, invoices, documents, unassigned, recurring, ratings, clock in/out, checklist, cron-driven reminders). New rows added on top of that:
+
+- **1-star follow-up**: customer "we want to make this right" email + CRITICAL admin alert with client details.
+- **Weekly provider performance**: every Monday at 09:00 each cleaner gets a summary of last week's hours, jobs, average rating, and tips.
+- **Weekly Rag Wash dashboard**: every Monday at 09:00 admins get totals of rags credited, payouts issued, and flagged jobs.
+- **Monthly customer statement**: 1st of every month, every active client gets HTML email + PDF attachment of the previous month's bookings and payments.
+- **Late arrival emails**: admin and cleaner both notified when a cleaner clocks in 10+ minutes late.
+- **No-show fee email**: customer is emailed when admin records a no-show.
+- **Last-minute booking email**: broadcast to other cleaners when a cleaner cancels last minute, includes the $10 bonus offer.
+- **Card hold lifecycle**: hold placed, hold released, capture failed.
+- **Quote receipt + admin alert**: customer confirmation and admin alert when a quote is submitted.
+- **Reschedule policy text**: customer email now states explicitly that there is no reschedule fee and the deposit carries over.
+
+Every new row is in the Notification Catalog and toggleable from Settings → Notifications. Email channel defaults to enabled on the four SMS picks too.
+
+### B. SMS via Twilio
+
+- SMS sender helper at `src/lib/sms.ts` with four pre-built wrappers: booking confirmation, on the way, reminders, cancellation.
+- Catalog rows have SMS channel enabled by default for those four events.
+- Phone numbers are normalized to E.164 automatically.
+- Sender is inert until env vars (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID`) are set. Placeholder keys already added to `.env.local`.
+
+### C. Penalty and rating system
+
+- **No-show fee admin action**: charges $25 to the saved card, increments `Client.noShowCount` and stamps `lastNoShowAt` (the automatic 1-star strike on the client profile), logs the event, and emails the customer.
+- **Late-arrival rating cap**: on clock-in we compute minutes late. Under 10 min is grace. At 10 min the cap is 4 stars; every additional 5 min subtracts 0.5 stars. The cap is enforced at customer rating time on both the public token form and the customer portal.
+- **Manager override for Rag Wash flagged jobs**: ops can clear the flag from `/wash-payouts` with one click. The credit is unaffected.
+
+### D. Operations workflow
+
+- **Accept / decline workflow**: every time a cleaner is added to a job (new booking, edit, or inline assign), we create a `JobAssignmentInvite` that expires after 10 minutes. The cleaner sees pending invites on `/my-jobs` and clicks Accept or Decline. The cron sweep (every 5 minutes) auto-declines stale invites and returns the job to the unassigned folder.
+- **Last-minute reassignment**: when a cleaner cancels within 24 hours of start and the job has no remaining cleaners, the system broadcasts the job to every other employee with a "Last minute booking — $10 bonus" invite. First cleaner to accept claims the job; the others are expired. The bonus is logged on the job for payout pickup.
+- **Pending requests sidebar badge**: shows count of cancellation/reschedule requests waiting on admin.
+- **Approve/deny requests with notes**: admin notes textarea routes the customer email correctly for cancellation or reschedule outcomes.
+- **Requests tab on Job detail page**: per-job cancellation/reschedule history with inline empty-state illustration.
+- **Provider cancellation email**: assigned cleaners are emailed when their job is cancelled.
+- **Inline "Assign cleaners" button on Team card**: multi-select modal lets admin add or change cleaners directly from the Job detail page without opening the full edit modal.
+
+### E. Customer billing
+
+- **Bulk charge** at `/bulk-charge`: lists every completed-and-unpaid job with a card on file. Multi-select + "Charge selected" runs each through the existing Stripe path. Per-job result summary shown after.
+- **Card hold lifecycle**: three admin actions (place hold, capture, release). Hold is a Stripe manual-capture PaymentIntent for the full job price. Capture happens on completion; release happens on cancel. All three transitions email the customer.
+- **Monthly statement cron**: PDF generated with `@react-pdf/renderer` and attached to the email.
+
+### F. Inventory and cleaner kits
+
+- **Cleaner kits admin** at `/inventory/kits`: per-cleaner kit list with "Add to kit" form. Adding does NOT decrement master stock (per your spec).
+- **Damaged / lost flow**: cleaner reports damage from `/my-inventory` with quantity, kind (damaged or lost), and optional reason. Both the cleaner's kit and master stock are decremented, and an admin alert is raised.
+- **Combined restock notification**: when stock crosses the low-stock threshold, a single combined "restock needed" email goes to admin (not one per item).
+- **Default low-stock threshold**: 10 for every product (per your spec).
+- **Product category field**: cleaning, paper, dispenser refill, equipment, other — used for filtering and grouping.
+- **Post-job inventory survey**: cleaners enter spray bottles, mop heads, and disposable usage at checkout. Spray usage recorded at 1.25 ml per spray.
+
+### G. Rag Wash
+
+- **Formula now credits directly**: hard caps removed. Base 8 + bedrooms x 4 + bathrooms x 3 + addons is what the cleaner is credited.
+- **Category ranges still flag oversized jobs**: the "flag for review" signal in `/wash-payouts` fires when projection exceeds the typical envelope. Manager can clear the flag without changing the credit.
+- **Manual payouts**: WashPayout rows are created in PENDING state and paid manually alongside the cleaner's regular pay. No Stripe transfer.
+- **Auto allocation on completion**: credits are written when a job is marked complete; no separate "refill" action needed.
+
+### H. Quotes
+
+- **Public landing page** at `/quote` (no login). Form captures name, email, phone, address, service type, bedrooms, bathrooms, square footage, preferred date, and free-text message.
+- **Admin inbox** at `/quotes` shows every submission. Each can be moved through NEW → CONTACTED → CONVERTED → ARCHIVED with internal notes.
+- **Confirmation email** to the customer; alert email to all admins.
+
+### I. Reliability and infrastructure
+
+- **Notification Catalog defaults fallback**: emails do not silently disappear when an admin hasn't seeded the catalog row. The static catalog is the source of truth before seeding.
+- **EmailLog `notificationKey`**: cron-driven notifications are idempotent. Re-running a cron won't double-send.
+- **Time-aware helpers**: `isAfter5pmDayBefore` for late cancellation rules.
+- **Resend attachments**: the `deliver` helper now supports email attachments (used by the monthly statement PDF).
+- **All policy values centralized** in `src/lib/policy.ts` so admin can tune without code changes elsewhere.
+
+### J. PWA improvements
+
+- Always-available "Install app" entry in the cleaner drawer.
+- PWA banner re-shows after 14 days.
+- `/icon/*` and `/apple-icon` exposed publicly so Chrome can install the app.
+
+---
+
+## 3. Database migrations applied
+
+All four migrations have been applied to your Supabase production database. Schema is fully up to date.
+
+1. `20260527130811_add_product_category` (already applied via SQL, marked resolved).
+2. `20260528101418_add_notification_settings` (already applied via SQL, marked resolved).
+3. `20260528105306_chat_presence_and_receipts`.
+4. `20260528161342_rag_wash_credit_system`.
+5. `20260528200000_email_log_notification_key`.
+6. `20260530120000_no_show_and_late_arrival` — Client.noShowCount / lastNoShowAt + Job.noShowAt / lateArrivalAt / lateArrivalRatingCap / washReviewOverrideAt / washReviewOverrideBy.
+7. `20260530130000_quote_requests` — QuoteRequest table.
+8. `20260530140000_job_assignment_invites` — JobAssignmentInvite table.
+9. `20260530150000_card_holds` — Job hold lifecycle columns.
+
+All are additive (no destructive changes).
+
+---
+
+## 4. Numeric defaults shipped
+
+All values live in `src/lib/policy.ts`. Tune as needed.
+
+- "On the way" ETA trigger: 15 minutes.
+- Accept / decline timeout: 10 minutes.
+- No-show fee: $25.
+- Late-arrival grace: 10 minutes (then 0.5 stars off per 5 minutes).
+- Late-arrival initial cap: 4 stars.
+- Last-minute claim bonus: $10.
+- Default inventory low-stock threshold: 10.
+- Poor-rating follow-up threshold: 1 star.
+
+---
+
+## 5. Cron jobs running
+
+- `/api/cron/reminders` — daily at 09:00.
+- `/api/cron/notifications` — every 5 minutes (includes the invite-expiry sweep).
+- `/api/cron/weekly` — Mondays at 09:00 (provider performance + Rag Wash dashboard).
+- `/api/cron/monthly` — 1st of each month at 09:00 (customer statement with PDF).
+
+All authorized with `Bearer ${CRON_SECRET}`.
+
+---
+
+## 6. Still open / pending your input
+
+1. **Gift cards**: held until you confirm:
+   - Redemption mechanism (account credit vs single-use code).
+   - Denominations (free amount vs fixed tiers).
+   - Recipient delivery (Cleano emails the recipient, or buyer forwards a code).
+
+2. **Twilio credentials**: code is wired and ready. We need from you:
+   - `TWILIO_ACCOUNT_SID`
+   - `TWILIO_AUTH_TOKEN`
+   - `TWILIO_FROM_NUMBER` (E.164) or `TWILIO_MESSAGING_SERVICE_SID`
+   - For US customers: A2P 10DLC business registration in the Twilio console.
+   Paste them into `.env.local` and the Vercel project's environment variables and the SMS sender will start delivering.
+
+3. **"On the way" GPS trigger**: deferred until you provide a Google Maps API key (needed for the Distance Matrix API). Once added to env as `GOOGLE_MAPS_API_KEY`, we will wire the ETA computation and the trigger.
+
+Everything else from your decision list is implemented and running.

@@ -483,5 +483,44 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, at: now.toISOString(), counts });
+  // ── Sweep expired job-assignment invites ─────────────────────────
+  // Cleaners who don't accept/decline within the configured window
+  // (default 10 min) are auto-released so the job returns to unassigned.
+  const expiredInvites = await db.jobAssignmentInvite.findMany({
+    where: { decision: "PENDING", expiresAt: { lt: now } },
+    select: { id: true, jobId: true, cleanerId: true },
+    take: 200,
+  });
+  for (const inv of expiredInvites) {
+    try {
+      await db.$transaction([
+        db.jobAssignmentInvite.update({
+          where: { id: inv.id },
+          data: { decision: "EXPIRED", respondedAt: now },
+        }),
+        db.job.update({
+          where: { id: inv.jobId },
+          data: { cleaners: { disconnect: { id: inv.cleanerId } } },
+        }),
+        db.jobLog.create({
+          data: {
+            jobId: inv.jobId,
+            userId: inv.cleanerId,
+            action: "NOTE_ADDED",
+            description:
+              "Assignment auto-declined (no response within the configured window).",
+          },
+        }),
+      ]);
+    } catch (e) {
+      console.error("expired invite sweep failed", inv.id, e);
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    at: now.toISOString(),
+    counts,
+    expiredInvites: expiredInvites.length,
+  });
 }

@@ -1359,6 +1359,7 @@ interface InvoiceEmailOpts {
   amount?: number;
   link?: string;
   clientName?: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }
 
 const INVOICE_KEY_MAP: Record<"ADMIN" | "CUSTOMER", Partial<Record<InvoiceEvent, string>>> = {
@@ -1450,6 +1451,7 @@ export async function sendInvoiceEmail(opts: InvoiceEmailOpts) {
     subject: copy.subject(opts.invoiceNumber),
     html,
     notification: { recipient: opts.recipient, key },
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
   });
 }
 

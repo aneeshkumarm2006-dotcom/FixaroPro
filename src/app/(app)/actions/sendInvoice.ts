@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import { sendInvoiceEmail } from "@/lib/email";
+import { buildInvoicePdfBuffer } from "@/lib/invoice-pdf";
+import { GST_RATE, QST_RATE } from "@/lib/tax";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -23,67 +25,107 @@ export async function sendInvoice(invoiceId: string) {
 
     const invoice = await db.invoice.findUnique({
       where: { id: invoiceId },
-    });
-
-    if (!invoice) return { success: false, error: "Invoice not found" };
-
-    if (invoice.status !== "DRAFT") {
-      return { success: false, error: "Only draft invoices can be sent" };
-    }
-
-    await db.invoice.update({
-      where: { id: invoiceId },
-      data: {
-        status: "SENT",
-        sentAt: new Date(),
+      include: {
+        client: { select: { name: true, email: true, phone: true, address: true } },
+        lineItems: { orderBy: { sortOrder: "asc" } },
       },
     });
 
-    // If linked to a job, update the job's invoiceSent flag
-    if (invoice.jobId) {
-      await db.$transaction([
-        db.job.update({
-          where: { id: invoice.jobId },
-          data: { invoiceSent: true },
-        }),
-        db.jobLog.create({
-          data: {
-            jobId: invoice.jobId,
-            userId: guard.session.user.id,
-            action: "INVOICE_SENT",
-            field: "invoiceSent",
-            oldValue: "false",
-            newValue: "true",
-            description: `Invoice ${invoice.invoiceNumber} sent by ${guard.session.user.name}`,
-          },
-        }),
-      ]);
-      revalidatePath(`/jobs/${invoice.jobId}`);
-      revalidatePath("/jobs");
+    if (!invoice) return { success: false, error: "Invoice not found" };
+    if (!["DRAFT", "SENT"].includes(invoice.status)) {
+      return { success: false, error: "Only draft or sent invoices can be emailed" };
+    }
+
+    const isFirstSend = invoice.status === "DRAFT";
+
+    // Mark as SENT if it was a draft
+    if (isFirstSend) {
+      await db.invoice.update({
+        where: { id: invoiceId },
+        data: { status: "SENT", sentAt: new Date() },
+      });
+
+      if (invoice.jobId) {
+        await db.$transaction([
+          db.job.update({
+            where: { id: invoice.jobId },
+            data: { invoiceSent: true },
+          }),
+          db.jobLog.create({
+            data: {
+              jobId: invoice.jobId,
+              userId: guard.session.user.id,
+              action: "INVOICE_SENT",
+              field: "invoiceSent",
+              oldValue: "false",
+              newValue: "true",
+              description: `Invoice ${invoice.invoiceNumber} sent by ${guard.session.user.name}`,
+            },
+          }),
+        ]);
+        revalidatePath(`/jobs/${invoice.jobId}`);
+        revalidatePath("/jobs");
+      }
     }
 
     revalidatePath("/invoices");
     revalidatePath(`/invoices/${invoiceId}`);
 
-    // Customer "Invoice resent" — gated by `cust.invoice.resend`.
-    const fresh = await db.invoice.findUnique({
-      where: { id: invoiceId },
-      include: { client: { select: { name: true, email: true } } },
-    });
-    if (fresh?.client?.email) {
+    // Send email with PDF attached if client has an email
+    if (invoice.client?.email) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-      sendInvoiceEmail({
-        to: fresh.client.email,
+
+      // Generate PDF attachment
+      let pdfAttachment: Array<{ filename: string; content: Buffer }> | undefined;
+      try {
+        const pdfBuffer = await buildInvoicePdfBuffer({
+          invoiceNumber: invoice.invoiceNumber,
+          createdAt: invoice.createdAt.toISOString(),
+          dueDate: invoice.dueDate?.toISOString() ?? null,
+          status: isFirstSend ? "SENT" : invoice.status,
+          client: {
+            name: invoice.client.name,
+            email: invoice.client.email,
+            phone: invoice.client.phone ?? null,
+            address: invoice.client.address ?? null,
+          },
+          lineItems: invoice.lineItems.map((li) => ({
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            amount: li.amount,
+          })),
+          subtotal: invoice.subtotal,
+          discountAmount: invoice.discountAmount,
+          gstAmount: invoice.gstAmount,
+          qstAmount: invoice.qstAmount,
+          totalAmount: invoice.totalAmount,
+          notes: invoice.notes,
+          taxConfig: {
+            gstRate: GST_RATE * 100,
+            qstRate: QST_RATE * 100,
+            gstNumber: "",
+            qstNumber: "",
+          },
+        });
+        pdfAttachment = [{ filename: `invoice-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }];
+      } catch (pdfErr) {
+        console.error("PDF generation failed, sending email without attachment", pdfErr);
+      }
+
+      await sendInvoiceEmail({
+        to: invoice.client.email,
         recipient: "CUSTOMER",
-        event: "resend",
-        invoiceNumber: fresh.invoiceNumber,
-        amount: fresh.totalAmount,
-        clientName: fresh.client.name,
-        link: `${appUrl}/portal/invoices/${fresh.id}`,
-      }).catch((e) => console.error("customer invoice-resend", e));
+        event: isFirstSend ? "new" : "resend",
+        invoiceNumber: invoice.invoiceNumber,
+        amount: invoice.totalAmount,
+        clientName: invoice.client.name,
+        link: `${appUrl}/invoices/${invoice.id}`,
+        attachments: pdfAttachment,
+      }).catch((e) => console.error("invoice email", e));
     }
 
-    return { success: true };
+    return { success: true, emailed: !!invoice.client?.email };
   } catch (error) {
     console.error("Error sending invoice:", error);
     return { success: false, error: "Failed to send invoice" };

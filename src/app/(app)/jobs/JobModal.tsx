@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, Resolver, SubmitHandler, useForm } from "react-hook-form";
@@ -494,6 +494,185 @@ function CustomTimePicker({
   );
 }
 
+// ── Searchable client picker ───────────────────────────────────────────────
+function ClientSearchField({
+  clients,
+  disabled,
+  selectedClientId,
+  value,
+  error,
+  onSelect,
+  onClear,
+  onChange,
+}: {
+  clients: ClientLite[];
+  disabled?: boolean;
+  selectedClientId: string;
+  value: string;
+  error?: string;
+  onSelect: (c: ClientLite) => void;
+  onClear: () => void;
+  onChange: (val: string) => void;
+}) {
+  const [query, setQuery] = React.useState(value || "");
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Keep query in sync when parent resets
+  React.useEffect(() => { setQuery(value || ""); }, [value]);
+
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = query.trim().length === 0
+    ? clients.slice(0, 8)
+    : clients.filter((c) =>
+        c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c.email?.toLowerCase().includes(query.toLowerCase()) ||
+        c.address?.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8);
+
+  const isLinked = !!selectedClientId;
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <label className="input-label tracking-tight">
+        Client <span className="text-red-500">*</span>
+      </label>
+
+      <div style={{ position: "relative" }}>
+        {/* Search icon */}
+        <svg
+          style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: isLinked ? "#e85d04" : "rgba(28,25,23,0.4)", pointerEvents: "none", zIndex: 1 }}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {isLinked
+            ? <><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></>
+            : <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>
+          }
+        </svg>
+
+        <input
+          type="text"
+          disabled={disabled}
+          value={query}
+          placeholder="Search existing clients or type a new name…"
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            onChange(val);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          style={{
+            width: "100%", height: 44, borderRadius: 10,
+            border: error ? "1px solid #dc2626" : isLinked ? "1px solid rgba(232,93,4,0.35)" : "1px solid rgba(28,25,23,0.12)",
+            background: isLinked ? "rgba(232,93,4,0.04)" : "#fff",
+            padding: "0 40px 0 42px",
+            fontSize: 14, color: "#1c1917", outline: "none",
+            fontFamily: "inherit",
+            transition: "border-color 0.15s, box-shadow 0.15s",
+          }}
+          onFocusCapture={(e) => {
+            e.currentTarget.style.borderColor = "#e85d04";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(232,93,4,0.12)";
+          }}
+          onBlurCapture={(e) => {
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.borderColor = error
+              ? "#dc2626"
+              : isLinked ? "rgba(232,93,4,0.35)" : "rgba(28,25,23,0.12)";
+          }}
+        />
+
+        {/* Clear button */}
+        {query && (
+          <button
+            type="button"
+            onClick={() => { setQuery(""); onClear(); setOpen(false); }}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "rgba(28,25,23,0.4)", display: "flex", padding: 2 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Linked client badge */}
+      {isLinked && (
+        <p style={{ fontSize: 11, color: "#e85d04", marginTop: 5, display: "flex", alignItems: "center", gap: 4 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Existing client linked · info auto-filled
+        </p>
+      )}
+
+      {error && !isLinked && (
+        <p className="mt-1.5 text-xs text-red-600">{error}</p>
+      )}
+
+      {/* Dropdown */}
+      {open && !disabled && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 9999,
+          background: "#fff", border: "1px solid rgba(28,25,23,0.1)", borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(28,25,23,0.12)", overflow: "hidden", maxHeight: 280, overflowY: "auto",
+        }}>
+          {filtered.length === 0 && query.trim() ? (
+            <div style={{ padding: "10px 14px" }}>
+              <div style={{ fontSize: 12, color: "rgba(28,25,23,0.5)", marginBottom: 4 }}>No existing clients match</div>
+              <button type="button" onClick={() => { onChange(query); setOpen(false); }}
+                style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "8px 0", fontSize: 14, color: "#1c1917", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, background: "rgba(232,93,4,0.1)", color: "#e85d04", padding: "2px 7px", borderRadius: 6, fontWeight: 600 }}>NEW</span>
+                Create &ldquo;{query}&rdquo; as new client
+              </button>
+            </div>
+          ) : (
+            <>
+              {query.trim() === "" && (
+                <div style={{ padding: "8px 14px 4px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(28,25,23,0.4)" }}>
+                  Existing clients
+                </div>
+              )}
+              {filtered.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { setQuery(c.name); onSelect(c); setOpen(false); }}
+                  style={{ width: "100%", textAlign: "left", background: c.id === selectedClientId ? "rgba(232,93,4,0.06)" : "none", border: "none", cursor: "pointer", padding: "10px 14px", fontFamily: "inherit", borderBottom: "1px solid rgba(28,25,23,0.04)", display: "flex", flexDirection: "column", gap: 2 }}
+                  onMouseEnter={(e) => { if (c.id !== selectedClientId) e.currentTarget.style.background = "rgba(28,25,23,0.03)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = c.id === selectedClientId ? "rgba(232,93,4,0.06)" : "none"; }}>
+                  <span style={{ fontSize: 14, color: "#1c1917", fontWeight: c.id === selectedClientId ? 600 : 400 }}>{c.name}</span>
+                  {(c.email || c.address) && (
+                    <span style={{ fontSize: 11, color: "rgba(28,25,23,0.5)" }}>
+                      {[c.email, c.address].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {query.trim() !== "" && (
+                <button type="button" onClick={() => { onChange(query); setSelectedClientIdLocal(); setOpen(false); }}
+                  style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "10px 14px", fontSize: 13, color: "rgba(28,25,23,0.6)", fontFamily: "inherit", borderTop: "1px solid rgba(28,25,23,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, background: "rgba(232,93,4,0.1)", color: "#e85d04", padding: "2px 7px", borderRadius: 6, fontWeight: 600 }}>NEW</span>
+                  Use &ldquo;{query}&rdquo; as new client name
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  function setSelectedClientIdLocal() { onClear(); }
+}
+
 export default function JobModal({
   isOpen,
   onClose,
@@ -538,6 +717,7 @@ export default function JobModal({
     trigger,
     control,
     setValue,
+    watch,
   } = useForm<FormValues>({
     resolver: (zodResolver as any)(formSchema) as Resolver<FormValues>,
     mode: "onChange",
@@ -952,84 +1132,29 @@ export default function JobModal({
               {/* Step 1: Basic Information */}
               {currentStep === 1 && (
                 <div className="space-y-5">
-                  {/* Existing Client Selector */}
-                  {clients.length > 0 && (
-                    <div>
-                      <label className="input-label tracking-tight">
-                        Link to Existing Client (optional)
-                      </label>
-                      <CustomDropdown
-                        trigger={
-                          <Button
-                            variant="default"
-                            size="md"
-                            border={false}
-                            type="button"
-                            disabled={disableForm}
-                            className="w-full h-[44px] px-4 py-3 flex items-center !justify-between bg-[#e85d04]/5">
-                            <span className="text-sm font-[350] text-[#1c1917] truncate">
-                              {selectedClientId
-                                ? clients.find(
-                                    (c) => c.id === selectedClientId
-                                  )?.name || "—"
-                                : "No linked client"}
-                            </span>
-                            <ChevronDown className="w-4 h-4 text-[#1c1917]/50" />
-                          </Button>
-                        }
-                        options={[
-                          {
-                            label: "— None —",
-                            onClick: () => {
-                              setSelectedClientId("");
-                              setDiscountTouched(false);
-                            },
-                          },
-                          ...clients.map((c) => ({
-                            label: c.name,
-                            onClick: () => {
-                              setSelectedClientId(c.id);
-                              setDiscountTouched(false);
-                              setValue("clientName", c.name, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
-                              setValue("location", c.address || "", {
-                                shouldDirty: true,
-                              });
-                            },
-                          })),
-                        ]}
-                        maxHeight="16rem"
-                      />
-                    </div>
-                  )}
-
-                  {/* Client Name */}
-                  <div>
-                    <label className="input-label tracking-tight">
-                      Client Name <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
-                      <Input
-                        variant="form"
-                        type="text"
-                        size="md"
-                        {...register("clientName")}
-                        disabled={disableForm}
-                        error={!!errors.clientName}
-                        className="w-full pl-11 px-4 py-3 tracking-tight placeholder:tracking-tight"
-                        placeholder="e.g., Alexis Juarez"
-                        border={false}
-                      />
-                    </div>
-                    {errors.clientName && (
-                      <p className="mt-1.5 text-xs text-red-600">
-                        {errors.clientName.message}
-                      </p>
-                    )}
-                  </div>
+                  {/* Client Search — existing client picker + free-text fallback */}
+                  <ClientSearchField
+                    clients={clients}
+                    disabled={disableForm}
+                    selectedClientId={selectedClientId}
+                    value={watch("clientName")}
+                    error={errors.clientName?.message}
+                    onSelect={(c) => {
+                      setSelectedClientId(c.id);
+                      setDiscountTouched(false);
+                      setValue("clientName", c.name, { shouldValidate: true, shouldDirty: true });
+                      setValue("location", c.address || "", { shouldDirty: true });
+                    }}
+                    onClear={() => {
+                      setSelectedClientId("");
+                      setDiscountTouched(false);
+                      setValue("clientName", "", { shouldValidate: false });
+                    }}
+                    onChange={(val) => {
+                      setSelectedClientId("");
+                      setValue("clientName", val, { shouldValidate: false, shouldDirty: true });
+                    }}
+                  />
 
                   {/* Location */}
                   <div>

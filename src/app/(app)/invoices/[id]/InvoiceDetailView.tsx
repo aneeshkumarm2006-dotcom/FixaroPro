@@ -13,6 +13,8 @@ import {
   Loader,
   FileText,
   Briefcase,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -87,15 +89,22 @@ export default function InvoiceDetailView({
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleSend = async () => {
     setIsSending(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
     const result = await sendInvoice(invoice.id);
     setIsSending(false);
     if (!result.success) {
       setErrorMsg(result.error || "Failed to send invoice");
     } else {
+      setSuccessMsg(
+        result.emailed
+          ? `Invoice sent to ${invoice.client.email} with PDF attached.`
+          : "Invoice marked as sent. No email on file for this client."
+      );
       router.refresh();
     }
   };
@@ -184,6 +193,17 @@ export default function InvoiceDetailView({
             <Printer className="w-4 h-4 mr-2" />
             Print
           </Button>
+
+          {/* Download PDF */}
+          <a
+            href={`/api/invoices/${invoice.id}/pdf`}
+            download={`invoice-${invoice.invoiceNumber}.pdf`}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-medium bg-white border border-gray-200 text-[#1c1917] hover:bg-gray-50 transition-colors">
+            <Download className="w-4 h-4" />
+            Download PDF
+          </a>
+
+          {/* Send (DRAFT) */}
           {invoice.status === "DRAFT" && (
             <Button
               variant="primary"
@@ -193,7 +213,21 @@ export default function InvoiceDetailView({
               onClick={handleSend}
               className="rounded-2xl px-6 py-3">
               {isSending ? <Loader className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-              Mark as Sent
+              {invoice.client.email ? "Send Invoice" : "Mark as Sent"}
+            </Button>
+          )}
+
+          {/* Resend (SENT / OVERDUE) */}
+          {(invoice.status === "SENT" || invoice.status === "OVERDUE") && invoice.client.email && (
+            <Button
+              variant="primary"
+              size="md"
+              border={false}
+              disabled={isSending}
+              onClick={handleSend}
+              className="rounded-2xl px-6 py-3">
+              {isSending ? <Loader className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Resend Invoice
             </Button>
           )}
           {(invoice.status === "SENT" || invoice.status === "OVERDUE") && (
@@ -224,6 +258,13 @@ export default function InvoiceDetailView({
       </div>
 
       {/* Error */}
+      {successMsg && (
+        <div className="rounded-2xl bg-green-50 border border-green-200 p-3 flex items-start gap-3 print:hidden">
+          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-green-800">{successMsg}</p>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="rounded-2xl bg-red-50 border border-red-200 p-3 flex items-start gap-3 print:hidden">
           <div className="flex-1 text-sm text-red-700">{errorMsg}</div>

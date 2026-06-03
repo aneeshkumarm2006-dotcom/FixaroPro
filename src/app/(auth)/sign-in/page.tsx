@@ -1,369 +1,293 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { z } from "zod";
+import { useState, useEffect, FormEvent, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import Checkbox from "@/components/ui/Checkbox";
-import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 
-import { Suspense } from "react";
+/* ── Shared input style ── */
+const inp: React.CSSProperties = {
+  width: "100%", height: 52, borderRadius: 12,
+  border: "1px solid rgba(22,21,20,0.15)", background: "#fff",
+  padding: "0 16px", fontSize: 15, color: "#161514",
+  fontFamily: "inherit", outline: "none",
+  transition: "border-color 0.15s, box-shadow 0.15s",
+};
+const inpFocus = { borderColor: "#e85d04", boxShadow: "0 0 0 3px rgba(232,93,4,0.14)" };
+const inpBlur  = { borderColor: "rgba(22,21,20,0.15)", boxShadow: "none" };
 
 function SignInInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const session = authClient.useSession();
-  const roleError = searchParams.get("error") === "crew_account";
+  const searchParams  = useSearchParams();
+  const session       = authClient.useSession();
+  const roleError     = searchParams.get("error") === "crew_account";
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {}
-  );
-  const [globalError, setGlobalError] = useState<string | null>(null);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
 
-  const signInSchema = z.object({
-    email: z.string().email({ message: "Enter a valid email address" }),
-    password: z
-      .string()
-      .min(6, { message: "Password must be at least 6 characters" }),
-  });
-
-  // Redirect if already logged in — role-aware via /api/post-signin
+  /* Live clock */
+  const [now, setNow] = useState(new Date());
   useEffect(() => {
-    if (session.data?.session) {
-      window.location.href = "/api/post-signin?from=admin";
-    }
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const timeStr = now.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const dateStr = now.toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" });
+
+  /* Redirect if already signed in */
+  useEffect(() => {
+    if (session.data?.session) window.location.href = "/api/post-signin?from=admin";
   }, [session.data?.session]);
 
-  // Load saved email if user had chosen remember me previously
+  /* Restore saved email */
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedEmail = localStorage.getItem("cleano_remember_email");
-    if (savedEmail) {
-      setFormData((prev) => ({ ...prev, email: savedEmail }));
-      setRememberMe(true);
-    }
+    const saved = localStorage.getItem("admin_remember_email");
+    if (saved) { setEmail(saved); setRemember(true); }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-
-    // Clear any previous global errors
-    setGlobalError(null);
-
-    // Validate form data with Zod
-    const validation = signInSchema.safeParse(formData);
-    if (!validation.success) {
-      const fieldErrors: { email?: string; password?: string } = {};
-      validation.error.issues.forEach((issue) => {
-        if (issue.path[0] === "email") fieldErrors.email = issue.message;
-        if (issue.path[0] === "password") fieldErrors.password = issue.message;
-      });
-      setErrors(fieldErrors);
-      return;
-    }
-    setErrors({});
-
-    // Persist or clear email based on remember-me
-    if (typeof window !== "undefined") {
-      if (rememberMe) {
-        localStorage.setItem("cleano_remember_email", formData.email);
-      } else {
-        localStorage.removeItem("cleano_remember_email");
-      }
-    }
-
+    setError(null);
+    if (!email.includes("@")) { setError("Enter a valid email address."); return; }
+    if (password.length < 6)  { setError("Password must be at least 6 characters."); return; }
     setLoading(true);
-
     try {
       const res = await authClient.signIn.email({
-        email: formData.email,
-        password: formData.password,
+        email: email.trim().toLowerCase(),
+        password,
         callbackURL: "/api/post-signin?from=admin",
       });
-
       if (res.error) {
-        // Set user-friendly error messages based on specific auth error codes
-        let errorMessage = "Please check your credentials and try again.";
-
-        const errorMsg = res.error.message?.toLowerCase() || "";
-        const statusCode = res.error.status || res.error.code;
-
-        // Check HTTP status codes first (more reliable)
-        if (statusCode === 401) {
-          errorMessage =
-            "The email or password is incorrect. Please check and try again.";
-        } else if (statusCode === 403) {
-          errorMessage =
-            "Access denied. Please contact support if this continues.";
-        } else if (statusCode === 429) {
-          errorMessage =
-            "Too many attempts. Please wait a few minutes before trying again.";
-        } else if (typeof statusCode === "number" && statusCode >= 500) {
-          errorMessage = "Server error. Please try again in a few moments.";
-        }
-        // Then check error message content for more specific cases
-        else if (
-          errorMsg.includes("invalid login credentials") ||
-          errorMsg.includes("invalid credentials")
-        ) {
-          errorMessage =
-            "The email or password is incorrect. Please check and try again.";
-        } else if (
-          errorMsg.includes("email not confirmed") ||
-          errorMsg.includes("email_not_confirmed")
-        ) {
-          errorMessage = "Please verify your email address before signing in.";
-        } else if (
-          errorMsg.includes("user not found") ||
-          errorMsg.includes("user_not_found")
-        ) {
-          errorMessage =
-            "No account found. Please sign up or check your email.";
-        } else if (
-          errorMsg.includes("too many requests") ||
-          errorMsg.includes("rate limit") ||
-          errorMsg.includes("too_many_requests")
-        ) {
-          errorMessage =
-            "Too many attempts. Please wait a few minutes before trying again.";
-        } else if (
-          errorMsg.includes("network") ||
-          errorMsg.includes("fetch") ||
-          errorMsg.includes("connection")
-        ) {
-          errorMessage =
-            "Connection issue. Please check your internet and try again.";
-        } else if (
-          errorMsg.includes("account disabled") ||
-          errorMsg.includes("account_disabled")
-        ) {
-          errorMessage =
-            "This account has been disabled. Please contact support.";
-        }
-
-        setGlobalError(errorMessage);
+        const code = res.error.status;
+        if (code === 401) setError("Email or password is incorrect.");
+        else if (code === 429) setError("Too many attempts. Please wait a few minutes.");
+        else setError(res.error.message || "Couldn't sign in. Please try again.");
         setLoading(false);
         return;
       }
-
+      if (remember) localStorage.setItem("admin_remember_email", email);
+      else localStorage.removeItem("admin_remember_email");
       window.location.href = "/api/post-signin?from=admin";
     } catch {
-      setGlobalError("Unexpected error. Please try again.");
+      setError("Unexpected error. Please try again.");
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="h-screen bg-white relative overflow-hidden flex">
-      {/* Hero Section - Hidden on mobile, shown on lg+ */}
-      <div
-        className="hidden lg:flex flex-1 relative overflow-hidden m-4 rounded-2xl"
-        style={{
-          background:
-            "linear-gradient(135deg, #1c1917 0%, #2a2520 50%, #0f0e0d 100%)",
-        }}>
-        {/* Background blobs */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 left-[15%] w-[40rem] h-[40rem] rounded-full bg-[#e85d04]/20 blur-[180px]" />
-          <div className="absolute top-[55%] -right-32 w-[48rem] h-[48rem] rounded-full bg-[#f48c06]/15 blur-[200px]" />
-          <div className="absolute bottom-[-15%] left-[-5%] w-[50rem] h-[50rem] rounded-full bg-[#1c1917]/80 blur-[210px]" />
+    <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", minHeight: "100vh", fontFamily: "var(--font-dm-sans, DM Sans, system-ui, sans-serif)" }}>
+
+      {/* ── LEFT: Command-center brand panel ── */}
+      <aside style={{
+        position: "relative", overflow: "hidden",
+        background: "radial-gradient(ellipse at 20% 30%, rgba(232,93,4,0.12) 0%, transparent 60%), linear-gradient(135deg, #0c0b0a 0%, #161514 50%, #1c1a18 100%)",
+        color: "#fff", padding: "40px 56px",
+        display: "flex", flexDirection: "column",
+      }}>
+        {/* Animated grid */}
+        <style>{`
+          @keyframes gridFloat {
+            0%,100% { transform: translate(0,0); }
+            50% { transform: translate(8px,-8px); }
+          }
+          @keyframes liveDot {
+            0%,100% { opacity:0.3; transform:scale(0.8); }
+            50% { opacity:1; transform:scale(1); }
+          }
+          .admin-grid {
+            position:absolute;inset:0;
+            background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);
+            background-size:40px 40px;
+            mask-image:radial-gradient(ellipse at 30% 50%,black 0%,transparent 70%);
+            -webkit-mask-image:radial-gradient(ellipse at 30% 50%,black 0%,transparent 70%);
+            animation:gridFloat 20s ease-in-out infinite;
+          }
+          .live-dot {
+            width:7px;height:7px;border-radius:50%;
+            background:#10b981;box-shadow:0 0 8px rgba(16,185,129,0.6);
+            animation:liveDot 2s ease-in-out infinite;
+          }
+          @media(max-width:768px){.admin-left-panel{display:none!important}}
+        `}</style>
+        <div className="admin-grid" />
+
+        {/* Gold corner glow */}
+        <div style={{ position:"absolute",top:0,right:0,width:280,height:280, background:"radial-gradient(circle at top right,rgba(203,163,90,0.08),transparent 70%)", pointerEvents:"none" }} />
+
+        {/* Logo row */}
+        <div style={{ position:"relative",zIndex:2,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+            <div style={{ width:38,height:38,borderRadius:12,background:"#fff",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.15)" }}>
+              <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={38} height={38} style={{ objectFit:"contain" }} />
+            </div>
+            <div>
+              <div style={{ fontWeight:700,fontSize:18,color:"#fff",lineHeight:1,letterSpacing:"-0.01em" }}>Fixaro</div>
+              <div style={{ fontSize:11,color:"rgba(255,255,255,0.45)",marginTop:3,letterSpacing:"0.04em" }}>Command Center</div>
+            </div>
+          </div>
+          <span style={{ fontSize:10,textTransform:"uppercase",letterSpacing:"0.16em",fontWeight:700,color:"#cba35a",background:"rgba(203,163,90,0.15)",padding:"6px 12px",borderRadius:999,border:"1px solid rgba(203,163,90,0.3)" }}>
+            Admin Access
+          </span>
         </div>
 
-        {/* Hero Content */}
-        <div className="relative z-10 h-full w-full flex flex-col items-start justify-center px-12 xl:px-16">
-          <div className="flex flex-col items-start justify-center space-y-6 max-w-xl">
-            {/* Logo */}
-            {/* <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-[500] text-white tracking-tight">
-Fixaro
-              </span>
-            </div> */}
-
-            <h1 className="text-5xl xl:text-6xl text-white leading-[1.1] font-[350]">
-              Welcome Back
+        {/* Body */}
+        <div style={{ position:"relative",zIndex:2,flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:36,marginTop:48 }}>
+          <div>
+            <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.14em",color:"#cba35a",fontWeight:600,marginBottom:18,opacity:0.9 }}>
+              {dateStr} · {timeStr} EDT
+            </p>
+            <h1 style={{ fontFamily:"var(--font-instrument-serif,'Instrument Serif',Georgia,serif)",fontWeight:400,fontSize:"clamp(40px,5vw,64px)",lineHeight:1.02,letterSpacing:"-0.02em",margin:"0 0 24px",color:"#fff" }}>
+              Run the<br />
+              <em style={{ fontStyle:"italic",color:"#d4b978" }}>whole operation.</em>
             </h1>
-            <p className="max-w-md font-[350] text-white/80 text-lg !leading-relaxed">
-              Sign in to your Fixaro account and continue managing your
-              service operations with ease.
+            <p style={{ fontSize:16,lineHeight:1.6,color:"rgba(255,255,255,0.65)",maxWidth:460,margin:0 }}>
+              Crew, clients, calendar, cash — one console. Sign in to see what&apos;s moving today.
             </p>
+          </div>
 
-            {/* Decorative elements */}
-            <div className="mt-8 flex items-center gap-4">
-              <div className="flex -space-x-3">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm border-2 border-white/25"
-                  />
-                ))}
+          {/* Live ops snapshot */}
+          <div style={{ background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:"20px 24px",backdropFilter:"blur(8px)",maxWidth:460 }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <div className="live-dot" />
+                <span style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",fontWeight:700,color:"rgba(255,255,255,0.6)" }}>Live · Operations</span>
               </div>
-              <span className="text-white/70 text-sm">
-                Trusted by service teams everywhere
-              </span>
+              <span style={{ fontSize:11,color:"rgba(255,255,255,0.4)",fontFamily:"monospace" }}>Live</span>
+            </div>
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18 }}>
+              {[
+                { val:"12", label:"Jobs today",   sub:"8 in progress" },
+                { val:"$4.2k", label:"Revenue",   sub:"last 24h" },
+                { val:"4.8★", label:"Satisfaction",sub:"47 reviews" },
+              ].map(s => (
+                <div key={s.label}>
+                  <div style={{ fontFamily:"var(--font-instrument-serif,'Instrument Serif',Georgia,serif)",fontSize:26,color:"#fff",fontWeight:400,letterSpacing:"-0.01em",lineHeight:1 }}>{s.val}</div>
+                  <div style={{ fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:5,fontWeight:600 }}>{s.label}</div>
+                  <div style={{ fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:2 }}>{s.sub}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Form Section */}
-      <div className="w-full lg:w-1/2 lg:shrink-0 h-screen flex items-center justify-center bg-[#f8fafa] lg:bg-white p-4">
-        <div className="w-full max-w-md mx-auto px-4 md:px-8 py-8 md:py-12">
-          {/* Mobile Logo */}
-          <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-white overflow-hidden flex items-center justify-center shadow-sm" style={{ border: "1px solid rgba(0,0,0,0.06)" }}>
-              <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={40} height={40} style={{ objectFit: "contain" }} />
-            </div>
-            <span className="text-xl font-[600] text-[#161514] tracking-tight">Fixaro</span>
+        {/* Security footer */}
+        <div style={{ position:"relative",zIndex:2,display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:24,borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(255,255,255,0.5)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Protected · SOC 2 Type II
           </div>
+          <div style={{ fontSize:12,color:"rgba(255,255,255,0.35)",fontFamily:"monospace" }}>Fixaro Admin</div>
+        </div>
+      </aside>
 
-          <div className="w-full flex flex-col items-start gap-1 mb-8">
-            <h1 className="h2-title">Sign In</h1>
-            <p className="h2-subheader">
-              Enter your credentials to access your account.
-            </p>
+      {/* ── RIGHT: Form panel ── */}
+      <div style={{ display:"flex",flexDirection:"column",background:"#fff" }}>
+        {/* Top bar */}
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"28px 48px" }}>
+          <Link href="/" style={{ fontSize:13,color:"rgba(22,21,20,0.5)",fontWeight:500,textDecoration:"none" }}>← Back</Link>
+          <div style={{ fontSize:13,color:"rgba(22,21,20,0.6)",display:"flex",alignItems:"center",gap:6 }}>
+            Need help?{" "}
+            <a href="mailto:support@fixaro.ca" style={{ color:"#e85d04",textDecoration:"none",fontWeight:600 }}>Contact ops</a>
           </div>
+        </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-4 md:space-y-6 w-full">
-            <div className="space-y-4">
+        <div style={{ flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:"16px 48px 32px" }}>
+          <div style={{ width:"100%",maxWidth:420,margin:"0 auto" }}>
+            <header style={{ marginBottom:36 }}>
+              <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",fontWeight:600,color:"#e85d04",marginBottom:12 }}>Admin sign in</p>
+              <h2 style={{ fontFamily:"var(--font-instrument-serif,'Instrument Serif',Georgia,serif)",fontWeight:400,fontSize:"clamp(28px,3.5vw,42px)",lineHeight:1.05,letterSpacing:"-0.02em",color:"#161514",margin:0 }}>
+                Welcome back,<br /><em style={{ fontStyle:"italic",color:"#e85d04" }}>operator.</em>
+              </h2>
+              <p style={{ fontSize:15,color:"rgba(22,21,20,0.7)",lineHeight:1.6,marginTop:14 }}>Sign in to your Fixaro admin account.</p>
+            </header>
+
+            <form onSubmit={handleSubmit} style={{ display:"flex",flexDirection:"column",gap:18 }}>
               {/* Email */}
-              <div>
-                <label className="input-label">Email Address *</label>
-                <Input
-                  variant="form"
-                  type="email"
-                  size="lg"
-                  border={false}
-                  className="px-4 py-3"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
+              <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                <label style={{ fontSize:13,fontWeight:500,color:"#161514" }}>Admin email</label>
+                <input type="email" placeholder="admin@fixaro.ca" value={email}
+                  onChange={e => { setEmail(e.target.value); setError(null); }} required style={inp}
+                  onFocus={e => Object.assign(e.currentTarget.style, inpFocus)}
+                  onBlur={e => Object.assign(e.currentTarget.style, inpBlur)} />
               </div>
 
               {/* Password */}
-              <div>
-                <label className="input-label">Password *</label>
-                <div className="relative">
-                  <Input
-                    variant="form"
-                    size="lg"
-                    border={false}
-                    className="px-4 py-3 pr-12"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    error={!!errors.password}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center">
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4 text-[#1c1917]/50 hover:text-[#1c1917] transition-colors" />
-                    ) : (
-                      <Eye className="w-4 h-4 text-[#1c1917]/50 hover:text-[#1c1917] transition-colors" />
-                    )}
+              <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                <label style={{ fontSize:13,fontWeight:500,color:"#161514" }}>Password</label>
+                <div style={{ position:"relative" }}>
+                  <input type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
+                    onChange={e => { setPassword(e.target.value); setError(null); }} required
+                    style={{ ...inp, paddingRight:56 }}
+                    onFocus={e => Object.assign(e.currentTarget.style, inpFocus)}
+                    onBlur={e => Object.assign(e.currentTarget.style, inpBlur)} />
+                  <button type="button" onClick={() => setShowPw(!showPw)} style={{ position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,color:"rgba(22,21,20,0.5)",fontFamily:"inherit" }}>
+                    {showPw ? "Hide" : "Show"}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                )}
               </div>
-            </div>
 
-            {/* Wrong role error — crew trying to use admin login */}
-            {roleError && (
-              <div className="p-4 rounded-xl border" style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
-                <p className="text-sm font-[600] text-amber-800 mb-1">Wrong sign-in page</p>
-                <p className="text-sm text-amber-700 leading-relaxed">
-                  This page is for admins only. Crew members should use the{" "}
-                  <Link href="/crew-sign-in" className="font-[600] underline underline-offset-2">
-                    Crew sign-in page
-                  </Link>
-                  .
-                </p>
-              </div>
-            )}
-
-            {/* Global Error */}
-            {globalError && (
-              <div className="p-4 bg-red-50/50 rounded-xl border border-red-100">
-                <p className="text-sm font-[350] tracking-tight text-red-600/80">
-                  {globalError}
-                </p>
-              </div>
-            )}
-
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Checkbox
-                  color="primary"
-                  checked={rememberMe}
-                  onChange={() => setRememberMe(!rememberMe)}
-                />
-                <label className="ml-2 text-sm text-[#1c1917]">
-                  Remember me
+              {/* Remember + Forgot */}
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:13 }}>
+                <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer",color:"rgba(22,21,20,0.7)" }}>
+                  <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ width:16,height:16,accentColor:"#e85d04",borderRadius:4 }} />
+                  Trust this device · 30 days
                 </label>
+                <Link href="/forgot-password" style={{ fontSize:13,color:"rgba(22,21,20,0.5)",textDecoration:"none" }}>Forgot?</Link>
               </div>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-[#1c1917]/80 hover:text-[#1c1917] transition-colors">
-                Forgot password?
-              </Link>
-            </div>
 
-            {/* Submit Button */}
-            <div className="w-full flex justify-center md:justify-end pt-4">
-              <Button
-                variant="action"
-                size="lg"
-                className="w-full md:w-auto px-8 py-3 text-base"
-                disabled={loading}
-                loading={loading}>
-                {loading ? "Signing In..." : "Sign In"}
-              </Button>
-            </div>
+              {/* Role error */}
+              {roleError && (
+                <div style={{ background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"14px 16px",fontSize:13,lineHeight:1.5 }}>
+                  <p style={{ fontWeight:600,color:"#92400e",margin:"0 0 4px" }}>Wrong sign-in page</p>
+                  <p style={{ color:"#b45309",margin:0 }}>
+                    Crew members should use the{" "}
+                    <Link href="/crew-sign-in" style={{ color:"#e85d04",fontWeight:600,textDecoration:"underline" }}>Crew sign-in page</Link>.
+                  </p>
+                </div>
+              )}
 
-            {/* Sign Up Link */}
-            <p className="pt-4 text-center text-sm text-[#1c1917]/80">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/sign-up"
-                className="font-medium text-[#1c1917] hover:text-[#1c1917]/80 transition-colors underline underline-offset-2">
-                Sign up
-              </Link>
-            </p>
-          </form>
+              {/* Error */}
+              {error && (
+                <div style={{ background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#dc2626",lineHeight:1.5 }}>
+                  {error}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button type="submit" disabled={loading} style={{ width:"100%",height:52,borderRadius:12,border:"none",background:loading?"rgba(232,93,4,0.6)":"#e85d04",color:"#fff",fontSize:15,fontWeight:600,cursor:loading?"not-allowed":"pointer",fontFamily:"inherit",letterSpacing:"-0.01em",boxShadow:loading?"none":"0 4px 18px rgba(232,93,4,0.30)",transition:"all 0.15s",marginTop:4 }}>
+                {loading ? "Signing in…" : "Sign in to dashboard →"}
+              </button>
+
+              {/* Crew link */}
+              <p style={{ fontSize:12,color:"rgba(22,21,20,0.5)",textAlign:"center",lineHeight:1.6,marginTop:8 }}>
+                Admin access is by invitation only.<br />
+                Looking for{" "}
+                <Link href="/crew-sign-in" style={{ color:"#e85d04",fontWeight:600,textDecoration:"none" }}>Crew sign-in</Link>
+                {" "}or{" "}
+                <Link href="/portal/login" style={{ color:"#e85d04",fontWeight:600,textDecoration:"none" }}>Customer portal</Link>?
+              </p>
+            </form>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"20px 48px",borderTop:"1px solid rgba(22,21,20,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"rgba(22,21,20,0.5)" }}>
+          <span>© {new Date().getFullYear()} Fixaro Inc.</span>
+          <div style={{ display:"flex",gap:20 }}>
+            {["Privacy","Terms","Security"].map(l => (
+              <a key={l} href="#" style={{ color:"rgba(22,21,20,0.5)",textDecoration:"none" }}>{l}</a>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Mobile: hide left panel */}
+      <style>{`@media(max-width:768px){aside{display:none!important}}`}</style>
     </div>
   );
 }

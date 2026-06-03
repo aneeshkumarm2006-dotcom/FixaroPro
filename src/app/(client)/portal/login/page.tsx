@@ -140,14 +140,7 @@ function PortalLoginInner() {
             />
             <span>Remember me</span>
           </label>
-          <a
-            href="#"
-            className="cl-link-muted"
-            onClick={(e) => {
-              e.preventDefault();
-              setNotice("Forgot password flow — coming soon.");
-            }}
-            style={{ fontSize: 13 }}>
+          <a href="/portal/forgot-password" className="cl-link-muted" style={{ fontSize: 13 }}>
             Forgot password?
           </a>
         </div>

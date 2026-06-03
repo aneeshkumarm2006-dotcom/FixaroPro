@@ -219,7 +219,7 @@ function CrewSignInInner() {
                   <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ width: 16, height: 16, accentColor: "#e85d04", borderRadius: 4 }} />
                   Keep me signed in
                 </label>
-                <span style={{ fontSize: 13, color: "rgba(22,21,20,0.5)", cursor: "pointer" }}>Forgot password?</span>
+                <Link href="/crew-forgot-password" style={{ fontSize: 13, color: "rgba(22,21,20,0.5)", textDecoration: "none" }}>Forgot password?</Link>
               </div>
 
               {/* Wrong role error — admin/customer trying to use crew login */}

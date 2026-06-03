@@ -402,11 +402,9 @@ export default function BookPage() {
       <div className="cl-book-shell">
         <aside className="cl-book-aside">
           <div className="cl-book-aside-logo">
-            <span
-              className="cl-logo-mark"
-              style={{ background: "#fff", color: "var(--primary)" }}>
-              <Sparkles size={18} strokeWidth={1.8} />
-            </span>
+            <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={36} height={36} style={{ objectFit: "contain" }} />
+            </div>
             <span
               style={{
                 color: "#fff",
@@ -414,7 +412,7 @@ export default function BookPage() {
                 fontSize: 18,
                 letterSpacing: "-0.01em",
               }}>
-              fixaro
+              Fixaro
             </span>
           </div>
 

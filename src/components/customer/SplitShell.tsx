@@ -3,8 +3,7 @@ import { Star } from "lucide-react";
 import CustomerLogo from "./Logo";
 
 export const BRAND_IMAGES = {
-  login:
-    "https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=1400&q=85&auto=format&fit=crop",
+  login: "/images/Customer_Login.png",
   setup:
     "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1400&q=80&auto=format&fit=crop",
   rate:

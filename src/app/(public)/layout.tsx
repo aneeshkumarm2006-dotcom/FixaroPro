@@ -9,10 +9,10 @@ export default function PublicLayout({
       <header className="border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#e85d04] flex items-center justify-center">
-              <span className="text-white text-sm font-[500]">C</span>
+            <div className="w-9 h-9 rounded-xl bg-white overflow-hidden shadow-sm flex items-center justify-center" style={{ border: "1px solid rgba(0,0,0,0.06)" }}>
+              <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={36} height={36} style={{ objectFit: "contain" }} />
             </div>
-            <span className="text-lg font-[400] text-[#1c1917]">Fixaro</span>
+            <span className="text-lg font-[600] text-[#161514]" style={{ letterSpacing: "-0.01em" }}>Fixaro</span>
           </div>
         </div>
       </header>

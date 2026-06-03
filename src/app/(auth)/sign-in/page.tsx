@@ -3,16 +3,20 @@
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import Checkbox from "@/components/ui/Checkbox";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
-export default function SignInPage() {
+import { Suspense } from "react";
+
+function SignInInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const session = authClient.useSession();
+  const roleError = searchParams.get("error") === "crew_account";
 
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,7 +40,7 @@ export default function SignInPage() {
   // Redirect if already logged in — role-aware via /api/post-signin
   useEffect(() => {
     if (session.data?.session) {
-      window.location.href = "/api/post-signin";
+      window.location.href = "/api/post-signin?from=admin";
     }
   }, [session.data?.session]);
 
@@ -84,7 +88,7 @@ export default function SignInPage() {
       const res = await authClient.signIn.email({
         email: formData.email,
         password: formData.password,
-        callbackURL: "/api/post-signin",
+        callbackURL: "/api/post-signin?from=admin",
       });
 
       if (res.error) {
@@ -152,7 +156,7 @@ export default function SignInPage() {
         return;
       }
 
-      window.location.href = "/api/post-signin";
+      window.location.href = "/api/post-signin?from=admin";
     } catch {
       setGlobalError("Unexpected error. Please try again.");
       setLoading(false);
@@ -219,12 +223,10 @@ Fixaro
         <div className="w-full max-w-md mx-auto px-4 md:px-8 py-8 md:py-12">
           {/* Mobile Logo */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-[#1c1917]" />
+            <div className="w-10 h-10 rounded-xl bg-white overflow-hidden flex items-center justify-center shadow-sm" style={{ border: "1px solid rgba(0,0,0,0.06)" }}>
+              <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={40} height={40} style={{ objectFit: "contain" }} />
             </div>
-            <span className="text-xl font-[500] text-[#1c1917] tracking-tight">
-Fixaro
-            </span>
+            <span className="text-xl font-[600] text-[#161514] tracking-tight">Fixaro</span>
           </div>
 
           <div className="w-full flex flex-col items-start gap-1 mb-8">
@@ -296,6 +298,20 @@ Fixaro
               </div>
             </div>
 
+            {/* Wrong role error — crew trying to use admin login */}
+            {roleError && (
+              <div className="p-4 rounded-xl border" style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
+                <p className="text-sm font-[600] text-amber-800 mb-1">Wrong sign-in page</p>
+                <p className="text-sm text-amber-700 leading-relaxed">
+                  This page is for admins only. Crew members should use the{" "}
+                  <Link href="/crew-sign-in" className="font-[600] underline underline-offset-2">
+                    Crew sign-in page
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
+
             {/* Global Error */}
             {globalError && (
               <div className="p-4 bg-red-50/50 rounded-xl border border-red-100">
@@ -349,5 +365,13 @@ Fixaro
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInInner />
+    </Suspense>
   );
 }

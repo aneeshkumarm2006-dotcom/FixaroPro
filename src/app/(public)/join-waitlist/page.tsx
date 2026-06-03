@@ -125,8 +125,11 @@ export default function JoinWaitlistPage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "20px 32px", maxWidth: 760, margin: "0 auto",
       }}>
-        <a href="/" style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 400, color: "#e85d04", textDecoration: "none", letterSpacing: "-0.01em" }}>
-Fixaro
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.10)", border: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <img src="/images/Fixaro-Logo.png" alt="Fixaro" width={36} height={36} style={{ objectFit: "contain" }} />
+          </div>
+          <span style={{ fontFamily: "var(--font-dm-sans, DM Sans, sans-serif)", fontSize: 18, fontWeight: 600, color: "#161514", letterSpacing: "-0.01em" }}>Fixaro</span>
         </a>
         <a href="/book" style={{ fontSize: 13, color: "#e85d04", textDecoration: "none", fontWeight: 600, opacity: 0.7 }}>
           Book a service →

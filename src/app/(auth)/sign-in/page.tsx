@@ -58,6 +58,7 @@ function SignInInner() {
       const res = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
         password,
+        rememberMe: remember,
         callbackURL: "/api/post-signin?from=admin",
       });
       if (res.error) {
@@ -78,10 +79,24 @@ function SignInInner() {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", minHeight: "100vh", fontFamily: "var(--font-dm-sans, DM Sans, system-ui, sans-serif)" }}>
+    <>
+      <style>{`
+        .admin-layout { display:grid; grid-template-columns:1.05fr 0.95fr; min-height:100vh; font-family:var(--font-dm-sans,DM Sans,system-ui,sans-serif); }
+        .admin-form-top  { padding:28px 48px; }
+        .admin-form-body { padding:16px 48px 32px; }
+        .admin-footer    { padding:20px 48px; }
+        @media(max-width:768px){
+          .admin-layout { grid-template-columns:1fr; }
+          .admin-aside  { display:none !important; }
+          .admin-form-top  { padding:20px 24px; }
+          .admin-form-body { padding:16px 24px 40px; }
+          .admin-footer    { padding:16px 24px; flex-wrap:wrap; gap:8px; }
+        }
+      `}</style>
+    <div className="admin-layout">
 
       {/* ── LEFT: Command-center brand panel ── */}
-      <aside style={{
+      <aside className="admin-aside" style={{
         position: "relative", overflow: "hidden",
         background: "radial-gradient(ellipse at 20% 30%, rgba(232,93,4,0.12) 0%, transparent 60%), linear-gradient(135deg, #0c0b0a 0%, #161514 50%, #1c1a18 100%)",
         color: "#fff", padding: "40px 56px",
@@ -188,15 +203,14 @@ function SignInInner() {
       {/* ── RIGHT: Form panel ── */}
       <div style={{ display:"flex",flexDirection:"column",background:"#fff" }}>
         {/* Top bar */}
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"28px 48px" }}>
-          <Link href="/" style={{ fontSize:13,color:"rgba(22,21,20,0.5)",fontWeight:500,textDecoration:"none" }}>← Back</Link>
+        <div className="admin-form-top" style={{ display:"flex",justifyContent:"flex-end",alignItems:"center" }}>
           <div style={{ fontSize:13,color:"rgba(22,21,20,0.6)",display:"flex",alignItems:"center",gap:6 }}>
             Need help?{" "}
             <a href="mailto:support@fixaro.ca" style={{ color:"#e85d04",textDecoration:"none",fontWeight:600 }}>Contact ops</a>
           </div>
         </div>
 
-        <div style={{ flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:"16px 48px 32px" }}>
+        <div className="admin-form-body" style={{ flex:1,display:"flex",flexDirection:"column",justifyContent:"center" }}>
           <div style={{ width:"100%",maxWidth:420,margin:"0 auto" }}>
             <header style={{ marginBottom:36 }}>
               <p style={{ fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",fontWeight:600,color:"#e85d04",marginBottom:12 }}>Admin sign in</p>
@@ -276,7 +290,7 @@ function SignInInner() {
         </div>
 
         {/* Footer */}
-        <div style={{ padding:"20px 48px",borderTop:"1px solid rgba(22,21,20,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"rgba(22,21,20,0.5)" }}>
+        <div className="admin-footer" style={{ borderTop:"1px solid rgba(22,21,20,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,color:"rgba(22,21,20,0.5)" }}>
           <span>© {new Date().getFullYear()} Fixaro Inc.</span>
           <div style={{ display:"flex",gap:20 }}>
             {["Privacy","Terms","Security"].map(l => (
@@ -286,9 +300,8 @@ function SignInInner() {
         </div>
       </div>
 
-      {/* Mobile: hide left panel */}
-      <style>{`@media(max-width:768px){aside{display:none!important}}`}</style>
     </div>
+    </>
   );
 }
 

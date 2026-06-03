@@ -61,6 +61,7 @@ function PortalLoginInner() {
       const res = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
         password,
+        rememberMe: remember,
         callbackURL: "/api/post-signin?from=portal",
       });
       if (res.error) {

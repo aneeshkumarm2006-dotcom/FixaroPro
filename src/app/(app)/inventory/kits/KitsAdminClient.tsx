@@ -100,10 +100,10 @@ export default function KitsAdminClient({ cleaners, products }: Props) {
     <div className="cl-page-wrap">
       <div className="cl-page-head">
         <div>
-          <h1 className="cl-page-title">Cleaner kits</h1>
+          <h1 className="cl-page-title">Technician kits</h1>
           <p className="cl-page-sub">
-            Assign items to each cleaner's personal kit. Master stock stays
-            unchanged when you assign; it only drops when a cleaner reports
+            Assign items to each technician's personal kit. Master stock stays
+            unchanged when you assign; it only drops when a technician reports
             damage or loss.
           </p>
         </div>
@@ -186,7 +186,7 @@ export default function KitsAdminClient({ cleaners, products }: Props) {
           }}>
           {!selected ? (
             <p style={{ fontSize: 14, color: "var(--primary-50)" }}>
-              Pick a cleaner from the left to manage their kit.
+              Pick a technician from the left to manage their kit.
             </p>
           ) : (
             <>
@@ -284,7 +284,7 @@ export default function KitsAdminClient({ cleaners, products }: Props) {
 
               {selected.kit.length === 0 ? (
                 <p style={{ marginTop: 20, fontSize: 13, color: "var(--primary-50)" }}>
-                  No items in this cleaner's kit yet.
+                  No items in this technician's kit yet.
                 </p>
               ) : (
                 <table style={{ width: "100%", marginTop: 16, borderCollapse: "collapse" }}>

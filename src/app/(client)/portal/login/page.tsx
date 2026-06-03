@@ -84,9 +84,9 @@ function PortalLoginInner() {
   return (
     <SplitShell
       image={BRAND_IMAGES.login}
-      quoteHtml={"Your home<br/>shouldn't <em>feel like<br/>work.</em>"}
-      quoteSub="Trusted Montréal cleaners. Transparent pricing. Manage everything from one place."
-      topRightLabel="Book a cleaning →"
+      quoteHtml={"Fast.<br/>Reliable.<br/><em>Fixed.</em>"}
+      quoteSub="Trusted Montréal handymen. Transparent pricing. Manage everything from one place."
+      topRightLabel="Book a service →"
       topRightHref="/book"
       badge="Customer portal">
       <header style={{ marginBottom: 36 }}>
@@ -99,7 +99,7 @@ function PortalLoginInner() {
           your <em>account.</em>
         </h1>
         <p className="cl-subtitle">
-          Manage bookings, reschedule, and track your past cleanings.
+          Manage bookings, reschedule, and track your past service visits.
         </p>
       </header>
 
@@ -174,7 +174,7 @@ function PortalLoginInner() {
           <div>
             First time?{" "}
             <Link href="/book" className="cl-link">
-              Book your first cleaning →
+              Book your first service →
             </Link>
           </div>
           <div style={{ fontSize: 13 }}>

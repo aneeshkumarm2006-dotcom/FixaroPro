@@ -51,7 +51,7 @@ export default function MultipliersTab({ settings }: MultipliersTabProps) {
   return (
     <SectionCard
       title="Pay Rate Multipliers"
-      description="Map cleaner ratings (4.0–5.0, in 0.1 steps) to pay multipliers applied at payout calculation."
+      description="Map technician ratings (4.0–5.0, in 0.1 steps) to pay multipliers applied at payout calculation."
       icon={Star}>
       <div className="space-y-3">
         {RATING_STEPS.map((step) => (
@@ -60,7 +60,7 @@ export default function MultipliersTab({ settings }: MultipliersTabProps) {
             className="grid grid-cols-[160px_1fr] items-center gap-3">
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 fill-[#77C8CC] text-[#77C8CC]" />
-              <span className="text-sm font-medium text-[#005F6A] tabular-nums">
+              <span className="text-sm font-medium text-[#1c1917] tabular-nums">
                 {step}
               </span>
             </div>

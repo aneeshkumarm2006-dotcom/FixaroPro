@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, Download, Share, MessageCircle, X } from "lucide-react";
@@ -198,7 +199,7 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
                 body: latest.body,
                 icon: "/icon/192",
                 badge: "/icon/192",
-                tag: "cleano-chat",
+                tag: "fixaro-chat",
               });
               n.onclick = () => {
                 window.focus();
@@ -268,7 +269,7 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <span className="cl-mobile-title">cleano</span>
+        <span className="cl-mobile-title">fixaro</span>
         <span className="cl-mobile-spacer" />
         <div className="cl-mobile-avatar">{initials}</div>
       </header>
@@ -284,11 +285,9 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
         {/* Logo */}
         <div className="cl-snav-logo" style={{ marginBottom: 8 }}>
           <div className="cl-snav-mark">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+            <Image src="/images/Fixaro-Logo.png" alt="Fixaro" width={28} height={28} className="object-contain" />
           </div>
-          <span className="cl-snav-wordmark">cleano</span>
+          <span className="cl-snav-wordmark">fixaro</span>
           <span className="cl-snav-badge">Crew</span>
           <button
             className="cl-drawer-close"
@@ -333,7 +332,7 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
                 if (canInstall) {
                   await install();
                 } else if (isIOSSafari) {
-                  alert("To install Cleano:\n\n1. Tap the Share button in Safari\n2. Scroll down and tap 'Add to Home Screen'");
+                  alert("To install Fixaro:\n\n1. Tap the Share button in Safari\n2. Scroll down and tap 'Add to Home Screen'");
                 }
                 setOpen(false);
               }}>

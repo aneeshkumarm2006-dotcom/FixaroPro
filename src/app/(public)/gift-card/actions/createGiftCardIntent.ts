@@ -85,7 +85,7 @@ export async function createGiftCardIntent(input: CreateGiftCardInput) {
       currency: "cad",
       automatic_payment_methods: { enabled: true },
       receipt_email: purchaserEmail,
-      description: `Cleano gift card — ${recipientName} ($${amount})`,
+      description: `Fixaro gift card — ${recipientName} ($${amount})`,
       metadata: {
         giftCardId: giftCard.id,
         kind: "gift_card",

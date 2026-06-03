@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       data: {
         kind: "REMINDER_24H",
         recipient: job.client.email,
-        subject: `Reminder: your cleaning is tomorrow`,
+        subject: `Reminder: your appointment is tomorrow`,
         status: "PENDING",
         jobId: job.id,
       },

@@ -79,7 +79,7 @@ export default function NavLink({
   const Icon = iconMap[icon];
 
   const badgeEl = badge > 0 ? (
-    <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-[600] rounded-full flex items-center justify-center px-1 leading-none flex-shrink-0">
+    <span className="min-w-[18px] h-[18px] bg-[#e85d04] text-white text-[10px] font-[600] rounded-full flex items-center justify-center px-1 leading-none flex-shrink-0">
       {badge > 99 ? "99+" : badge}
     </span>
   ) : null;
@@ -88,17 +88,18 @@ export default function NavLink({
     return (
       <Link
         href={href}
-        className={`flex items-center gap-3 h-12 px-3 rounded-xl text-sm font-[350] transition-colors duration-150 ${
+        className={`relative flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-[400] transition-colors duration-150 ${
           isActive
-            ? "bg-[#005F6A] text-white shadow-sm"
-            : "text-[#005F6A] hover:bg-[#005F6A]/10 hover:text-[#005F6A]"
+            ? "bg-[rgba(232,93,4,0.35)] text-white"
+            : "text-white/60 hover:bg-white/[0.06] hover:text-white"
         }`}>
+        {isActive && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-[3px] bg-[#e85d04]" />
+        )}
         {Icon && (
           <Icon
             strokeWidth={1.6}
-            className={`w-5 h-5 shrink-0 ${
-              isActive ? "text-white" : "text-[#005F6A]"
-            }`}
+            className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-white/60"}`}
           />
         )}
         <span className="truncate flex-1">{children}</span>
@@ -110,21 +111,22 @@ export default function NavLink({
   return (
     <Link
       href={href}
-      className={`relative flex items-center justify-center w-12 h-12 rounded-xl transition-colors duration-150 ${
+      className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-150 ${
         isActive
-          ? "bg-[#005F6A] text-white shadow-sm"
-          : "text-[#005F6A] hover:bg-[#005F6A]/10 hover:text-[#005F6A]"
+          ? "bg-[rgba(232,93,4,0.35)] text-white"
+          : "text-white/50 hover:bg-white/[0.06] hover:text-white"
       }`}>
+      {isActive && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-[3px] bg-[#e85d04]" />
+      )}
       {Icon && (
         <Icon
           strokeWidth={1.6}
-          className={`w-5 h-5 ${
-            isActive ? "text-white" : "text-[#005F6A]"
-          }`}
+          className={`w-4 h-4 ${isActive ? "text-white" : "text-white/50"}`}
         />
       )}
       {badge > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-[700] rounded-full flex items-center justify-center px-1 leading-none">
+        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-[#e85d04] text-white text-[9px] font-[700] rounded-full flex items-center justify-center px-1 leading-none">
           {badge > 99 ? "99+" : badge}
         </span>
       )}

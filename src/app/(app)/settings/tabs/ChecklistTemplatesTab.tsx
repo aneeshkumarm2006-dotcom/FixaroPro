@@ -216,7 +216,7 @@ export default function ChecklistTemplatesTab({
         </Button>
       }>
       {templates.length === 0 ? (
-        <p className="text-sm text-[#005F6A]/60">
+        <p className="text-sm text-[#1c1917]/60">
           No checklist templates yet.
         </p>
       ) : (
@@ -224,24 +224,24 @@ export default function ChecklistTemplatesTab({
           {templates.map((tpl) => (
             <div
               key={tpl.id}
-              className="flex items-start justify-between gap-3 p-4 border border-[#005F6A]/10 rounded-xl bg-white hover:bg-[#005F6A]/3 transition-colors">
+              className="flex items-start justify-between gap-3 p-4 border border-[#1c1917]/10 rounded-xl bg-white hover:bg-[#e85d04]/3 transition-colors">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-[400] text-[#005F6A]">
+                  <h3 className="text-sm font-[400] text-[#1c1917]">
                     {tpl.name}
                   </h3>
                   {!tpl.isActive && (
-                    <span className="text-xs text-[#005F6A]/40">
+                    <span className="text-xs text-[#1c1917]/40">
                       (inactive)
                     </span>
                   )}
                   {tpl.jobType && (
-                    <span className="text-xs bg-[#005F6A]/10 text-[#005F6A] px-2 py-0.5 rounded-full">
+                    <span className="text-xs bg-[#e85d04]/10 text-[#1c1917] px-2 py-0.5 rounded-full">
                       Job: {tpl.jobType}
                     </span>
                   )}
                   {tpl.addOnName && (
-                    <span className="text-xs bg-[#77C8CC]/20 text-[#005F6A] px-2 py-0.5 rounded-full">
+                    <span className="text-xs bg-[#77C8CC]/20 text-[#1c1917] px-2 py-0.5 rounded-full">
                       Add-on: {tpl.addOnName}
                     </span>
                   )}
@@ -252,11 +252,11 @@ export default function ChecklistTemplatesTab({
                   )}
                 </div>
                 {tpl.description && (
-                  <p className="text-xs text-[#005F6A]/60 mt-1">
+                  <p className="text-xs text-[#1c1917]/60 mt-1">
                     {tpl.description}
                   </p>
                 )}
-                <p className="text-xs text-[#005F6A]/50 mt-1">
+                <p className="text-xs text-[#1c1917]/50 mt-1">
                   {tpl.items.length} item{tpl.items.length === 1 ? "" : "s"}
                 </p>
               </div>
@@ -351,21 +351,21 @@ export default function ChecklistTemplatesTab({
             </Field>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-[#005F6A] select-none">
+          <label className="flex items-center gap-2 text-sm text-[#1c1917] select-none">
             <input
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) =>
                 setDraft((prev) => ({ ...prev, isActive: e.target.checked }))
               }
-              className="accent-[#005F6A]"
+              className="accent-[#e85d04]"
             />
             Active
           </label>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+              <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                 Checklist Items
               </label>
               <Button
@@ -379,20 +379,20 @@ export default function ChecklistTemplatesTab({
               </Button>
             </div>
             {draft.items.length === 0 && (
-              <p className="text-xs text-[#005F6A]/60">No items added.</p>
+              <p className="text-xs text-[#1c1917]/60">No items added.</p>
             )}
             <div className="space-y-2">
               {draft.items.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl bg-[#005F6A]/5 space-y-2">
+                  className="p-3 rounded-xl bg-[#e85d04]/5 space-y-2">
                   <div className="flex items-start gap-2">
                     <div className="flex flex-col gap-1">
                       <button
                         type="button"
                         onClick={() => moveItem(idx, -1)}
                         disabled={idx === 0}
-                        className="p-1 rounded text-[#005F6A]/60 hover:bg-[#005F6A]/10 disabled:opacity-20 disabled:cursor-not-allowed"
+                        className="p-1 rounded text-[#1c1917]/60 hover:bg-[#e85d04]/10 disabled:opacity-20 disabled:cursor-not-allowed"
                         aria-label="Move up">
                         <ArrowUp className="w-3 h-3" />
                       </button>
@@ -400,7 +400,7 @@ export default function ChecklistTemplatesTab({
                         type="button"
                         onClick={() => moveItem(idx, 1)}
                         disabled={idx === draft.items.length - 1}
-                        className="p-1 rounded text-[#005F6A]/60 hover:bg-[#005F6A]/10 disabled:opacity-20 disabled:cursor-not-allowed"
+                        className="p-1 rounded text-[#1c1917]/60 hover:bg-[#e85d04]/10 disabled:opacity-20 disabled:cursor-not-allowed"
                         aria-label="Move down">
                         <ArrowDown className="w-3 h-3" />
                       </button>
@@ -422,14 +422,14 @@ export default function ChecklistTemplatesTab({
                         }
                         placeholder="Optional description"
                       />
-                      <label className="flex items-center gap-2 text-xs text-[#005F6A] select-none">
+                      <label className="flex items-center gap-2 text-xs text-[#1c1917] select-none">
                         <input
                           type="checkbox"
                           checked={item.isRequired}
                           onChange={(e) =>
                             updateItem(idx, { isRequired: e.target.checked })
                           }
-                          className="accent-[#005F6A]"
+                          className="accent-[#e85d04]"
                         />
                         Required
                       </label>

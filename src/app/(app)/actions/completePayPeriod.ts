@@ -8,7 +8,7 @@ import { isNotificationEnabled } from "@/lib/notifications";
 import type { NotificationGate } from "@/lib/email";
 import { Resend } from "resend";
 
-const FROM = process.env.EMAIL_FROM ?? "Cleano <no-reply@cleano.ca>";
+const FROM = process.env.EMAIL_FROM ?? "Fixaro <no-reply@fixaropro.com>";
 
 async function sendPaymentReceivedEmail(opts: {
   to: string;
@@ -26,12 +26,12 @@ async function sendPaymentReceivedEmail(opts: {
   await resend.emails.send({
     from: FROM,
     to: opts.to,
-    subject: `Cleano payout — $${opts.amount.toFixed(2)}`,
+    subject: `Fixaro payout — $${opts.amount.toFixed(2)}`,
     html: `<div style="font-family:sans-serif;padding:24px;background:#f5f2ed">
       <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:28px">
-        <h1 style="color:#00424a;margin:0 0 12px">You just got paid</h1>
+        <h1 style="color:#c44c03;margin:0 0 12px">You just got paid</h1>
         <p style="font-size:15px;color:#333">Hi ${opts.name.split(" ")[0]}, your payout for ${opts.periodLabel} was just processed.</p>
-        <p style="font-size:24px;font-weight:700;color:#00424a;margin:18px 0">$${opts.amount.toFixed(2)}</p>
+        <p style="font-size:24px;font-weight:700;color:#c44c03;margin:18px 0">$${opts.amount.toFixed(2)}</p>
         <p style="font-size:13px;color:#666">Expect funds in your account within 1–2 business days.</p>
       </div>
     </div>`,

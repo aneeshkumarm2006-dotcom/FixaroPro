@@ -88,27 +88,27 @@ export default function InventoryRulesTab({
       description="Configure usage per job and refill thresholds per product. Used by inventory forecasting."
       icon={Boxes}>
       {products.length === 0 ? (
-        <p className="text-sm text-[#005F6A]/60">
+        <p className="text-sm text-[#1c1917]/60">
           No products yet. Add products in the Inventory page first.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left border-b border-[#005F6A]/10">
-                <th className="py-3 pr-3 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+              <tr className="text-left border-b border-[#1c1917]/10">
+                <th className="py-3 pr-3 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                   Product
                 </th>
-                <th className="py-3 pr-3 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                <th className="py-3 pr-3 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                   Usage / Job
                 </th>
-                <th className="py-3 pr-3 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                <th className="py-3 pr-3 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                   Refill Threshold
                 </th>
-                <th className="py-3 pr-3 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                <th className="py-3 pr-3 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                   Stock
                 </th>
-                <th className="py-3 text-right text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                <th className="py-3 text-right text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                   Actions
                 </th>
               </tr>
@@ -119,10 +119,10 @@ export default function InventoryRulesTab({
                 return (
                   <tr
                     key={p.id}
-                    className="border-b border-[#005F6A]/5 last:border-0">
-                    <td className="py-3 pr-3 text-sm text-[#005F6A]">
+                    className="border-b border-[#1c1917]/5 last:border-0">
+                    <td className="py-3 pr-3 text-sm text-[#1c1917]">
                       {p.name}
-                      <span className="text-xs text-[#005F6A]/60 ml-2">
+                      <span className="text-xs text-[#1c1917]/60 ml-2">
                         ({p.unit})
                       </span>
                     </td>
@@ -156,7 +156,7 @@ export default function InventoryRulesTab({
                         className="max-w-[140px]"
                       />
                     </td>
-                    <td className="py-3 pr-3 text-sm text-[#005F6A]/70">
+                    <td className="py-3 pr-3 text-sm text-[#1c1917]/70">
                       {p.stockLevel}
                     </td>
                     <td className="py-3 text-right space-x-2">

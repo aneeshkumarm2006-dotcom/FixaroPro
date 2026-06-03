@@ -68,7 +68,7 @@ export async function placeCardHold(jobId: string) {
       off_session: true,
       confirm: true,
       capture_method: "manual",
-      description: `Cleano hold — job #${job.jobNumber}`,
+      description: `Fixaro hold — job #${job.jobNumber}`,
       metadata: { jobId, jobNumber: String(job.jobNumber), kind: "hold" },
     });
 

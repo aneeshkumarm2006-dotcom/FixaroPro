@@ -72,7 +72,7 @@ const SelectionPreview: React.FC<{
 
   return (
     <div
-      className="absolute z-40 pointer-events-none bg-[#005F6A]/[0.08]"
+      className="absolute z-40 pointer-events-none bg-[#e85d04]/[0.08]"
       style={{
         left: `${(currentRoomIndex / roomColumns.length) * 100}%`,
         width: `${100 / roomColumns.length}%`,
@@ -434,7 +434,7 @@ export const DayView: React.FC = () => {
       <div className="flex-shrink-0 flex pb-0 px-4 overflow-x-auto">
         {/* Timezone Label */}
         <div className="w-10 flex-shrink-0 flex flex-col items-center justify-end py-3">
-          <span className="app-subtitle !text-[#005F6A]/50">
+          <span className="app-subtitle !text-[#1c1917]/50">
             {timezoneLabel}
           </span>
         </div>
@@ -445,13 +445,13 @@ export const DayView: React.FC = () => {
             <div
               key={roomName}
               className={`flex items-baseline gap-1 p-2 rounded-xl min-w-[200px] flex-1 ${
-                roomName === "Unassigned Events" ? "bg-[#005F6A]/5" : ""
+                roomName === "Unassigned Events" ? "bg-[#e85d04]/5" : ""
               }`}>
               <span
                 className={`app-title ${
                   roomName === "Unassigned Events"
-                    ? "text-[#005F6A]/70 italic"
-                    : "text-[#005F6A]"
+                    ? "text-[#1c1917]/70 italic"
+                    : "text-[#1c1917]"
                 }`}>
                 {roomName}
               </span>
@@ -469,7 +469,7 @@ export const DayView: React.FC = () => {
               key={hour}
               className="relative flex-shrink-0"
               style={{ height: `${zoomLevel}px` }}>
-              <span className="absolute right-0 pr-2 z-[1000] section-title !lowercase !text-[#005F6A]/30 text-right -translate-y-1/2">
+              <span className="absolute right-0 pr-2 z-[1000] section-title !lowercase !text-[#1c1917]/30 text-right -translate-y-1/2">
                 {formatHour(hour, use24HourClock)}
               </span>
             </div>
@@ -485,7 +485,7 @@ export const DayView: React.FC = () => {
                 <React.Fragment key={hour}>
                   {/* Hour line */}
                   <div
-                    className="absolute left-0 right-0 border-t-1 border-[#005F6A]/5"
+                    className="absolute left-0 right-0 border-t-1 border-[#1c1917]/5"
                     style={{
                       top: `${
                         (hour - (officeHours?.start || 0)) * zoomLevel
@@ -496,7 +496,7 @@ export const DayView: React.FC = () => {
                   {[15, 30, 45].map((minutes) => (
                     <div
                       key={`${hour}-${minutes}`}
-                      className="absolute left-0 right-0 border-t-1 border-[#005F6A]/[0.025]"
+                      className="absolute left-0 right-0 border-t-1 border-[#1c1917]/[0.025]"
                       style={{
                         top: `${
                           (hour - (officeHours?.start || 0)) * zoomLevel +
@@ -549,10 +549,10 @@ export const DayView: React.FC = () => {
                   data-room-column={roomIndex}
                   data-room-name={roomName}
                   className={`relative min-w-[200px] flex-1 ${
-                    roomIndex > 0 ? "border-l border-[#005F6A]/10" : ""
+                    roomIndex > 0 ? "border-l border-[#1c1917]/10" : ""
                   } ${
                     roomName === "Unassigned Events"
-                      ? "bg-[#005F6A]/[0.02]"
+                      ? "bg-[#e85d04]/[0.02]"
                       : ""
                   }`}
                   style={{ minHeight: `${gridHeight}px` }}
@@ -589,7 +589,7 @@ export const DayView: React.FC = () => {
                         className={`absolute left-0 right-0 z-20 transition-colors duration-200 ${
                           isDraggingSelection
                             ? "cursor-crosshair"
-                            : "cursor-pointer hover:bg-[#005F6A]/[0.06]"
+                            : "cursor-pointer hover:bg-[#e85d04]/[0.06]"
                         }`}
                         style={{
                           top: `${

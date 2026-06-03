@@ -84,7 +84,7 @@ function AnalogClock({ time }: { time: Date }) {
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isHour ? "rgba(0, 95, 106, 0.5)" : "rgba(0, 95, 106, 0.2)"}
+              stroke={t.isHour ? "rgba(232, 93, 4, 0.5)" : "rgba(232, 93, 4, 0.2)"}
               strokeWidth={t.isHour ? 1.4 : 0.8}
               strokeLinecap="round"
             />

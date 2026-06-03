@@ -156,7 +156,7 @@ export default function InventoryLocationsTab({
         </Button>
       }>
       {locations.length === 0 ? (
-        <p className="text-sm text-[#005F6A]/60">No locations defined yet.</p>
+        <p className="text-sm text-[#1c1917]/60">No locations defined yet.</p>
       ) : (
         <div className="space-y-2">
           {locations.map((loc) => {
@@ -164,29 +164,29 @@ export default function InventoryLocationsTab({
             return (
               <div
                 key={loc.id}
-                className="flex items-start justify-between gap-3 p-4 border border-[#005F6A]/10 rounded-xl bg-white hover:bg-[#005F6A]/3 transition-colors">
+                className="flex items-start justify-between gap-3 p-4 border border-[#1c1917]/10 rounded-xl bg-white hover:bg-[#e85d04]/3 transition-colors">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-[400] text-[#005F6A]">
+                    <h3 className="text-sm font-[400] text-[#1c1917]">
                       {loc.name}
                     </h3>
                     {!loc.isActive && (
-                      <span className="text-xs text-[#005F6A]/40">
+                      <span className="text-xs text-[#1c1917]/40">
                         (inactive)
                       </span>
                     )}
                   </div>
                   {loc.address && (
-                    <p className="text-xs text-[#005F6A]/60 mt-0.5">
+                    <p className="text-xs text-[#1c1917]/60 mt-0.5">
                       {loc.address}
                     </p>
                   )}
                   {loc.notes && (
-                    <p className="text-xs text-[#005F6A]/50 mt-0.5">
+                    <p className="text-xs text-[#1c1917]/50 mt-0.5">
                       {loc.notes}
                     </p>
                   )}
-                  <p className="text-xs text-[#005F6A]/60 mt-1">
+                  <p className="text-xs text-[#1c1917]/60 mt-1">
                     {stockedCount} product{stockedCount === 1 ? "" : "s"} stocked
                   </p>
                 </div>
@@ -260,14 +260,14 @@ export default function InventoryLocationsTab({
               placeholder="Optional"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-[#005F6A] select-none">
+          <label className="flex items-center gap-2 text-sm text-[#1c1917] select-none">
             <input
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) =>
                 setDraft((prev) => ({ ...prev, isActive: e.target.checked }))
               }
-              className="accent-[#005F6A]"
+              className="accent-[#e85d04]"
             />
             Active
           </label>
@@ -302,7 +302,7 @@ export default function InventoryLocationsTab({
         title={stockLocation ? `Stock at ${stockLocation.name}` : "Stock"}>
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
           {products.length === 0 ? (
-            <p className="text-sm text-[#005F6A]/60">
+            <p className="text-sm text-[#1c1917]/60">
               Add products in the Inventory page first.
             </p>
           ) : (
@@ -311,8 +311,8 @@ export default function InventoryLocationsTab({
                 key={p.id}
                 className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
                 <div>
-                  <p className="text-sm text-[#005F6A]">{p.name}</p>
-                  <p className="text-xs text-[#005F6A]/60">{p.unit}</p>
+                  <p className="text-sm text-[#1c1917]">{p.name}</p>
+                  <p className="text-xs text-[#1c1917]/60">{p.unit}</p>
                 </div>
                 <Input
                   variant="form"

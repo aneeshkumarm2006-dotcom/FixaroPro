@@ -27,10 +27,31 @@ function uid() {
 
 export default function JobTypesTab({ settings }: JobTypesTabProps) {
   const initial = getSetting<JobTypeEntry[]>(settings, KEY, [
-    { id: uid(), name: "Standard Cleaning", isActive: true },
-    { id: uid(), name: "Deep Cleaning", isActive: true },
-    { id: uid(), name: "Move-In/Out", isActive: true },
-    { id: uid(), name: "Post-Construction", isActive: true },
+    { id: uid(), name: "Drywall repair", isActive: true },
+    { id: uid(), name: "Door repair", isActive: true },
+    { id: uid(), name: "Faucet repair", isActive: true },
+    { id: uid(), name: "Toilet repair", isActive: true },
+    { id: uid(), name: "Cabinet repair", isActive: true },
+    { id: uid(), name: "Caulking touch-ups", isActive: true },
+    { id: uid(), name: "Weatherstripping", isActive: true },
+    { id: uid(), name: "Lock replacement", isActive: true },
+    { id: uid(), name: "TV mounting", isActive: true },
+    { id: uid(), name: "Furniture assembly", isActive: true },
+    { id: uid(), name: "Shelf installation", isActive: true },
+    { id: uid(), name: "Curtain rod installation", isActive: true },
+    { id: uid(), name: "Light fixture installation", isActive: true },
+    { id: uid(), name: "Mirror hanging", isActive: true },
+    { id: uid(), name: "Blinds installation", isActive: true },
+    { id: uid(), name: "Picture hanging", isActive: true },
+    { id: uid(), name: "Appliance hookup", isActive: true },
+    { id: uid(), name: "Silicone Sealing", isActive: true },
+    { id: uid(), name: "Painting", isActive: true },
+    { id: uid(), name: "Small carpentry", isActive: true },
+    { id: uid(), name: "Fence repair", isActive: true },
+    { id: uid(), name: "Deck repairs", isActive: true },
+    { id: uid(), name: "Gutter cleaning", isActive: true },
+    { id: uid(), name: "Dryer vent cleaning", isActive: true },
+    { id: uid(), name: "Weatherproofing", isActive: true },
   ]);
 
   const [items, setItems] = useState<JobTypeEntry[]>(initial);
@@ -87,12 +108,12 @@ export default function JobTypesTab({ settings }: JobTypesTabProps) {
       }>
       <div className="space-y-2">
         {items.length === 0 && (
-          <p className="text-sm text-[#005F6A]/60">No job types configured.</p>
+          <p className="text-sm text-[#1c1917]/60">No job types configured.</p>
         )}
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#005F6A]/5 transition-colors">
+            className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#e85d04]/5 transition-colors">
             <Input
               variant="form"
               value={item.name}
@@ -100,14 +121,14 @@ export default function JobTypesTab({ settings }: JobTypesTabProps) {
               placeholder="Job type name"
               className="flex-1"
             />
-            <label className="flex items-center gap-2 text-sm text-[#005F6A] select-none">
+            <label className="flex items-center gap-2 text-sm text-[#1c1917] select-none">
               <input
                 type="checkbox"
                 checked={item.isActive}
                 onChange={(e) =>
                   update(item.id, { isActive: e.target.checked })
                 }
-                className="accent-[#005F6A]"
+                className="accent-[#e85d04]"
               />
               Active
             </label>

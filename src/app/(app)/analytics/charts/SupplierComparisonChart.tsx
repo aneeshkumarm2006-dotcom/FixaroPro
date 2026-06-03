@@ -13,7 +13,7 @@ export default function SupplierComparisonChart({
 }: SupplierComparisonChartProps) {
   if (data.length === 0) {
     return (
-      <p className="text-sm text-[#005F6A]/60 text-center py-8">
+      <p className="text-sm text-[#1c1917]/60 text-center py-8">
         No supplier data yet
       </p>
     );

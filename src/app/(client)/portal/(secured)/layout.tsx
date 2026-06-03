@@ -8,7 +8,7 @@ import RatingPopup from "../RatingPopup";
 import { getPendingClientRating } from "../actions/ratingActions";
 
 export const metadata = {
-  title: "My Cleano",
+  title: "My Fixaro",
 };
 
 export default async function PortalLayout({

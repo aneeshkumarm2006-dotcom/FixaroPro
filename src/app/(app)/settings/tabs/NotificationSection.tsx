@@ -62,11 +62,11 @@ const ROWS: ToggleRow[] = [
   {
     key: "providerLowStock",
     label: "Provider low stock",
-    description: "When a cleaner's product stock crosses the refill threshold.",
+    description: "When a technician's product stock crosses the refill threshold.",
   },
   {
     key: "cleanerPayment",
-    label: "Cleaner payment scheduled or completed",
+    label: "Technician payment scheduled or completed",
     description: "When a regular payout is scheduled, approved, or paid out.",
   },
   {

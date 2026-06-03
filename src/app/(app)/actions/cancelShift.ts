@@ -64,8 +64,8 @@ export async function cancelShift(jobId: string): Promise<{ success: true; penal
           userId: employeeId,
           action: "NOTE_ADDED",
           description: isLateCancel
-            ? `Cleaner cancelled shift < ${LATE_CANCEL_HOURS}h before start — late-cancel penalty applied ($${LATE_CANCEL_FEE} deduction + 1-star rating)`
-            : "Cleaner cancelled shift",
+            ? `Technician cancelled shift < ${LATE_CANCEL_HOURS}h before start — late-cancel penalty applied ($${LATE_CANCEL_FEE} deduction + 1-star rating)`
+            : "Technician cancelled shift",
         },
       });
 

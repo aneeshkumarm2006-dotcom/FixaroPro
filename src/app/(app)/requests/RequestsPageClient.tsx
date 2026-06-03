@@ -92,10 +92,10 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A] flex items-center gap-3">
+        <h1 className="text-3xl !font-light tracking-tight text-[#1c1917] flex items-center gap-3">
           <Inbox className="w-7 h-7" /> Pending Requests
         </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
+        <p className="text-sm text-[#1c1917]/70 mt-1">
           Customer-initiated cancellation and reschedule requests that need a
           decision from you.
         </p>
@@ -122,8 +122,8 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                 onClick={() => setFilter(k)}
                 className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
                   active
-                    ? "bg-[#005F6A] text-white"
-                    : "bg-[#005F6A]/5 text-[#005F6A] hover:bg-[#005F6A]/10"
+                    ? "bg-[#e85d04] text-white"
+                    : "bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10"
                 }`}>
                 {label}
               </button>
@@ -132,7 +132,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="text-center text-sm text-[#005F6A]/60 py-12">
+          <div className="text-center text-sm text-[#1c1917]/60 py-12">
             No pending requests. 🎉
           </div>
         ) : (
@@ -154,22 +154,22 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
               return (
                 <article
                   key={j.id}
-                  className="rounded-xl border border-[#005F6A]/10 bg-white p-5 space-y-3">
+                  className="rounded-xl border border-[#1c1917]/10 bg-white p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[10px] uppercase tracking-wide text-[#005F6A]/60 font-medium">
+                      <div className="text-[10px] uppercase tracking-wide text-[#1c1917]/60 font-medium">
                         Job #{j.jobNumber}
                       </div>
-                      <div className="text-lg font-medium text-[#005F6A] mt-0.5">
+                      <div className="text-lg font-medium text-[#1c1917] mt-0.5">
                         {startStr}
                         {j.isFlexible ? (
-                          <span className="ml-2 text-xs text-[#005F6A]/60 font-normal">
+                          <span className="ml-2 text-xs text-[#1c1917]/60 font-normal">
                             (flexible)
                           </span>
                         ) : null}
                       </div>
                       {j.location ? (
-                        <div className="text-xs text-[#005F6A]/60 mt-1">
+                        <div className="text-xs text-[#1c1917]/60 mt-1">
                           {j.location}
                         </div>
                       ) : null}
@@ -189,7 +189,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-3 text-xs text-[#005F6A]/70">
+                  <div className="flex flex-wrap gap-3 text-xs text-[#1c1917]/70">
                     {j.client ? (
                       <span>
                         {j.client.name}
@@ -204,10 +204,10 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[#005F6A]/10">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[#1c1917]/10">
                     <a
                       href={`/jobs/${j.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#005F6A]/70 hover:bg-[#005F6A]/5">
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#1c1917]/70 hover:bg-[#e85d04]/5">
                       <ExternalLink className="w-3.5 h-3.5" /> Open job
                     </a>
                     <div className="flex-1" />
@@ -229,7 +229,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                           type="button"
                           disabled={busyId === j.id}
                           onClick={() => handle(j.id, k, "deny")}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#005F6A] bg-[#005F6A]/5 hover:bg-[#005F6A]/10 disabled:opacity-50">
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#1c1917] bg-[#e85d04]/5 hover:bg-[#e85d04]/10 disabled:opacity-50">
                           <X className="w-3.5 h-3.5" /> Deny
                         </button>
                       </div>
@@ -237,7 +237,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                   </div>
 
                   {requestedAt ? (
-                    <div className="text-[10px] text-[#005F6A]/40">
+                    <div className="text-[10px] text-[#1c1917]/40">
                       Requested {new Date(requestedAt).toLocaleString()}
                     </div>
                   ) : null}
@@ -334,7 +334,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                 style={{
                   width: "100%",
                   borderRadius: 12,
-                  border: "1px solid var(--primary-10, rgba(0,95,106,0.15))",
+                  border: "1px solid var(--primary-10, rgba(232,93,4,0.15))",
                   padding: "10px 12px",
                   fontSize: 14,
                   fontFamily: "inherit",

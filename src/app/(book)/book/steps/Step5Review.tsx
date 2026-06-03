@@ -81,13 +81,10 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   const service = SERVICE_TYPES.find((s) => s.value === draft.serviceType);
   const freq = FREQUENCIES.find((f) => f.value === draft.frequency);
 
-  const propertyLine = [
-    `${draft.bedCount} bed`,
-    `${draft.bathCount} bath${draft.halfBathCount ? ` + ${draft.halfBathCount} half` : ""}`,
-    draft.squareFootage > 0 ? `${draft.squareFootage} sq ft` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const isSiliconeSealing = draft.serviceType === "SILICONE_SEALING";
+  const durationLine = isSiliconeSealing
+    ? `${draft.hours} room${draft.hours > 1 ? "s" : ""}`
+    : `${draft.hours} hour${draft.hours > 1 ? "s" : ""}`;
 
   const dateLine = draft.date
     ? `${new Date(draft.date).toLocaleDateString("en-US", { weekday: "long" })} · ${
@@ -105,7 +102,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           <em>booking.</em>
         </h1>
         <p className="cl-subtitle">
-          A <strong>$20 deposit</strong> is charged today to secure your booking. The remaining balance is charged after your cleaning is complete.
+          A <strong>$20 deposit</strong> is charged today to secure your booking. The remaining balance is charged after the visit is complete.
         </p>
       </header>
 
@@ -114,10 +111,10 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           Service
         </span>
         <dl className="cl-dlist">
-          <Row dt="Type" dd={service?.label ?? "—"} />
+          <Row dt="Service" dd={service?.label ?? "—"} />
+          <Row dt="Duration" dd={durationLine} />
           <Row dt="Frequency" dd={freq?.label ?? "—"} />
           <Row dt="Address" dd={draft.address || "—"} />
-          <Row dt="Property" dd={propertyLine} />
           <Row dt="Date" dd={dateLine} />
         </dl>
       </div>
@@ -142,11 +139,11 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           ) : null}
           <Row dt="GST (5%)" dd={`$${breakdown.gstAmount.toFixed(2)}`} />
           <Row dt="QST (9.975%)" dd={`$${breakdown.qstAmount.toFixed(2)}`} />
-          <RowBorder total dt="Total (1st cleaning)" dd={`$${(breakdown.total - (draft.promoDiscount ?? 0)).toFixed(2)}`} />
+          <RowBorder total dt="Total (1st visit)" dd={`$${(breakdown.total - (draft.promoDiscount ?? 0)).toFixed(2)}`} />
           {(draft.frequency === "WEEKLY" || draft.frequency === "BIWEEKLY") && (
             <div className="cl-dlist-row" style={{ marginTop: 6 }}>
               <dt style={{ color: "var(--primary)", fontSize: 12 }}>
-                {draft.frequency === "WEEKLY" ? "12%" : "8%"} off from 2nd cleaning
+                {draft.frequency === "WEEKLY" ? "12%" : "8%"} off from 2nd visit
               </dt>
               <dd style={{ color: "var(--primary)", fontSize: 12, fontWeight: 600 }}>
                 −${(basePrice * (draft.frequency === "WEEKLY" ? 0.12 : 0.08)).toFixed(2)}/visit
@@ -164,7 +161,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           </div>
           <div className="cl-dlist-row">
             <dt style={{ color: "var(--primary-50)", fontSize: 12 }}>Remaining balance</dt>
-            <dd style={{ color: "var(--primary-50)", fontSize: 12 }}>After cleaning</dd>
+            <dd style={{ color: "var(--primary-50)", fontSize: 12 }}>After the visit</dd>
           </div>
         </dl>
       </div>
@@ -204,7 +201,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--primary-70)", margin: "0 0 16px", lineHeight: 1.55 }}>
-          A $20 deposit is charged now to secure your booking. Your card is saved for the remaining balance after cleaning. Apple Pay and Google Pay accepted.
+          A $20 deposit is charged now to secure your booking. Your card is saved for the remaining balance after the visit. Apple Pay and Google Pay accepted.
         </p>
 
         {stripeLoading && (

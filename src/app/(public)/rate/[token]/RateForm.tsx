@@ -87,7 +87,7 @@ export default function RateForm({
       image={BRAND_IMAGES.rate}
       quoteHtml={"Your feedback<br/>shapes <em>every visit.</em>"}
       quoteSub="It takes 30 seconds — and goes straight to your cleaner."
-      badge="Rate your cleaning">
+      badge="Rate your service">
       {submitted ? (
         <SubmittedState />
       ) : fallback ? (
@@ -106,7 +106,7 @@ export default function RateForm({
               style={{ fontSize: "clamp(32px, 4.4vw, 52px)" }}>
               How was your
               <br />
-              <em>cleaning?</em>
+              <em>service?</em>
             </h1>
             <div
               style={{

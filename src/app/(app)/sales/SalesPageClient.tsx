@@ -23,8 +23,8 @@ import {
 const SalesMapView = dynamic(() => import("./SalesMapView"), {
   ssr: false,
   loading: () => (
-    <div className="h-[400px] bg-[#005F6A]/5 rounded-xl flex items-center justify-center">
-      <p className="text-sm text-[#005F6A]/50">Loading map...</p>
+    <div className="h-[400px] bg-[#e85d04]/5 rounded-xl flex items-center justify-center">
+      <p className="text-sm text-[#1c1917]/50">Loading map...</p>
     </div>
   ),
 });
@@ -129,10 +129,10 @@ export default function SalesPageClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             Sales & Marketing
           </h1>
-          <p className="text-sm text-[#005F6A]/70 mt-1">
+          <p className="text-sm text-[#1c1917]/70 mt-1">
             Manage sales areas, landing pages, and marketing campaigns
           </p>
         </div>
@@ -142,53 +142,53 @@ export default function SalesPageClient({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card variant="default" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#005F6A]/10 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-[#005F6A]" />
+            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-[#1c1917]" />
             </div>
             <div>
-              <p className="text-lg font-[400] text-[#005F6A]">
+              <p className="text-lg font-[400] text-[#1c1917]">
                 {stats.totalAreas}
               </p>
-              <p className="text-xs text-[#005F6A]/50">Sales Areas</p>
+              <p className="text-xs text-[#1c1917]/50">Sales Areas</p>
             </div>
           </div>
         </Card>
         <Card variant="default" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#005F6A]/10 flex items-center justify-center">
-              <Eye className="w-5 h-5 text-[#005F6A]" />
+            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
+              <Eye className="w-5 h-5 text-[#1c1917]" />
             </div>
             <div>
-              <p className="text-lg font-[400] text-[#005F6A]">
+              <p className="text-lg font-[400] text-[#1c1917]">
                 {stats.totalVisits}
               </p>
-              <p className="text-xs text-[#005F6A]/50">Page Visits</p>
+              <p className="text-xs text-[#1c1917]/50">Page Visits</p>
             </div>
           </div>
         </Card>
         <Card variant="default" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#005F6A]/10 flex items-center justify-center">
-              <Megaphone className="w-5 h-5 text-[#005F6A]" />
+            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
+              <Megaphone className="w-5 h-5 text-[#1c1917]" />
             </div>
             <div>
-              <p className="text-lg font-[400] text-[#005F6A]">
+              <p className="text-lg font-[400] text-[#1c1917]">
                 {stats.activeCampaigns}
               </p>
-              <p className="text-xs text-[#005F6A]/50">Active Campaigns</p>
+              <p className="text-xs text-[#1c1917]/50">Active Campaigns</p>
             </div>
           </div>
         </Card>
         <Card variant="default" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#005F6A]/10 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-[#005F6A]" />
+            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-[#1c1917]" />
             </div>
             <div>
-              <p className="text-lg font-[400] text-[#005F6A]">
+              <p className="text-lg font-[400] text-[#1c1917]">
                 ${stats.totalSpent.toFixed(0)}
               </p>
-              <p className="text-xs text-[#005F6A]/50">
+              <p className="text-xs text-[#1c1917]/50">
                 of ${stats.totalBudget.toFixed(0)} budget
               </p>
             </div>
@@ -197,7 +197,7 @@ export default function SalesPageClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 bg-[#005F6A]/5 rounded-2xl p-1 w-fit">
+      <div className="flex items-center gap-2 bg-[#e85d04]/5 rounded-2xl p-1 w-fit">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -221,10 +221,10 @@ export default function SalesPageClient({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-[400] text-[#005F6A]">
+                <h3 className="text-sm font-[400] text-[#1c1917]">
                   Sales Areas Map
                 </h3>
-                <p className="text-xs text-[#005F6A]/50 mt-0.5">
+                <p className="text-xs text-[#1c1917]/50 mt-0.5">
                   Color-coded pins showing sales activity across areas
                 </p>
               </div>
@@ -253,7 +253,7 @@ export default function SalesPageClient({
             {/* Area List */}
             {salesAreas.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-[400] text-[#005F6A]/60 uppercase tracking-wider">
+                <h4 className="text-xs font-[400] text-[#1c1917]/60 uppercase tracking-wider">
                   All Areas ({salesAreas.length})
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -269,7 +269,7 @@ export default function SalesPageClient({
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-[400] text-[#005F6A] truncate">
+                            <p className="text-sm font-[400] text-[#1c1917] truncate">
                               {area.name}
                             </p>
                             <Badge variant="secondary" size="sm">
@@ -277,15 +277,15 @@ export default function SalesPageClient({
                             </Badge>
                           </div>
                           {area.address && (
-                            <p className="text-xs text-[#005F6A]/40 mt-1 truncate">
+                            <p className="text-xs text-[#1c1917]/40 mt-1 truncate">
                               {area.address}
                             </p>
                           )}
-                          <p className="text-xs text-[#005F6A]/40 mt-0.5">
+                          <p className="text-xs text-[#1c1917]/40 mt-0.5">
                             {new Date(area.date).toLocaleDateString("en-US")}
                           </p>
                         </div>
-                        <Pencil className="w-3.5 h-3.5 text-[#005F6A]/30 flex-shrink-0 mt-0.5" />
+                        <Pencil className="w-3.5 h-3.5 text-[#1c1917]/30 flex-shrink-0 mt-0.5" />
                       </div>
                     </Card>
                   ))}

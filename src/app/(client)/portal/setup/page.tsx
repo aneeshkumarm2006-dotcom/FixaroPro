@@ -115,7 +115,7 @@ function SetupForm() {
         </h1>
         <p className="cl-subtitle">
           A password lets you manage bookings online — and we'll have it ready
-          for your cleaning team.
+          for your technician.
         </p>
       </header>
 

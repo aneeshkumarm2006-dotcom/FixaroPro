@@ -411,7 +411,7 @@ export default function CalendarJobActions() {
             variant="ghost"
             size="sm"
             onClick={handleViewDetails}
-            className="w-full justify-center !text-[#005F6A]">
+            className="w-full justify-center !text-[#1c1917]">
             <ExternalLink className="w-4 h-4 mr-1.5" />
             View Full Job Details
           </Button>

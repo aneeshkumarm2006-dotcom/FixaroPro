@@ -59,17 +59,17 @@ export default function FinancesPageClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+        <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
           Finances
         </h1>
-        <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+        <p className="text-sm text-[#1c1917]/70 !font-light mt-1">
           Track transactions, budgets, taxes and profitability
         </p>
       </div>
 
       <div className="flex gap-6">
         <nav className="w-60 flex-shrink-0">
-          <div className="bg-[#005F6A]/5 rounded-2xl p-1 space-y-1">
+          <div className="bg-[#e85d04]/5 rounded-2xl p-1 space-y-1">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
@@ -80,8 +80,8 @@ export default function FinancesPageClient({
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-[350] transition-all duration-200 whitespace-nowrap ${
                     active
-                      ? "bg-[#005F6A]/90 text-white"
-                      : "text-[#005F6A] hover:bg-[#005F6A]/10"
+                      ? "bg-[#e85d04]/90 text-white"
+                      : "text-[#1c1917] hover:bg-[#e85d04]/10"
                   }`}>
                   <Icon strokeWidth={1.6} className="w-4 h-4" />
                   {tab.label}

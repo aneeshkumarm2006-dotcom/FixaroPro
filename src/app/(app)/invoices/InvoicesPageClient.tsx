@@ -203,10 +203,10 @@ export default function InvoicesPageClient({
       variant={variant === "warning" ? "warning" : "cleano_light"}
       className="p-6 h-[7rem]">
       <div className="h-full flex flex-col justify-between">
-        <span className={`app-title-small ${variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"}`}>
+        <span className={`app-title-small ${variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"}`}>
           {label}
         </span>
-        <p className={`h2-title ${variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"}`}>
+        <p className={`h2-title ${variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"}`}>
           {value}
         </p>
       </div>
@@ -218,10 +218,10 @@ export default function InvoicesPageClient({
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             Invoices
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+          <p className="text-sm text-[#1c1917]/70 !font-light mt-1">
             Create, send, and track invoices for your clients
           </p>
         </div>
@@ -262,13 +262,13 @@ export default function InvoicesPageClient({
       {/* Search & Filters */}
       <div className="flex flex-col lg:flex-row gap-2 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#005F6A]/60 z-10 w-4 h-4" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1c1917]/60 z-10 w-4 h-4" />
           <Input
             placeholder="Search by invoice number, client name..."
             value={searchTerm}
             size="md"
             onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-            className="pl-10 h-[42px] py-3 placeholder:!text-[#005F6A]/40 placeholder:!font-[350]"
+            className="pl-10 h-[42px] py-3 placeholder:!text-[#1c1917]/40 placeholder:!font-[350]"
             variant="form"
             border={false}
           />
@@ -325,11 +325,11 @@ export default function InvoicesPageClient({
       {total === 0 ? (
         <div className="bg-white rounded-2xl">
           <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-              <FileText className="w-8 h-8 text-[#005F6A]/40" />
+            <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+              <FileText className="w-8 h-8 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm font-[350] text-[#005F6A]/70">No invoices found</p>
-            <p className="text-xs font-[350] text-[#005F6A]/60 mt-1">
+            <p className="text-sm font-[350] text-[#1c1917]/70">No invoices found</p>
+            <p className="text-xs font-[350] text-[#1c1917]/60 mt-1">
               Create your first invoice to get started
             </p>
           </div>
@@ -339,7 +339,7 @@ export default function InvoicesPageClient({
           {/* Desktop Table */}
           <div className="hidden lg:block overflow-x-auto rounded-t-2xl">
             <div className="min-w-max">
-              <div className="flex bg-[#005F6A]/5 rounded-t-2xl">
+              <div className="flex bg-[#e85d04]/5 rounded-t-2xl">
                 {[
                   { label: "Invoice #", className: "w-[160px] text-left" },
                   { label: "Client", className: "w-[200px] text-left" },
@@ -351,47 +351,47 @@ export default function InvoicesPageClient({
                 ].map((col) => (
                   <div
                     key={col.label}
-                    className={`p-4 text-xs font-[350] !text-[#005F6A]/40 uppercase !tracking-wider ${col.className}`}>
+                    className={`p-4 text-xs font-[350] !text-[#1c1917]/40 uppercase !tracking-wider ${col.className}`}>
                     {col.label}
                   </div>
                 ))}
               </div>
 
-              <div className="divide-y divide-[#005F6A]/4">
+              <div className="divide-y divide-[#e85d04]/4">
                 {paginated.map((inv) => (
-                  <div key={inv.id} className="flex items-center hover:bg-[#005F6A]/1 transition-colors">
+                  <div key={inv.id} className="flex items-center hover:bg-[#e85d04]/1 transition-colors">
                     <div className="w-[160px] p-4">
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="app-title-small text-[#005F6A] hover:underline flex items-center gap-1.5">
+                        className="app-title-small text-[#1c1917] hover:underline flex items-center gap-1.5">
                         {getStatusIcon(inv.status)}
                         {inv.invoiceNumber}
                       </Link>
                     </div>
 
                     <div className="w-[200px] p-4">
-                      <p className="app-title-small text-[#005F6A] truncate">{inv.clientName}</p>
+                      <p className="app-title-small text-[#1c1917] truncate">{inv.clientName}</p>
                       {inv.jobId && (
-                        <p className="text-[10px] text-[#005F6A]/50 truncate">
+                        <p className="text-[10px] text-[#1c1917]/50 truncate">
                           Job: {inv.jobType || "—"}{inv.jobDate ? ` · ${new Date(inv.jobDate).toLocaleDateString("en-US")}` : ""}
                         </p>
                       )}
                     </div>
 
                     <div className="w-[120px] p-4">
-                      <span className="app-title-small !text-[#005F6A]/60 text-xs">
+                      <span className="app-title-small !text-[#1c1917]/60 text-xs">
                         {new Date(inv.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
 
                     <div className="w-[120px] p-4">
-                      <span className="app-title-small !text-[#005F6A]/60 text-xs">
+                      <span className="app-title-small !text-[#1c1917]/60 text-xs">
                         {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-US") : "—"}
                       </span>
                     </div>
 
                     <div className="w-[120px] p-4 text-right">
-                      <span className="app-title-small !text-[#005F6A]">
+                      <span className="app-title-small !text-[#1c1917]">
                         ${inv.totalAmount.toFixed(2)}
                       </span>
                     </div>
@@ -458,19 +458,19 @@ export default function InvoicesPageClient({
                     <div>
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="text-sm font-[400] text-[#005F6A] hover:underline">
+                        className="text-sm font-[400] text-[#1c1917] hover:underline">
                         {inv.invoiceNumber}
                       </Link>
-                      <p className="text-xs text-[#005F6A]/60 mt-0.5">{inv.clientName}</p>
+                      <p className="text-xs text-[#1c1917]/60 mt-0.5">{inv.clientName}</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-[400] text-[#005F6A]">
+                      <span className="text-sm font-[400] text-[#1c1917]">
                         ${inv.totalAmount.toFixed(2)}
                       </span>
                       <div className="mt-1">{getStatusBadge(inv.status)}</div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-[#005F6A]/60">
+                  <div className="flex items-center justify-between text-xs text-[#1c1917]/60">
                     <span>{new Date(inv.createdAt).toLocaleDateString("en-US")}</span>
                     {inv.dueDate && <span>Due: {new Date(inv.dueDate).toLocaleDateString("en-US")}</span>}
                   </div>
@@ -512,8 +512,8 @@ export default function InvoicesPageClient({
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between p-2 px-3 bg-[#005F6A]/4 rounded-b-2xl">
-            <div className="text-xs text-[#005F6A]/70 font-[350]">
+          <div className="flex items-center justify-between p-2 px-3 bg-[#e85d04]/4 rounded-b-2xl">
+            <div className="text-xs text-[#1c1917]/70 font-[350]">
               Showing {startIdx + 1} to {Math.min(startIdx + rowsPerPage, total)} of {total} invoices
             </div>
             <div className="flex items-center gap-2">
@@ -523,7 +523,7 @@ export default function InvoicesPageClient({
               <Button variant="ghost" size="sm" onClick={() => goToPage(page - 1)} disabled={page === 1} className="px-2">
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-xs text-[#005F6A]/70 px-2">
+              <span className="text-xs text-[#1c1917]/70 px-2">
                 Page {page} / {totalPages}
               </span>
               <Button variant="ghost" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} className="px-2">

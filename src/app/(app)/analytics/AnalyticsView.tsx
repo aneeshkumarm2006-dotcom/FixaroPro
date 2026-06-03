@@ -274,7 +274,7 @@ function SimpleBarChart({
   data,
   maxValue,
   label,
-  color = "bg-[#005F6A]",
+  color = "bg-[#e85d04]",
 }: {
   data: { label: string; value: number }[];
   maxValue: number;
@@ -284,17 +284,17 @@ function SimpleBarChart({
   return (
     <div className="space-y-3">
       {label && (
-        <p className="text-xs text-[#005F6A]/60 uppercase tracking-wide">
+        <p className="text-xs text-[#1c1917]/60 uppercase tracking-wide">
           {label}
         </p>
       )}
       {data.map((item, idx) => (
         <div key={idx} className="space-y-1">
-          <div className="flex justify-between text-xs text-[#005F6A]/70">
+          <div className="flex justify-between text-xs text-[#1c1917]/70">
             <span>{item.label}</span>
             <span className="font-[400]">{item.value}</span>
           </div>
-          <div className="h-2 bg-[#005F6A]/10 rounded-full overflow-hidden">
+          <div className="h-2 bg-[#e85d04]/10 rounded-full overflow-hidden">
             <div
               className={`h-full ${color} rounded-full transition-all duration-500`}
               style={{
@@ -333,7 +333,7 @@ function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(0, 95, 106, 0.1)"
+          stroke="rgba(232, 93, 4, 0.1)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -341,7 +341,7 @@ function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#005F6A"
+          stroke="#e85d04"
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -352,11 +352,11 @@ function ProgressRing({
       <div
         className="absolute flex flex-col items-center justify-center"
         style={{ width: size, height: size }}>
-        <span className="text-2xl font-[400] text-[#005F6A]">
+        <span className="text-2xl font-[400] text-[#1c1917]">
           {percentage.toFixed(0)}%
         </span>
       </div>
-      <p className="text-xs text-[#005F6A]/60 mt-2">{label}</p>
+      <p className="text-xs text-[#1c1917]/60 mt-2">{label}</p>
     </div>
   );
 }
@@ -388,7 +388,7 @@ function MetricCard({
         <div className="flex items-center justify-between">
           <span
             className={`app-title-small ${
-              variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
+              variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"
             }`}>
             {label}
           </span>
@@ -409,12 +409,12 @@ function MetricCard({
         <div>
           <p
             className={`h2-title ${
-              variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
+              variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"
             }`}>
             {value}
           </p>
           {subValue && (
-            <p className="text-xs text-[#005F6A]/60 mt-0.5">{subValue}</p>
+            <p className="text-xs text-[#1c1917]/60 mt-0.5">{subValue}</p>
           )}
         </div>
       </div>
@@ -479,10 +479,10 @@ export default function AnalyticsView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Revenue Trend (12 months)
             </h3>
           </div>
@@ -491,10 +491,10 @@ export default function AnalyticsView({
 
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Briefcase className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Briefcase className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Jobs by Type
             </h3>
           </div>
@@ -508,7 +508,7 @@ export default function AnalyticsView({
               label=""
             />
           ) : (
-            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            <p className="text-sm text-[#1c1917]/60 text-center py-8">
               No job data yet
             </p>
           )}
@@ -517,29 +517,29 @@ export default function AnalyticsView({
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card variant="cleano_light" className="p-4 text-center">
-          <p className="text-2xl font-[400] text-[#005F6A]">
+          <p className="text-2xl font-[400] text-[#1c1917]">
             {employeeStats.totalEmployees}
           </p>
-          <p className="text-xs text-[#005F6A]/60 mt-1">Total Employees</p>
+          <p className="text-xs text-[#1c1917]/60 mt-1">Total Employees</p>
         </Card>
         <Card variant="cleano_light" className="p-4 text-center">
-          <p className="text-2xl font-[400] text-[#005F6A]">
+          <p className="text-2xl font-[400] text-[#1c1917]">
             {inventoryStats.totalProducts}
           </p>
-          <p className="text-xs text-[#005F6A]/60 mt-1">Products</p>
+          <p className="text-xs text-[#1c1917]/60 mt-1">Products</p>
         </Card>
         <Card variant="cleano_light" className="p-4 text-center">
-          <p className="text-2xl font-[400] text-[#005F6A]">
+          <p className="text-2xl font-[400] text-[#1c1917]">
             ${revenueStats.avgJobPrice.toFixed(0)}
           </p>
-          <p className="text-xs text-[#005F6A]/60 mt-1">Avg Job Price</p>
+          <p className="text-xs text-[#1c1917]/60 mt-1">Avg Job Price</p>
         </Card>
         <Card
           variant={lowStockProducts.length > 0 ? "warning" : "cleano_light"}
           className="p-4 text-center">
           <p
             className={`text-2xl font-[400] ${
-              lowStockProducts.length > 0 ? "text-yellow-700" : "text-[#005F6A]"
+              lowStockProducts.length > 0 ? "text-yellow-700" : "text-[#1c1917]"
             }`}>
             {lowStockProducts.length}
           </p>
@@ -547,7 +547,7 @@ export default function AnalyticsView({
             className={`text-xs mt-1 ${
               lowStockProducts.length > 0
                 ? "text-yellow-600"
-                : "text-[#005F6A]/60"
+                : "text-[#1c1917]/60"
             }`}>
             Low Stock Items
           </p>
@@ -615,17 +615,17 @@ export default function AnalyticsView({
           {kpis.map((kpi, idx) => (
             <Card key={idx} variant="default" className="p-6">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-[#005F6A]/10 rounded-lg text-[#005F6A]">
+                <div className="p-2 bg-[#e85d04]/10 rounded-lg text-[#1c1917]">
                   {kpi.icon}
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-[#005F6A]/60 uppercase tracking-wide">
+                  <p className="text-xs text-[#1c1917]/60 uppercase tracking-wide">
                     {kpi.label}
                   </p>
-                  <p className="text-xl font-[400] text-[#005F6A] mt-1">
+                  <p className="text-xl font-[400] text-[#1c1917] mt-1">
                     {kpi.value}
                   </p>
-                  <p className="text-xs text-[#005F6A]/50 mt-0.5">
+                  <p className="text-xs text-[#1c1917]/50 mt-0.5">
                     {kpi.subValue}
                   </p>
                 </div>
@@ -637,10 +637,10 @@ export default function AnalyticsView({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card variant="default" className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <CheckCircle2 className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <CheckCircle2 className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Job Completion
               </h3>
             </div>
@@ -656,10 +656,10 @@ export default function AnalyticsView({
 
           <Card variant="default" className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <DollarSign className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <DollarSign className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Payment Collection
               </h3>
             </div>
@@ -682,10 +682,10 @@ export default function AnalyticsView({
     <div className="space-y-6">
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Revenue Trend (12 months)
           </h3>
         </div>
@@ -694,10 +694,10 @@ export default function AnalyticsView({
 
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <BarChart3 className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <BarChart3 className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Profit & Loss by Month
           </h3>
         </div>
@@ -707,10 +707,10 @@ export default function AnalyticsView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Package className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Package className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Inventory Value: Warehouse vs In-Circulation
             </h3>
           </div>
@@ -719,10 +719,10 @@ export default function AnalyticsView({
 
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <DollarSign className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <DollarSign className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Supplier Price Comparison
             </h3>
           </div>
@@ -736,10 +736,10 @@ export default function AnalyticsView({
       {targetsWithActuals.length > 0 && (
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Target className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Target className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Targets vs Actuals
             </h3>
           </div>
@@ -782,10 +782,10 @@ export default function AnalyticsView({
 
           <Card variant="default" className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <BarChart3 className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <BarChart3 className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Budget vs Actual Spending
               </h3>
             </div>
@@ -803,10 +803,10 @@ export default function AnalyticsView({
 
           <Card variant="default" className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <DollarSign className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <DollarSign className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Budget Detail
               </h3>
             </div>
@@ -817,17 +817,17 @@ export default function AnalyticsView({
                   <div
                     key={b.id}
                     className={`p-4 rounded-xl ${
-                      overBudget ? "bg-red-50 border border-red-200" : "bg-[#005F6A]/5"
+                      overBudget ? "bg-red-50 border border-red-200" : "bg-[#e85d04]/5"
                     }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="text-sm font-[400] text-[#005F6A]">
+                        <p className="text-sm font-[400] text-[#1c1917]">
                           {b.category}
                         </p>
-                        <p className="text-xs text-[#005F6A]/60">{b.period}</p>
+                        <p className="text-xs text-[#1c1917]/60">{b.period}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-[400] text-[#005F6A]">
+                        <p className="text-sm font-[400] text-[#1c1917]">
                           ${b.actualAmount.toFixed(2)} / ${b.budgetAmount.toFixed(2)}
                         </p>
                         <Badge
@@ -837,10 +837,10 @@ export default function AnalyticsView({
                         </Badge>
                       </div>
                     </div>
-                    <div className="h-2 bg-[#005F6A]/10 rounded-full overflow-hidden">
+                    <div className="h-2 bg-[#e85d04]/10 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          overBudget ? "bg-red-500" : "bg-[#005F6A]"
+                          overBudget ? "bg-red-500" : "bg-[#e85d04]"
                         }`}
                         style={{ width: `${Math.min(b.percentUsed, 100)}%` }}
                       />
@@ -853,13 +853,13 @@ export default function AnalyticsView({
         </>
       ) : (
         <Card variant="default" className="p-12 text-center">
-          <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-            <DollarSign className="w-8 h-8 text-[#005F6A]/40" />
+          <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+            <DollarSign className="w-8 h-8 text-[#1c1917]/40" />
           </div>
-          <p className="text-sm font-[350] text-[#005F6A]/70">
+          <p className="text-sm font-[350] text-[#1c1917]/70">
             No budgets configured yet
           </p>
-          <p className="text-xs text-[#005F6A]/50 mt-1">
+          <p className="text-xs text-[#1c1917]/50 mt-1">
             Set up budgets in the Finances module to see comparisons here
           </p>
         </Card>
@@ -888,7 +888,7 @@ export default function AnalyticsView({
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-[350] text-[#005F6A]/80">
+          <h2 className="text-sm font-[350] text-[#1c1917]/80">
             Business Targets
           </h2>
           <Button
@@ -911,7 +911,7 @@ export default function AnalyticsView({
               className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                  <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                     Metric
                   </label>
                   <PremiumSelect
@@ -930,7 +930,7 @@ export default function AnalyticsView({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                  <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                     Period
                   </label>
                   <PremiumSelect
@@ -947,7 +947,7 @@ export default function AnalyticsView({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                  <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                     Period Start
                   </label>
                   <DatePicker
@@ -958,7 +958,7 @@ export default function AnalyticsView({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                  <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                     Target Value
                   </label>
                   <input
@@ -966,18 +966,18 @@ export default function AnalyticsView({
                     name="targetValue"
                     step="0.01"
                     required
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#1c1917]/10 bg-white text-sm text-[#1c1917] focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                   Notes
                 </label>
                 <input
                   type="text"
                   name="notes"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#1c1917]/10 bg-white text-sm text-[#1c1917] focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20"
                 />
               </div>
               <Button
@@ -996,10 +996,10 @@ export default function AnalyticsView({
           <>
             <Card variant="default" className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                  <Target className="w-4 h-4 text-[#005F6A]" />
+                <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                  <Target className="w-4 h-4 text-[#1c1917]" />
                 </div>
-                <h3 className="text-sm font-[350] text-[#005F6A]/80">
+                <h3 className="text-sm font-[350] text-[#1c1917]/80">
                   Target Progress
                 </h3>
               </div>
@@ -1035,21 +1035,21 @@ export default function AnalyticsView({
                   <Card key={target.id} variant="default" className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="text-sm font-[400] text-[#005F6A]">
+                        <p className="text-sm font-[400] text-[#1c1917]">
                           {metricLabels[target.metric] || target.metric}
                         </p>
-                        <p className="text-xs text-[#005F6A]/60">
+                        <p className="text-xs text-[#1c1917]/60">
                           {target.period} from{" "}
                           {new Date(target.periodStart).toLocaleDateString("en-US")}
                         </p>
                       </div>
                       <div className="text-right flex items-center gap-3">
                         <div>
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             {target.actual.toFixed(valuePrecision)}{" "}
                             / {target.targetValue.toFixed(valuePrecision)}
                           </p>
-                          <p className="text-xs text-[#005F6A]/60">
+                          <p className="text-xs text-[#1c1917]/60">
                             Variance: {target.variance >= 0 ? "+" : ""}
                             {target.variance.toFixed(2)}
                           </p>
@@ -1067,7 +1067,7 @@ export default function AnalyticsView({
                                 setDeletingId(null);
                                 setEditingId(target.id);
                               }}
-                              className="p-1.5 rounded-lg text-[#005F6A]/60 hover:text-[#005F6A] hover:bg-[#005F6A]/10 transition-colors">
+                              className="p-1.5 rounded-lg text-[#1c1917]/60 hover:text-[#1c1917] hover:bg-[#e85d04]/10 transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
@@ -1085,14 +1085,14 @@ export default function AnalyticsView({
                         )}
                       </div>
                     </div>
-                    <div className="h-2 bg-[#005F6A]/10 rounded-full overflow-hidden">
+                    <div className="h-2 bg-[#e85d04]/10 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${progressColor} rounded-full transition-all duration-500`}
                         style={{ width: `${Math.min(target.progress, 100)}%` }}
                       />
                     </div>
                     {target.notes && !isEditing && (
-                      <p className="text-xs text-[#005F6A]/50 mt-2">
+                      <p className="text-xs text-[#1c1917]/50 mt-2">
                         {target.notes}
                       </p>
                     )}
@@ -1103,11 +1103,11 @@ export default function AnalyticsView({
                           await updateTarget(formData);
                           setEditingId(null);
                         }}
-                        className="mt-4 pt-4 border-t border-[#005F6A]/10 space-y-3">
+                        className="mt-4 pt-4 border-t border-[#1c1917]/10 space-y-3">
                         <input type="hidden" name="targetId" value={target.id} />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                            <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                               Target Value
                             </label>
                             <input
@@ -1116,18 +1116,18 @@ export default function AnalyticsView({
                               step="0.01"
                               required
                               defaultValue={target.targetValue}
-                              className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                              className="w-full px-4 py-2.5 rounded-xl border border-[#1c1917]/10 bg-white text-sm text-[#1c1917] focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20"
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-1 block">
+                            <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-1 block">
                               Notes
                             </label>
                             <input
                               type="text"
                               name="notes"
                               defaultValue={target.notes ?? ""}
-                              className="w-full px-4 py-2.5 rounded-xl border border-[#005F6A]/10 bg-white text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20"
+                              className="w-full px-4 py-2.5 rounded-xl border border-[#1c1917]/10 bg-white text-sm text-[#1c1917] focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20"
                             />
                           </div>
                         </div>
@@ -1154,8 +1154,8 @@ export default function AnalyticsView({
                     )}
 
                     {isConfirmingDelete && (
-                      <div className="mt-4 pt-4 border-t border-[#005F6A]/10 flex items-center justify-between gap-3 flex-wrap">
-                        <p className="text-xs text-[#005F6A]/70">
+                      <div className="mt-4 pt-4 border-t border-[#1c1917]/10 flex items-center justify-between gap-3 flex-wrap">
+                        <p className="text-xs text-[#1c1917]/70">
                           Delete this target? This cannot be undone.
                         </p>
                         <form
@@ -1192,13 +1192,13 @@ export default function AnalyticsView({
           </>
         ) : (
           <Card variant="default" className="p-12 text-center">
-            <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Target className="w-8 h-8 text-[#005F6A]/40" />
+            <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Target className="w-8 h-8 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm font-[350] text-[#005F6A]/70">
+            <p className="text-sm font-[350] text-[#1c1917]/70">
               No targets set yet
             </p>
-            <p className="text-xs text-[#005F6A]/50 mt-1">
+            <p className="text-xs text-[#1c1917]/50 mt-1">
               Click &quot;Add Target&quot; to create your first business target
             </p>
           </Card>
@@ -1233,10 +1233,10 @@ export default function AnalyticsView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Most Used Products
             </h3>
           </div>
@@ -1246,28 +1246,28 @@ export default function AnalyticsView({
                 <Link
                   key={product.id}
                   href={`/inventory/${product.id}`}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5 hover:bg-[#005F6A]/8 transition-colors">
+                  className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5 hover:bg-[#e85d04]/8 transition-colors">
                   <div className="flex items-center gap-3">
                     <Badge variant="cleano" size="sm">
                       #{idx + 1}
                     </Badge>
                     <div>
-                      <p className="text-sm font-[400] text-[#005F6A]">
+                      <p className="text-sm font-[400] text-[#1c1917]">
                         {product.name}
                       </p>
-                      <p className="text-xs text-[#005F6A]/60">
+                      <p className="text-xs text-[#1c1917]/60">
                         {product.totalUsed.toFixed(1)} {product.unit} used
                       </p>
                     </div>
                   </div>
-                  <p className="text-sm font-[400] text-[#005F6A]">
+                  <p className="text-sm font-[400] text-[#1c1917]">
                     ${product.totalCost.toFixed(2)}
                   </p>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            <p className="text-sm text-[#1c1917]/60 text-center py-8">
               No usage data yet
             </p>
           )}
@@ -1281,13 +1281,13 @@ export default function AnalyticsView({
               className={`p-2 rounded-lg ${
                 lowStockProducts.length > 0
                   ? "bg-yellow-100"
-                  : "bg-[#005F6A]/10"
+                  : "bg-[#e85d04]/10"
               }`}>
               <AlertTriangle
                 className={`w-4 h-4 ${
                   lowStockProducts.length > 0
                     ? "text-yellow-600"
-                    : "text-[#005F6A]"
+                    : "text-[#1c1917]"
                 }`}
               />
             </div>
@@ -1295,7 +1295,7 @@ export default function AnalyticsView({
               className={`text-sm font-[350] ${
                 lowStockProducts.length > 0
                   ? "text-yellow-700"
-                  : "text-[#005F6A]/80"
+                  : "text-[#1c1917]/80"
               }`}>
               Low Stock Alert
             </h3>
@@ -1326,7 +1326,7 @@ export default function AnalyticsView({
               <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
               </div>
-              <p className="text-sm text-[#005F6A]/60">All stock levels OK</p>
+              <p className="text-sm text-[#1c1917]/60">All stock levels OK</p>
             </div>
           )}
         </Card>
@@ -1334,10 +1334,10 @@ export default function AnalyticsView({
 
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <Package className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <Package className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Inventory Value Distribution
           </h3>
         </div>
@@ -1368,10 +1368,10 @@ export default function AnalyticsView({
       <Card variant="default" className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Users className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Users className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Employee Performance
             </h3>
           </div>
@@ -1384,7 +1384,7 @@ export default function AnalyticsView({
         {employeePerformance.length > 0 ? (
           <div className="overflow-x-auto">
             <div className="min-w-max">
-              <div className="flex bg-[#005F6A]/5 rounded-t-xl">
+              <div className="flex bg-[#e85d04]/5 rounded-t-xl">
                 {[
                   { label: "Employee", className: "w-[180px] text-left" },
                   { label: "Jobs", className: "w-[80px] text-center" },
@@ -1395,17 +1395,17 @@ export default function AnalyticsView({
                 ].map((col) => (
                   <div
                     key={col.label}
-                    className={`p-3 text-xs font-[350] !text-[#005F6A]/40 uppercase !tracking-wider ${col.className}`}>
+                    className={`p-3 text-xs font-[350] !text-[#1c1917]/40 uppercase !tracking-wider ${col.className}`}>
                     {col.label}
                   </div>
                 ))}
               </div>
-              <div className="divide-y divide-[#005F6A]/4">
+              <div className="divide-y divide-[#e85d04]/4">
                 {employeePerformance.map((emp, idx) => (
                   <Link
                     key={emp.id}
                     href={`/employees/${emp.id}`}
-                    className="flex items-center hover:bg-[#005F6A]/1 transition-colors">
+                    className="flex items-center hover:bg-[#e85d04]/1 transition-colors">
                     <div className="w-[180px] p-3 flex items-center gap-2">
                       {idx === 0 && (
                         <Badge variant="cleano" size="sm">
@@ -1436,7 +1436,7 @@ export default function AnalyticsView({
                       </p>
                     </div>
                     <div className="w-[100px] p-3 text-right">
-                      <p className="app-title-small !text-[#005F6A]/50">
+                      <p className="app-title-small !text-[#1c1917]/50">
                         ${emp.avgJobPrice.toFixed(2)}
                       </p>
                     </div>
@@ -1446,7 +1446,7 @@ export default function AnalyticsView({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+          <p className="text-sm text-[#1c1917]/60 text-center py-8">
             No employee data yet
           </p>
         )}
@@ -1455,10 +1455,10 @@ export default function AnalyticsView({
       {/* 5.1 Job Count per Employee */}
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <Briefcase className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <Briefcase className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Job Count per Employee
           </h3>
         </div>
@@ -1474,7 +1474,7 @@ export default function AnalyticsView({
             height={300}
           />
         ) : (
-          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+          <p className="text-sm text-[#1c1917]/60 text-center py-8">
             No data yet
           </p>
         )}
@@ -1484,10 +1484,10 @@ export default function AnalyticsView({
         {/* 5.1 Average Time per Job */}
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Clock className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Clock className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Average Time per Job (minutes)
             </h3>
           </div>
@@ -1505,7 +1505,7 @@ export default function AnalyticsView({
               height={300}
             />
           ) : (
-            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            <p className="text-sm text-[#1c1917]/60 text-center py-8">
               No completed jobs with duration yet
             </p>
           )}
@@ -1514,10 +1514,10 @@ export default function AnalyticsView({
         {/* 5.1 Current Star Rating by Employee */}
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Star className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Star className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Current Star Rating by Employee
             </h3>
           </div>
@@ -1535,7 +1535,7 @@ export default function AnalyticsView({
               height={300}
             />
           ) : (
-            <p className="text-sm text-[#005F6A]/60 text-center py-8">
+            <p className="text-sm text-[#1c1917]/60 text-center py-8">
               No ratings yet
             </p>
           )}
@@ -1545,10 +1545,10 @@ export default function AnalyticsView({
       {/* 5.1 Historical Rating Trend */}
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <TrendingUp className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Historical Rating Trend (12 months)
           </h3>
         </div>
@@ -1560,7 +1560,7 @@ export default function AnalyticsView({
             height={320}
           />
         ) : (
-          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+          <p className="text-sm text-[#1c1917]/60 text-center py-8">
             Not enough rating history yet
           </p>
         )}
@@ -1569,10 +1569,10 @@ export default function AnalyticsView({
       {/* 5.1 Total Complaints Logged */}
       <Card variant="default" className="p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-            <MessageSquare className="w-4 h-4 text-[#005F6A]" />
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <MessageSquare className="w-4 h-4 text-[#1c1917]" />
           </div>
-          <h3 className="text-sm font-[350] text-[#005F6A]/80">
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
             Total Complaints Logged (ratings &lt; 3)
           </h3>
         </div>
@@ -1590,7 +1590,7 @@ export default function AnalyticsView({
             height={300}
           />
         ) : (
-          <p className="text-sm text-[#005F6A]/60 text-center py-8">
+          <p className="text-sm text-[#1c1917]/60 text-center py-8">
             No complaints logged
           </p>
         )}
@@ -1692,7 +1692,7 @@ export default function AnalyticsView({
         <Card variant="cleano_light" className="p-6">
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
+              <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-2 block">
                 Quick Select
               </label>
               <div className="flex flex-wrap gap-2">
@@ -1719,7 +1719,7 @@ export default function AnalyticsView({
             </div>
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1">
-                <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
+                <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-2 block">
                   Start Date
                 </label>
                 <DatePicker
@@ -1729,7 +1729,7 @@ export default function AnalyticsView({
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide mb-2 block">
+                <label className="text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide mb-2 block">
                   End Date
                 </label>
                 <DatePicker
@@ -1761,19 +1761,19 @@ export default function AnalyticsView({
         </div>
 
         <Card variant="default" className="p-0">
-          <div className="p-6 border-b border-[#005F6A]/10">
+          <div className="p-6 border-b border-[#1c1917]/10">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                    <DollarSign className="w-4 h-4 text-[#005F6A]" />
+                  <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                    <DollarSign className="w-4 h-4 text-[#1c1917]" />
                   </div>
-                  <h3 className="text-sm font-[350] text-[#005F6A]/80">
+                  <h3 className="text-sm font-[350] text-[#1c1917]/80">
                     Employee Payment Summary
                   </h3>
                 </div>
                 {(startDate || endDate) && (
-                  <p className="text-xs text-[#005F6A]/60 mt-2">
+                  <p className="text-xs text-[#1c1917]/60 mt-2">
                     {startDate && endDate
                       ? `${new Date(startDate).toLocaleDateString("en-US")} - ${new Date(endDate).toLocaleDateString("en-US")}`
                       : startDate
@@ -1818,7 +1818,7 @@ export default function AnalyticsView({
             <>
               <div className="hidden md:block overflow-x-auto">
                 <div className="min-w-max">
-                  <div className="flex bg-[#005F6A]/5">
+                  <div className="flex bg-[#e85d04]/5">
                     {[
                       { label: "Employee Name", className: "w-[220px]" },
                       { label: "Jobs", className: "w-[100px]" },
@@ -1828,23 +1828,23 @@ export default function AnalyticsView({
                     ].map((col) => (
                       <div
                         key={col.label}
-                        className={`${col.className} p-4 text-left text-xs font-[350] !text-[#005F6A]/40 uppercase tracking-wide`}>
+                        className={`${col.className} p-4 text-left text-xs font-[350] !text-[#1c1917]/40 uppercase tracking-wide`}>
                         {col.label}
                       </div>
                     ))}
                   </div>
-                  <div className="divide-y divide-[#005F6A]/4">
+                  <div className="divide-y divide-[#e85d04]/4">
                     {employeePayments.map((emp) => (
                       <div
                         key={emp.id}
-                        className="flex items-center hover:bg-[#005F6A]/1 transition-colors">
+                        className="flex items-center hover:bg-[#e85d04]/1 transition-colors">
                         <div className="w-[220px] p-4">
-                          <p className="text-sm font-[350] text-[#005F6A] truncate">
+                          <p className="text-sm font-[350] text-[#1c1917] truncate">
                             {emp.name}
                           </p>
                         </div>
                         <div className="w-[100px] p-4">
-                          <p className="text-sm font-[350] text-[#005F6A]">
+                          <p className="text-sm font-[350] text-[#1c1917]">
                             {emp.jobsCount}
                           </p>
                         </div>
@@ -1854,7 +1854,7 @@ export default function AnalyticsView({
                           </Badge>
                         </div>
                         <div className="w-[120px] p-4">
-                          <p className="text-sm font-[350] text-[#005F6A]/60">
+                          <p className="text-sm font-[350] text-[#1c1917]/60">
                             ${(emp.totalOwed / emp.jobsCount).toFixed(2)}
                           </p>
                         </div>
@@ -1881,10 +1881,10 @@ export default function AnalyticsView({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             {emp.name}
                           </p>
-                          <p className="text-xs text-[#005F6A]/70 mt-1">
+                          <p className="text-xs text-[#1c1917]/70 mt-1">
                             {emp.jobsCount} jobs • $
                             {(emp.totalOwed / emp.jobsCount).toFixed(2)} avg
                           </p>
@@ -1909,13 +1909,13 @@ export default function AnalyticsView({
             </>
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                <DollarSign className="w-8 h-8 text-[#005F6A]/40" />
+              <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                <DollarSign className="w-8 h-8 text-[#1c1917]/40" />
               </div>
-              <p className="text-sm font-[350] text-[#005F6A]/70">
+              <p className="text-sm font-[350] text-[#1c1917]/70">
                 No payments found
               </p>
-              <p className="text-xs font-[350] text-[#005F6A]/60 mt-1">
+              <p className="text-xs font-[350] text-[#1c1917]/60 mt-1">
                 Employee payments for completed jobs will appear here
               </p>
             </div>
@@ -1998,17 +1998,17 @@ export default function AnalyticsView({
                               {alert.title}
                             </p>
                             {!alert.isRead && (
-                              <span className="w-2 h-2 bg-[#005F6A] rounded-full" />
+                              <span className="w-2 h-2 bg-[#e85d04] rounded-full" />
                             )}
                           </div>
-                          <p className="text-xs text-[#005F6A]/60 mt-1">
+                          <p className="text-xs text-[#1c1917]/60 mt-1">
                             {alert.message}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <Badge variant="default" size="sm">
                               {alert.type.replace(/_/g, " ")}
                             </Badge>
-                            <span className="text-xs text-[#005F6A]/40">
+                            <span className="text-xs text-[#1c1917]/40">
                               {new Date(alert.createdAt).toLocaleDateString("en-US")}{" "}
                               {new Date(alert.createdAt).toLocaleTimeString()}
                             </span>
@@ -2050,10 +2050,10 @@ export default function AnalyticsView({
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
               <CheckCircle2 className="w-8 h-8 text-green-500" />
             </div>
-            <p className="text-sm font-[350] text-[#005F6A]/70">
+            <p className="text-sm font-[350] text-[#1c1917]/70">
               No active alerts
             </p>
-            <p className="text-xs text-[#005F6A]/50 mt-1">
+            <p className="text-xs text-[#1c1917]/50 mt-1">
               Alerts for low inventory, cancellations, and overdue payments will
               appear here
             </p>
@@ -2099,7 +2099,7 @@ export default function AnalyticsView({
 
         {/* Campaigns Table */}
         <Card variant="default" className="p-5">
-          <h3 className="text-sm font-[400] text-[#005F6A] mb-3">
+          <h3 className="text-sm font-[400] text-[#1c1917] mb-3">
             Campaign Performance
           </h3>
           {md && md.campaigns.length > 0 ? (
@@ -2107,22 +2107,22 @@ export default function AnalyticsView({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Campaign
                     </th>
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Status
                     </th>
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Channel
                     </th>
-                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-right py-2 text-xs font-[400] text-[#1c1917]/60">
                       Budget
                     </th>
-                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-right py-2 text-xs font-[400] text-[#1c1917]/60">
                       Spent
                     </th>
-                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-right py-2 text-xs font-[400] text-[#1c1917]/60">
                       Pages
                     </th>
                   </tr>
@@ -2132,7 +2132,7 @@ export default function AnalyticsView({
                     <tr
                       key={c.id}
                       className="border-b border-gray-50 last:border-0">
-                      <td className="py-2 font-[350] text-[#005F6A]">
+                      <td className="py-2 font-[350] text-[#1c1917]">
                         {c.name}
                       </td>
                       <td className="py-2">
@@ -2144,16 +2144,16 @@ export default function AnalyticsView({
                           {c.status}
                         </Badge>
                       </td>
-                      <td className="py-2 text-[#005F6A]/60">
+                      <td className="py-2 text-[#1c1917]/60">
                         {c.channel || "-"}
                       </td>
-                      <td className="py-2 text-right text-[#005F6A]/70">
+                      <td className="py-2 text-right text-[#1c1917]/70">
                         ${c.budget.toFixed(0)}
                       </td>
-                      <td className="py-2 text-right text-[#005F6A]/70">
+                      <td className="py-2 text-right text-[#1c1917]/70">
                         ${c.spent.toFixed(0)}
                       </td>
-                      <td className="py-2 text-right text-[#005F6A]/70">
+                      <td className="py-2 text-right text-[#1c1917]/70">
                         {c.landingPageCount}
                       </td>
                     </tr>
@@ -2162,7 +2162,7 @@ export default function AnalyticsView({
               </table>
             </div>
           ) : (
-            <p className="text-sm text-[#005F6A]/50 text-center py-4">
+            <p className="text-sm text-[#1c1917]/50 text-center py-4">
               No campaigns yet. Create one from the Sales page.
             </p>
           )}
@@ -2170,7 +2170,7 @@ export default function AnalyticsView({
 
         {/* Landing Pages Table */}
         <Card variant="default" className="p-5">
-          <h3 className="text-sm font-[400] text-[#005F6A] mb-3">
+          <h3 className="text-sm font-[400] text-[#1c1917] mb-3">
             Landing Page Visits
           </h3>
           {md && md.landingPages.length > 0 ? (
@@ -2178,16 +2178,16 @@ export default function AnalyticsView({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Page
                     </th>
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Status
                     </th>
-                    <th className="text-left py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-left py-2 text-xs font-[400] text-[#1c1917]/60">
                       Campaign
                     </th>
-                    <th className="text-right py-2 text-xs font-[400] text-[#005F6A]/60">
+                    <th className="text-right py-2 text-xs font-[400] text-[#1c1917]/60">
                       Total Visits
                     </th>
                   </tr>
@@ -2200,10 +2200,10 @@ export default function AnalyticsView({
                         key={lp.id}
                         className="border-b border-gray-50 last:border-0">
                         <td className="py-2">
-                          <p className="font-[350] text-[#005F6A]">
+                          <p className="font-[350] text-[#1c1917]">
                             {lp.title}
                           </p>
-                          <p className="text-xs text-[#005F6A]/40">
+                          <p className="text-xs text-[#1c1917]/40">
                             /p/{lp.slug}
                           </p>
                         </td>
@@ -2216,10 +2216,10 @@ export default function AnalyticsView({
                             {lp.isPublished ? "Published" : "Draft"}
                           </Badge>
                         </td>
-                        <td className="py-2 text-[#005F6A]/60">
+                        <td className="py-2 text-[#1c1917]/60">
                           {lp.campaignName || "-"}
                         </td>
-                        <td className="py-2 text-right font-[400] text-[#005F6A]">
+                        <td className="py-2 text-right font-[400] text-[#1c1917]">
                           {lp.totalVisits}
                         </td>
                       </tr>
@@ -2228,7 +2228,7 @@ export default function AnalyticsView({
               </table>
             </div>
           ) : (
-            <p className="text-sm text-[#005F6A]/50 text-center py-4">
+            <p className="text-sm text-[#1c1917]/50 text-center py-4">
               No landing pages yet. Create one from the Sales page.
             </p>
           )}
@@ -2241,16 +2241,16 @@ export default function AnalyticsView({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+        <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
           Analytics & Reports
         </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
+        <p className="text-sm text-[#1c1917]/70 mt-1">
           Comprehensive insights into your business performance
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 bg-[#005F6A]/5 rounded-2xl p-1 w-fit overflow-x-auto max-w-full">
+      <div className="flex items-center gap-2 bg-[#e85d04]/5 rounded-2xl p-1 w-fit overflow-x-auto max-w-full">
         {MENU_ITEMS.map((item) => {
           const isActive = activeView === item.id;
           const alertCount =

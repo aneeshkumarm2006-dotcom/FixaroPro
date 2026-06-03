@@ -6,11 +6,11 @@ import { useInstall } from "./InstallContext";
 
 // Bumped from -dismissed → -dismissed-v2 so previously-dismissed users see the
 // banner again after this change. Re-show 14 days after a fresh dismiss.
-const DISMISS_KEY = "cleano:install-dismissed-v2";
+const DISMISS_KEY = "fixaro:install-dismissed-v2";
 const DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * Floating "Install Cleano" card. Renders if Chrome captured a
+ * Floating "Install Fixaro" card. Renders if Chrome captured a
  * beforeinstallprompt or if the user is on iOS Safari (where we show
  * manual Add-to-Home-Screen instructions). Dismissible — but the user
  * can always re-install from the drawer's "Install app" entry.
@@ -50,10 +50,10 @@ export default function InstallPrompt() {
         {isIOSSafari && !canInstall ? <Share size={18} /> : <Download size={18} />}
       </div>
       <div className="cl-install-body">
-        <strong>Install Cleano</strong>
+        <strong>Install Fixaro</strong>
         <span>
           {canInstall
-            ? "Add Cleano to your phone for the full app experience."
+            ? "Add Fixaro to your phone for the full app experience."
             : "Tap Share, then Add to Home Screen."}
         </span>
       </div>

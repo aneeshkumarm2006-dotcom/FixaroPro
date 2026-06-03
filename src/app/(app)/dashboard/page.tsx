@@ -261,24 +261,24 @@ export default async function DashboardPage() {
       <Card
         variant={variant === "warning" ? "warning" : "cleano_light"}
         className={`p-6 h-[7rem] ${
-          href ? "hover:bg-[#005F6A]/8 transition-colors cursor-pointer" : ""
+          href ? "hover:bg-[#e85d04]/8 transition-colors cursor-pointer" : ""
         }`}>
         <div className="h-full flex flex-col justify-between">
           <span
             className={`app-title-small ${
-              variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
+              variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"
             }`}>
             {label}
           </span>
           <div>
             <p
               className={`h2-title ${
-                variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
+                variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"
               }`}>
               {value}
             </p>
             {subValue && (
-              <p className="text-xs text-[#005F6A]/60 mt-0.5">{subValue}</p>
+              <p className="text-xs text-[#1c1917]/60 mt-0.5">{subValue}</p>
             )}
           </div>
         </div>
@@ -295,10 +295,10 @@ export default async function DashboardPage() {
     <div className="space-y-8 p-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+        <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
           Welcome back, {user.name}!
         </h1>
-        <p className="text-sm text-[#005F6A]/70 mt-1">
+        <p className="text-sm text-[#1c1917]/70 mt-1">
           Here&apos;s what&apos;s happening with your business today
         </p>
       </div>
@@ -388,10 +388,10 @@ export default async function DashboardPage() {
             <Card variant="default" className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                    <Calendar className="w-4 h-4 text-[#005F6A]" />
+                  <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                    <Calendar className="w-4 h-4 text-[#1c1917]" />
                   </div>
-                  <h2 className="text-sm font-[350] text-[#005F6A]/80">
+                  <h2 className="text-sm font-[350] text-[#1c1917]/80">
                     Upcoming Jobs
                   </h2>
                 </div>
@@ -399,7 +399,7 @@ export default async function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-[#005F6A]/60">
+                    className="text-xs text-[#1c1917]/60">
                     View All
                     <ArrowRight className="w-3 h-3 ml-1" />
                   </Button>
@@ -408,10 +408,10 @@ export default async function DashboardPage() {
 
               {upcomingJobs.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Calendar className="w-6 h-6 text-[#005F6A]/40" />
+                  <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Calendar className="w-6 h-6 text-[#1c1917]/40" />
                   </div>
-                  <p className="text-sm text-[#005F6A]/60">No upcoming jobs</p>
+                  <p className="text-sm text-[#1c1917]/60">No upcoming jobs</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -419,12 +419,12 @@ export default async function DashboardPage() {
                     <Link
                       key={job.id}
                       href={`/jobs/${job.id}`}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5 hover:bg-[#005F6A]/8 transition-colors">
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5 hover:bg-[#e85d04]/8 transition-colors">
                       <div className="flex-1">
-                        <p className="text-sm font-[400] text-[#005F6A]">
+                        <p className="text-sm font-[400] text-[#1c1917]">
                           {job.clientName}
                         </p>
-                        <p className="text-xs text-[#005F6A]/60">
+                        <p className="text-xs text-[#1c1917]/60">
                           {job.jobDate
                             ? new Date(job.jobDate).toLocaleDateString("en-US")
                             : "No date"}{" "}
@@ -435,7 +435,7 @@ export default async function DashboardPage() {
                         </p>
                       </div>
                       {job.price && (
-                        <span className="text-sm font-[400] text-[#005F6A]">
+                        <span className="text-sm font-[400] text-[#1c1917]">
                           ${job.price.toFixed(2)}
                         </span>
                       )}
@@ -449,10 +449,10 @@ export default async function DashboardPage() {
             <Card variant="default" className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                    <CheckCircle2 className="w-4 h-4 text-[#005F6A]" />
+                  <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                    <CheckCircle2 className="w-4 h-4 text-[#1c1917]" />
                   </div>
-                  <h2 className="text-sm font-[350] text-[#005F6A]/80">
+                  <h2 className="text-sm font-[350] text-[#1c1917]/80">
                     Recent Completed
                   </h2>
                 </div>
@@ -460,7 +460,7 @@ export default async function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-[#005F6A]/60">
+                    className="text-xs text-[#1c1917]/60">
                     View All
                     <ArrowRight className="w-3 h-3 ml-1" />
                   </Button>
@@ -469,10 +469,10 @@ export default async function DashboardPage() {
 
               {recentJobs.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle2 className="w-6 h-6 text-[#005F6A]/40" />
+                  <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle2 className="w-6 h-6 text-[#1c1917]/40" />
                   </div>
-                  <p className="text-sm text-[#005F6A]/60">
+                  <p className="text-sm text-[#1c1917]/60">
                     No completed jobs yet
                   </p>
                 </div>
@@ -482,12 +482,12 @@ export default async function DashboardPage() {
                     <Link
                       key={job.id}
                       href={`/jobs/${job.id}`}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5 hover:bg-[#005F6A]/8 transition-colors">
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5 hover:bg-[#e85d04]/8 transition-colors">
                       <div className="flex-1">
-                        <p className="text-sm font-[400] text-[#005F6A]">
+                        <p className="text-sm font-[400] text-[#1c1917]">
                           {job.clientName}
                         </p>
-                        <p className="text-xs text-[#005F6A]/60">
+                        <p className="text-xs text-[#1c1917]/60">
                           {new Date(job.updatedAt).toLocaleDateString("en-US")}
                         </p>
                       </div>
@@ -499,7 +499,7 @@ export default async function DashboardPage() {
                           {job.paymentReceived ? "Paid" : "Unpaid"}
                         </Badge>
                         {job.price && (
-                          <span className="text-sm font-[400] text-[#005F6A]">
+                          <span className="text-sm font-[400] text-[#1c1917]">
                             ${job.price.toFixed(2)}
                           </span>
                         )}
@@ -554,7 +554,7 @@ export default async function DashboardPage() {
 
           {/* Quick Actions */}
           <div>
-            <h2 className="text-lg font-[350] tracking-tight text-[#005F6A] mb-4">
+            <h2 className="text-lg font-[350] tracking-tight text-[#1c1917] mb-4">
               Quick Actions
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -603,10 +603,10 @@ export default async function DashboardPage() {
           <Card variant="default" className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                  <Calendar className="w-4 h-4 text-[#005F6A]" />
+                <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                  <Calendar className="w-4 h-4 text-[#1c1917]" />
                 </div>
-                <h2 className="text-sm font-[350] text-[#005F6A]/80">
+                <h2 className="text-sm font-[350] text-[#1c1917]/80">
                   My Upcoming Jobs
                 </h2>
               </div>
@@ -614,7 +614,7 @@ export default async function DashboardPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-[#005F6A]/60">
+                  className="text-xs text-[#1c1917]/60">
                   View All
                   <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
@@ -623,10 +623,10 @@ export default async function DashboardPage() {
 
             {myUpcomingJobs.length === 0 ? (
               <div className="text-center py-8">
-                <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <Calendar className="w-6 h-6 text-[#005F6A]/40" />
+                <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Calendar className="w-6 h-6 text-[#1c1917]/40" />
                 </div>
-                <p className="text-sm text-[#005F6A]/60">No upcoming jobs</p>
+                <p className="text-sm text-[#1c1917]/60">No upcoming jobs</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -634,12 +634,12 @@ export default async function DashboardPage() {
                   <Link
                     key={job.id}
                     href={`/my-jobs/${job.id}`}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5 hover:bg-[#005F6A]/8 transition-colors">
+                    className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5 hover:bg-[#e85d04]/8 transition-colors">
                     <div className="flex-1">
-                      <p className="text-sm font-[400] text-[#005F6A]">
+                      <p className="text-sm font-[400] text-[#1c1917]">
                         {job.clientName}
                       </p>
-                      <p className="text-xs text-[#005F6A]/60">
+                      <p className="text-xs text-[#1c1917]/60">
                         {job.jobDate
                           ? new Date(job.jobDate).toLocaleDateString("en-US")
                           : "No date"}{" "}
@@ -698,7 +698,7 @@ export default async function DashboardPage() {
 
           {/* Quick Actions for Employee */}
           <div>
-            <h2 className="text-lg font-[350] tracking-tight text-[#005F6A] mb-4">
+            <h2 className="text-lg font-[350] tracking-tight text-[#1c1917] mb-4">
               Quick Actions
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -733,11 +733,11 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-[#005F6A]/10 hover:border-[#005F6A]/20 hover:bg-[#005F6A]/5 transition-colors gap-2">
-      <div className="p-2 bg-[#005F6A]/10 rounded-xl">
-        <Icon className="w-5 h-5 text-[#005F6A]" />
+      className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-[#1c1917]/10 hover:border-[#1c1917]/20 hover:bg-[#e85d04]/5 transition-colors gap-2">
+      <div className="p-2 bg-[#e85d04]/10 rounded-xl">
+        <Icon className="w-5 h-5 text-[#1c1917]" />
       </div>
-      <span className="text-sm font-[350] text-[#005F6A]">{title}</span>
+      <span className="text-sm font-[350] text-[#1c1917]">{title}</span>
     </Link>
   );
 }

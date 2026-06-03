@@ -19,11 +19,11 @@ type PageProps = {
 function jobTypeLabel(type: string | null) {
   if (!type) return null;
   switch (type) {
-    case "R": return "Residential cleaning";
-    case "C": return "Commercial cleaning";
-    case "PC": return "Post-construction cleaning";
-    case "F": return "Follow-up cleaning";
-    case "move-in-out": return "Move-in / move-out cleaning";
+    case "R": return "Residential service";
+    case "C": return "Commercial service";
+    case "PC": return "Post-construction service";
+    case "F": return "Follow-up service";
+    case "move-in-out": return "Move-in / move-out service";
     default: return type;
   }
 }
@@ -359,7 +359,7 @@ export default async function JobDetailPage({ params }: PageProps) {
                 </div>
                 <div>
                   <div className="name">{c.name}</div>
-                  <div className="role">{c.id === session.user.id ? "You · Cleaner" : "Cleaner"}</div>
+                  <div className="role">{c.id === session.user.id ? "You · Technician" : "Technician"}</div>
                 </div>
               </div>
             ))}

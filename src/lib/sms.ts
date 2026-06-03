@@ -127,7 +127,7 @@ export function smsBookingConfirmation(opts: {
   });
   return sendSms({
     to: opts.to,
-    body: `Cleano: booking #${opts.jobNumber} confirmed for ${when}. Reply STOP to opt out.`,
+    body: `Fixaro: booking #${opts.jobNumber} confirmed for ${when}. Reply STOP to opt out.`,
     notification: { recipient: "CUSTOMER", key: "cust.booking.confirmed" },
   });
 }
@@ -139,7 +139,7 @@ export function smsOnTheWay(opts: {
 }) {
   return sendSms({
     to: opts.to,
-    body: `Cleano: ${opts.cleanerName} is on the way, about ${opts.etaMin} min out.`,
+    body: `Fixaro: ${opts.cleanerName} is on the way, about ${opts.etaMin} min out.`,
     notification: { recipient: "CUSTOMER", key: "cust.booking.on_the_way" },
   });
 }
@@ -156,7 +156,7 @@ export function smsReminder(opts: {
   });
   return sendSms({
     to: opts.to,
-    body: `Cleano reminder: booking #${opts.jobNumber} is scheduled for ${when}.`,
+    body: `Fixaro reminder: booking #${opts.jobNumber} is scheduled for ${when}.`,
     notification: { recipient: "CUSTOMER", key: "cust.reminders.booking_reminder_2" },
   });
 }
@@ -169,7 +169,7 @@ export function smsCancellation(opts: {
   const tail = opts.reason ? ` (${opts.reason})` : "";
   return sendSms({
     to: opts.to,
-    body: `Cleano: booking #${opts.jobNumber} has been canceled${tail}. We'll be in touch.`,
+    body: `Fixaro: booking #${opts.jobNumber} has been canceled${tail}. We'll be in touch.`,
     notification: { recipient: "CUSTOMER", key: "cust.cancel.booking_cancellation" },
   });
 }

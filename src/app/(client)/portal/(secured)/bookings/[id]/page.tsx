@@ -134,7 +134,7 @@ export default async function BookingDetailPage({
               Service details
             </h2>
             <dl className="cl-dlist">
-              <DetailRow dt="Type" dd={job.jobType ?? "Standard cleaning"} />
+              <DetailRow dt="Service" dd={job.jobType ?? "Handyman service"} />
               <DetailRow
                 dt="Address"
                 dd={job.location ?? "—"}
@@ -304,8 +304,8 @@ export default async function BookingDetailPage({
                 />
                 <span>
                   {job.depositPaid
-                    ? "$20 deposit collected at booking. The remaining balance will be charged after your cleaning is complete."
-                    : "You won't be charged until after your cleaning is complete."}
+                    ? "$20 deposit collected at booking. The remaining balance will be charged after your visit is complete."
+                    : "You won't be charged until after your visit is complete."}
                 </span>
               </div>
             ) : null}
@@ -337,7 +337,7 @@ export default async function BookingDetailPage({
                 margin: 0,
                 lineHeight: 1.55,
               }}>
-              Email <a className="cl-link">care@cleano.ca</a> or text us at{" "}
+              Email <a className="cl-link">contact@fixaropro.com</a> or text us at{" "}
               <a className="cl-link">(514) 555-CLEAN</a>.
             </p>
           </section>

@@ -84,16 +84,16 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A] flex items-center gap-3">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917] flex items-center gap-3">
             <Tag className="w-7 h-7" /> Promo Codes
           </h1>
-          <p className="text-sm text-[#005F6A]/70 mt-1">
+          <p className="text-sm text-[#1c1917]/70 mt-1">
             Create and manage discount codes for customers.
           </p>
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#005F6A] text-white rounded-xl text-sm font-semibold hover:bg-[#00424a] transition-colors">
+          className="flex items-center gap-2 px-4 py-2 bg-[#e85d04] text-white rounded-xl text-sm font-semibold hover:bg-[#c44c03] transition-colors">
           <Plus className="w-4 h-4" />
           New code
         </button>
@@ -103,13 +103,13 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
         <form
           onSubmit={handleCreate}
           className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-[#005F6A]">New promo code</h2>
+          <h2 className="font-semibold text-[#1c1917]">New promo code</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">Code</label>
               <input
                 required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#e85d04]/30"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="SUMMER20"
@@ -119,7 +119,7 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">Description</label>
               <input
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#e85d04]/30"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Summer 2026 promo"
@@ -146,7 +146,7 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
                 type="number"
                 min="0.01"
                 step="0.01"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#e85d04]/30"
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
                 placeholder={discountType === "FIXED" ? "20.00" : "15"}
@@ -157,7 +157,7 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
               <input
                 type="number"
                 min="1"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#005F6A]/30"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#e85d04]/30"
                 value={maxUses}
                 onChange={(e) => setMaxUses(e.target.value)}
                 placeholder="100"
@@ -178,7 +178,7 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
             <button
               type="submit"
               disabled={creating}
-              className="px-5 py-2 bg-[#005F6A] text-white rounded-xl text-sm font-semibold hover:bg-[#00424a] transition-colors disabled:opacity-60 flex items-center gap-2">
+              className="px-5 py-2 bg-[#e85d04] text-white rounded-xl text-sm font-semibold hover:bg-[#c44c03] transition-colors disabled:opacity-60 flex items-center gap-2">
               {creating && <Loader2 className="w-4 h-4 animate-spin" />}
               Create
             </button>
@@ -207,7 +207,7 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
             <tbody className="divide-y divide-gray-50">
               {list.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-5 py-3.5 font-mono font-semibold text-[#005F6A]">{c.code}</td>
+                  <td className="px-5 py-3.5 font-mono font-semibold text-[#1c1917]">{c.code}</td>
                   <td className="px-5 py-3.5 font-medium">{fmt(c)}</td>
                   <td className="px-5 py-3.5 text-gray-500">
                     {c.usesCount}{c.maxUses ? ` / ${c.maxUses}` : ""}
@@ -227,10 +227,10 @@ export default function PromoCodesClient({ codes }: { codes: PromoCode[] }) {
                       <button
                         onClick={() => handleToggle(c.id)}
                         disabled={busyId === c.id}
-                        className="text-gray-400 hover:text-[#005F6A] transition-colors disabled:opacity-40"
+                        className="text-gray-400 hover:text-[#1c1917] transition-colors disabled:opacity-40"
                         title={c.isActive ? "Deactivate" : "Activate"}>
                         {c.isActive
-                          ? <ToggleRight className="w-5 h-5 text-[#005F6A]" />
+                          ? <ToggleRight className="w-5 h-5 text-[#1c1917]" />
                           : <ToggleLeft className="w-5 h-5" />}
                       </button>
                       <button

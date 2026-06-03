@@ -77,7 +77,7 @@ export async function signDocument(input: SignDocumentInput) {
       process.env.CLOUDINARY_API_SECRET
     ) {
       try {
-        const folder = `cleano/signatures/${documentId}`;
+        const folder = `fixaro/signatures/${documentId}`;
         const publicId = `${employeeId}-${Date.now()}`;
         const result = await uploadDataUrl(signatureDataUrl, folder, publicId);
         signatureUrl = result.secure_url;

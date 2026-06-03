@@ -103,7 +103,7 @@ export async function chargeJob(jobId: string) {
       payment_method: client.defaultPaymentMethodId,
       off_session: true,
       confirm: true,
-      description: `Cleano job #${job.jobNumber} — ${job.jobType ?? "cleaning"}`,
+      description: `Fixaro job #${job.jobNumber} — ${job.jobType ?? "service"}`,
       metadata: { jobId, jobNumber: String(job.jobNumber) },
     });
 

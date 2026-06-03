@@ -82,9 +82,9 @@ export const MonthView = () => {
               <div
                 key={label}
                 className={`flex items-center justify-center p-2 rounded-xl ${
-                  isWeekend ? "bg-[#005F6A]/[0.02]" : ""
+                  isWeekend ? "bg-[#e85d04]/[0.02]" : ""
                 }`}>
-                <span className="app-title-small !font-[450] !text-[#005F6A]/60">
+                <span className="app-title-small !font-[450] !text-[#1c1917]/60">
                   {label}
                 </span>
               </div>
@@ -113,11 +113,11 @@ export const MonthView = () => {
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[120px] p-2 cursor-pointer transition-colors border-[#005F6A]/5 ${
+                className={`min-h-[120px] p-2 cursor-pointer transition-colors border-[#1c1917]/5 ${
                   index % 7 !== 0 ? "border-l" : ""
                 } ${!isFirstRow ? "border-t" : ""} ${
-                  isWeekend ? "bg-[#005F6A]/[0.02]" : ""
-                } ${isCurrentMonth ? "hover:bg-[#005F6A]/[0.04]" : "bg-[#005F6A]/[0.1] opacity-10"} `}
+                  isWeekend ? "bg-[#e85d04]/[0.02]" : ""
+                } ${isCurrentMonth ? "hover:bg-[#e85d04]/[0.04]" : "bg-[#e85d04]/[0.1] opacity-10"} `}
                 onClick={(e) => handleDayClick(day, e)}>
                 {/* Day Number */}
                 <div
@@ -127,10 +127,10 @@ export const MonthView = () => {
                   <span
                     className={`app-title ${
                       isToday
-                        ? "bg-[#005F6A] !text-white px-2 py-0.5 rounded-lg"
+                        ? "bg-[#e85d04] !text-white px-2 py-0.5 rounded-lg"
                         : isCurrentMonth
-                          ? "text-[#005F6A]"
-                          : "text-[#005F6A]/5"
+                          ? "text-[#1c1917]"
+                          : "text-[#1c1917]/5"
                     }`}>
                     {format(day, "d")}
                   </span>
@@ -143,7 +143,7 @@ export const MonthView = () => {
                       {[0, 1, 2].map((i) => (
                         <div
                           key={`skeleton-${day.toISOString()}-${i}`}
-                          className="px-2 py-1 rounded-lg bg-[#005F6A]/10 animate-pulse h-[40px]"
+                          className="px-2 py-1 rounded-lg bg-[#e85d04]/10 animate-pulse h-[40px]"
                         />
                       ))}
                     </>
@@ -249,7 +249,7 @@ export const MonthView = () => {
                         );
                       })}
                       {dayEvents.length > 3 && (
-                        <div className="app-subtitle !text-[#005F6A]/50 pl-1">
+                        <div className="app-subtitle !text-[#1c1917]/50 pl-1">
                           +{dayEvents.length - 3} more
                         </div>
                       )}

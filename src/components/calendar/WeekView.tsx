@@ -112,7 +112,7 @@ const SelectionPreview: React.FC<{
     previews.push(
       <div
         key={dayIndex}
-        className="absolute z-40 pointer-events-none bg-[#005F6A]/[0.08]"
+        className="absolute z-40 pointer-events-none bg-[#e85d04]/[0.08]"
         style={{
           left: `${(dayIndex / 7) * 100}%`,
           width: `${100 / 7}%`,
@@ -440,7 +440,7 @@ export const WeekView: React.FC = () => {
       <div className="flex-shrink-0 flex pb-0 px-4 overflow-x-auto">
         {/* Timezone Label */}
         <div className="w-10 flex-shrink-0 flex flex-col items-center justify-end py-3">
-          <span className="app-subtitle !text-[#005F6A]/50">
+          <span className="app-subtitle !text-[#1c1917]/50">
             {timezoneLabel}
           </span>
         </div>
@@ -455,18 +455,18 @@ export const WeekView: React.FC = () => {
                 key={day.toISOString()}
                 className={`flex items-baseline gap-1 p-2 rounded-xl min-w-[120px] flex-1 ${
                   isToday
-                    ? "bg-[#005F6A]/10"
+                    ? "bg-[#e85d04]/10"
                     : isWeekend
-                    ? "bg-[#005F6A]/[0]"
+                    ? "bg-[#e85d04]/[0]"
                     : ""
                 }`}>
                 <span
                   className={`app-title ${
-                    isToday ? "text-[#005F6A]" : "text-[#005F6A]/70"
+                    isToday ? "text-[#1c1917]" : "text-[#1c1917]/70"
                   }`}>
                   {day.getDate()}
                 </span>
-                <span className="app-subtitle !text-[#005F6A]/60">
+                <span className="app-subtitle !text-[#1c1917]/60">
                   {day.toLocaleString("default", { weekday: "short" })}
                 </span>
               </div>
@@ -484,7 +484,7 @@ export const WeekView: React.FC = () => {
               key={hour}
               className="relative flex-shrink-0"
               style={{ height: `${zoomLevel}px` }}>
-              <span className="absolute right-0 pr-2 z-[1000] section-title !lowercase !text-[#005F6A]/30 text-right -translate-y-1/2">
+              <span className="absolute right-0 pr-2 z-[1000] section-title !lowercase !text-[#1c1917]/30 text-right -translate-y-1/2">
                 {formatHour(hour, use24HourClock)}
               </span>
             </div>
@@ -500,7 +500,7 @@ export const WeekView: React.FC = () => {
                 <React.Fragment key={hour}>
                   {/* Hour line */}
                   <div
-                    className="absolute left-0 right-0 border-t-1 border-[#005F6A]/5"
+                    className="absolute left-0 right-0 border-t-1 border-[#1c1917]/5"
                     style={{
                       top: `${
                         (hour - (officeHours?.start || 0)) * zoomLevel
@@ -511,7 +511,7 @@ export const WeekView: React.FC = () => {
                   {[15, 30, 45].map((minutes) => (
                     <div
                       key={`${hour}-${minutes}`}
-                      className="absolute left-0 right-0 border-t-1 border-[#005F6A]/[0.025]"
+                      className="absolute left-0 right-0 border-t-1 border-[#1c1917]/[0.025]"
                       style={{
                         top: `${
                           (hour - (officeHours?.start || 0)) * zoomLevel +
@@ -564,8 +564,8 @@ export const WeekView: React.FC = () => {
                   }}
                   data-day-column={index}
                   className={`relative min-w-[120px] flex-1 ${
-                    index > 0 ? "border-l border-[#005F6A]/10" : ""
-                  } ${isWeekend ? "bg-[#005F6A]/[0.02]" : ""}`}
+                    index > 0 ? "border-l border-[#1c1917]/10" : ""
+                  } ${isWeekend ? "bg-[#e85d04]/[0.02]" : ""}`}
                   style={{ minHeight: `${gridHeight}px` }}
                   onDrop={(e) => handlePresetDrop(e, day)}
                   onDragOver={(e) => e.preventDefault()}>
@@ -599,7 +599,7 @@ export const WeekView: React.FC = () => {
                         className={`absolute left-0 right-0 z-20 transition-colors duration-200 ${
                           isDraggingSelection
                             ? "cursor-crosshair"
-                            : "cursor-pointer hover:bg-[#005F6A]/[0.06]"
+                            : "cursor-pointer hover:bg-[#e85d04]/[0.06]"
                         }`}
                         style={{
                           top: `${

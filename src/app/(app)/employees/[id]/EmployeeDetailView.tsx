@@ -274,19 +274,19 @@ export default function EmployeeDetailView({
       <div className="h-full flex flex-col justify-between">
         <span
           className={`app-title-small ${
-            variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
+            variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"
           }`}>
           {label}
         </span>
         <div>
           <p
             className={`h2-title ${
-              variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
+              variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"
             }`}>
             {value}
           </p>
           {subValue && (
-            <p className="text-xs text-[#005F6A]/60 mt-0.5">{subValue}</p>
+            <p className="text-xs text-[#1c1917]/60 mt-0.5">{subValue}</p>
           )}
         </div>
       </div>
@@ -366,7 +366,7 @@ export default function EmployeeDetailView({
                 value={ratingEdit}
                 onChange={(e) => setRatingEdit(e.target.value)}
                 placeholder="4.0 – 5.0"
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-1 focus:ring-[#005F6A]"
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-1 focus:ring-[#e85d04]"
               />
               <button
                 onClick={async () => {
@@ -386,7 +386,7 @@ export default function EmployeeDetailView({
                   }
                 }}
                 disabled={ratingSaving}
-                className="px-3 py-1.5 text-sm bg-[#005F6A] text-white rounded-lg hover:bg-[#005F6A]/90 disabled:opacity-50">
+                className="px-3 py-1.5 text-sm bg-[#e85d04] text-white rounded-lg hover:bg-[#e85d04]/90 disabled:opacity-50">
                 {ratingSaving ? "Saving…" : "Set"}
               </button>
             </div>
@@ -463,26 +463,26 @@ export default function EmployeeDetailView({
   const JobsTab = () => (
     <div className="space-y-6">
       {/* Upcoming Jobs */}
-      <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
+      <h2 className="text-lg font-[350] tracking-tight text-[#1c1917]">
         Upcoming Jobs
       </h2>
       {upcomingJobs.length === 0 ? (
         <Card variant="ghost" className="p-8">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <Calendar className="w-6 h-6 text-[#005F6A]/40" />
+            <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-6 h-6 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm text-[#005F6A]/60">No upcoming jobs</p>
+            <p className="text-sm text-[#1c1917]/60">No upcoming jobs</p>
           </div>
         </Card>
       ) : (
         <Card variant="default" className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <Calendar className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <Calendar className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Scheduled Jobs
               </h3>
             </div>
@@ -494,12 +494,12 @@ export default function EmployeeDetailView({
             {upcomingJobs.map((job) => (
               <div
                 key={job.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5">
+                className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5">
                 <div className="flex-1">
-                  <p className="text-sm font-[400] text-[#005F6A]">
+                  <p className="text-sm font-[400] text-[#1c1917]">
                     {job.clientName}
                   </p>
-                  <p className="text-xs text-[#005F6A]/60">
+                  <p className="text-xs text-[#1c1917]/60">
                     {new Date(job.startTime).toLocaleDateString("en-US")} at{" "}
                     {new Date(job.startTime).toLocaleTimeString([], {
                       hour: "2-digit",
@@ -514,7 +514,7 @@ export default function EmployeeDetailView({
                     </Badge>
                   )}
                   {job.price && (
-                    <span className="text-sm font-[400] text-[#005F6A]">
+                    <span className="text-sm font-[400] text-[#1c1917]">
                       ${job.price.toFixed(2)}
                     </span>
                   )}
@@ -534,14 +534,14 @@ export default function EmployeeDetailView({
       )}
 
       {/* Recent Jobs */}
-      <h2 className="input-label !text-[#005F6A]/70 !mb-2">Recent Jobs</h2>
+      <h2 className="input-label !text-[#1c1917]/70 !mb-2">Recent Jobs</h2>
       {recentJobs.length === 0 ? (
         <Card variant="ghost" className="p-8">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <History className="w-6 h-6 text-[#005F6A]/40" />
+            <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <History className="w-6 h-6 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm text-[#005F6A]/60">No recent jobs</p>
+            <p className="text-sm text-[#1c1917]/60">No recent jobs</p>
           </div>
         </Card>
       ) : (
@@ -550,12 +550,12 @@ export default function EmployeeDetailView({
             {recentJobs.map((job) => (
               <div
                 key={job.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/2">
+                className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/2">
                 <div className="flex-1">
-                  <p className="app-title-small text-[#005F6A]">
+                  <p className="app-title-small text-[#1c1917]">
                     {job.clientName}
                   </p>
-                  <p className="app-subtitle !text-[#005F6A]/60">
+                  <p className="app-subtitle !text-[#1c1917]/60">
                     {new Date(job.startTime).toLocaleDateString("en-US")}
                   </p>
                 </div>
@@ -567,7 +567,7 @@ export default function EmployeeDetailView({
                     {job.paymentReceived ? "Paid" : "Unpaid"}
                   </Badge>
                   {job.price && (
-                    <span className="text-sm font-[400] text-[#005F6A]">
+                    <span className="text-sm font-[400] text-[#1c1917]">
                       ${job.price.toFixed(2)}
                     </span>
                   )}
@@ -593,7 +593,7 @@ export default function EmployeeDetailView({
     <div className="space-y-6">
       {/* Assign Starter Kit */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
+        <h2 className="text-lg font-[350] tracking-tight text-[#1c1917]">
           Products & Inventory
         </h2>
         <Button
@@ -611,10 +611,10 @@ export default function EmployeeDetailView({
       {forecast.length > 0 && (
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <TrendingDown className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <TrendingDown className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Inventory Forecast ({upcomingJobCount} upcoming job{upcomingJobCount !== 1 ? "s" : ""})
             </h3>
           </div>
@@ -623,13 +623,13 @@ export default function EmployeeDetailView({
               <div
                 key={item.productId}
                 className={`flex items-center justify-between p-3 rounded-xl ${
-                  item.needsRefill ? "bg-red-50 border border-red-200" : "bg-[#005F6A]/5"
+                  item.needsRefill ? "bg-red-50 border border-red-200" : "bg-[#e85d04]/5"
                 }`}>
                 <div className="flex-1">
-                  <p className={`text-sm font-[400] ${item.needsRefill ? "text-red-700" : "text-[#005F6A]"}`}>
+                  <p className={`text-sm font-[400] ${item.needsRefill ? "text-red-700" : "text-[#1c1917]"}`}>
                     {item.productName}
                   </p>
-                  <p className={`text-xs ${item.needsRefill ? "text-red-500" : "text-[#005F6A]/60"}`}>
+                  <p className={`text-xs ${item.needsRefill ? "text-red-500" : "text-[#1c1917]/60"}`}>
                     Has {item.currentQuantity} {item.unit} &middot; Needs {item.projectedUsage} {item.unit} for upcoming jobs
                   </p>
                 </div>
@@ -655,25 +655,25 @@ export default function EmployeeDetailView({
       )}
 
       {/* Most Used Products */}
-      <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
+      <h2 className="text-lg font-[350] tracking-tight text-[#1c1917]">
         Most Used Products
       </h2>
       {topProducts.length === 0 ? (
         <Card variant="ghost" className="p-8">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <Package className="w-6 h-6 text-[#005F6A]/40" />
+            <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Package className="w-6 h-6 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm text-[#005F6A]/60">No usage data yet</p>
+            <p className="text-sm text-[#1c1917]/60">No usage data yet</p>
           </div>
         </Card>
       ) : (
         <Card variant="default" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-              <Package className="w-4 h-4 text-[#005F6A]" />
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Package className="w-4 h-4 text-[#1c1917]" />
             </div>
-            <h3 className="text-sm font-[350] text-[#005F6A]/80">
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
               Product Usage
             </h3>
           </div>
@@ -681,12 +681,12 @@ export default function EmployeeDetailView({
             {topProducts.map((product, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5">
+                className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5">
                 <div className="flex-1">
-                  <p className="text-sm font-[400] text-[#005F6A]">
+                  <p className="text-sm font-[400] text-[#1c1917]">
                     {product.name}
                   </p>
-                  <p className="text-xs text-[#005F6A]/60">
+                  <p className="text-xs text-[#1c1917]/60">
                     {product.quantity} {product.unit}
                   </p>
                 </div>
@@ -700,26 +700,26 @@ export default function EmployeeDetailView({
       )}
 
       {/* Assigned Inventory */}
-      <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
+      <h2 className="text-lg font-[350] tracking-tight text-[#1c1917]">
         Assigned Inventory
       </h2>
       {assignedProducts.length === 0 ? (
         <Card variant="ghost" className="p-8">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <Briefcase className="w-6 h-6 text-[#005F6A]/40" />
+            <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Briefcase className="w-6 h-6 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm text-[#005F6A]/60">No inventory assigned</p>
+            <p className="text-sm text-[#1c1917]/60">No inventory assigned</p>
           </div>
         </Card>
       ) : (
         <Card variant="default" className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#005F6A]/10 rounded-lg">
-                <Briefcase className="w-4 h-4 text-[#005F6A]" />
+              <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+                <Briefcase className="w-4 h-4 text-[#1c1917]" />
               </div>
-              <h3 className="text-sm font-[350] text-[#005F6A]/80">
+              <h3 className="text-sm font-[350] text-[#1c1917]/80">
                 Current Inventory
               </h3>
             </div>
@@ -731,17 +731,17 @@ export default function EmployeeDetailView({
             {assignedProducts.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#005F6A]/5">
+                className="flex items-center justify-between p-3 rounded-xl bg-[#e85d04]/5">
                 <div className="flex-1">
-                  <p className="text-sm font-[400] text-[#005F6A]">
+                  <p className="text-sm font-[400] text-[#1c1917]">
                     {item.productName}
                   </p>
-                  <p className="text-xs text-[#005F6A]/60">
+                  <p className="text-xs text-[#1c1917]/60">
                     {item.quantity} {item.unit}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-[400] text-[#005F6A]">
+                  <span className="text-sm font-[400] text-[#1c1917]">
                     ${(item.quantity * item.costPerUnit).toFixed(2)}
                   </span>
                   <Button
@@ -782,10 +782,10 @@ export default function EmployeeDetailView({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-lg font-[350] tracking-tight text-[#005F6A] mb-2">
+          <h2 className="text-lg font-[350] tracking-tight text-[#1c1917] mb-2">
             Weekly Availability
           </h2>
-          <p className="text-sm text-[#005F6A]/60">
+          <p className="text-sm text-[#1c1917]/60">
             Days and hours {employee.name} is typically available.
           </p>
         </div>
@@ -793,10 +793,10 @@ export default function EmployeeDetailView({
         {availability.length === 0 ? (
           <Card variant="ghost" className="p-8">
             <div className="text-center">
-              <div className="w-12 h-12 bg-[#005F6A]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Calendar className="w-6 h-6 text-[#005F6A]/40" />
+              <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Calendar className="w-6 h-6 text-[#1c1917]/40" />
               </div>
-              <p className="text-sm text-[#005F6A]/60">
+              <p className="text-sm text-[#1c1917]/60">
                 {employee.name} hasn't entered availability yet.
               </p>
             </div>
@@ -812,11 +812,11 @@ export default function EmployeeDetailView({
                   return (
                     <div
                       key={day}
-                      className="grid grid-cols-[120px_1fr] gap-3 items-center p-3 rounded-xl bg-[#005F6A]/5">
-                      <span className="text-sm font-[400] text-[#005F6A]/60">
+                      className="grid grid-cols-[120px_1fr] gap-3 items-center p-3 rounded-xl bg-[#e85d04]/5">
+                      <span className="text-sm font-[400] text-[#1c1917]/60">
                         {label}
                       </span>
-                      <span className="text-xs text-[#005F6A]/50">
+                      <span className="text-xs text-[#1c1917]/50">
                         Unavailable
                       </span>
                     </div>
@@ -828,17 +828,17 @@ export default function EmployeeDetailView({
                     className={`grid grid-cols-[120px_1fr_auto] gap-3 items-center p-3 rounded-xl ${
                       hasConflict
                         ? "bg-yellow-50 border border-yellow-200"
-                        : "bg-[#005F6A]/5"
+                        : "bg-[#e85d04]/5"
                     }`}>
                     <span
                       className={`text-sm font-[400] ${
-                        hasConflict ? "text-yellow-700" : "text-[#005F6A]"
+                        hasConflict ? "text-yellow-700" : "text-[#1c1917]"
                       }`}>
                       {label}
                     </span>
                     <span
                       className={`text-sm ${
-                        hasConflict ? "text-yellow-700" : "text-[#005F6A]/80"
+                        hasConflict ? "text-yellow-700" : "text-[#1c1917]/80"
                       }`}>
                       {slot.startTime} – {slot.endTime}
                     </span>
@@ -870,10 +870,10 @@ export default function EmployeeDetailView({
                   key={c.jobId}
                   className="flex items-center justify-between p-3 rounded-xl bg-white">
                   <div className="flex-1">
-                    <p className="text-sm font-[400] text-[#005F6A]">
+                    <p className="text-sm font-[400] text-[#1c1917]">
                       {c.clientName}
                     </p>
-                    <p className="text-xs text-[#005F6A]/60">
+                    <p className="text-xs text-[#1c1917]/60">
                       {new Date(c.startTime).toLocaleDateString("en-US")} at{" "}
                       {new Date(c.startTime).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -903,7 +903,7 @@ export default function EmployeeDetailView({
     <div className="relative h-full overflow-y-auto py-8 px-4">
       <div className="relative z-10 max-w-[80rem] w-full mx-auto space-y-6">
         {/* Header Card */}
-        <div className="rounded-2xl bg-[#005F6A]/5 p-5">
+        <div className="rounded-2xl bg-[#e85d04]/5 p-5">
           {/* Back + Edit row */}
           <div className="flex items-center justify-between mb-5">
             <Link href="/employees">
@@ -929,17 +929,17 @@ export default function EmployeeDetailView({
 
           {/* Employee identity */}
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#005F6A]/10 flex items-center justify-center shrink-0">
-              <User className="w-7 h-7 text-[#005F6A]" />
+            <div className="w-14 h-14 rounded-2xl bg-[#e85d04]/10 flex items-center justify-center shrink-0">
+              <User className="w-7 h-7 text-[#1c1917]" />
             </div>
             <div>
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+                <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
                   {employee.name}
                 </h1>
                 {getRoleBadge(employee.role)}
               </div>
-              <div className="flex flex-col sm:flex-row gap-4 text-[#005F6A]/70 mt-2">
+              <div className="flex flex-col sm:flex-row gap-4 text-[#1c1917]/70 mt-2">
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   <span className="text-sm">{employee.email}</span>
@@ -984,7 +984,7 @@ export default function EmployeeDetailView({
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 bg-[#005F6A]/5 rounded-2xl p-1 w-fit overflow-x-auto">
+        <div className="flex items-center gap-2 bg-[#e85d04]/5 rounded-2xl p-1 w-fit overflow-x-auto">
           {MENU_ITEMS.map((item) => {
             const isActive = activeView === item.id;
             return (
@@ -1029,7 +1029,7 @@ export default function EmployeeDetailView({
         }}
         title="Assign Starter Kit">
         <div className="space-y-4">
-          <p className="text-sm text-[#005F6A]/70">
+          <p className="text-sm text-[#1c1917]/70">
             Select a kit template to assign products to {employee.name}.
             Warehouse stock will be deducted accordingly.
           </p>
@@ -1051,8 +1051,8 @@ export default function EmployeeDetailView({
           />
 
           {selectedKit && (
-            <div className="bg-[#005F6A]/5 rounded-xl p-4 space-y-2">
-              <h4 className="text-sm font-[400] text-[#005F6A]">Kit Contents:</h4>
+            <div className="bg-[#e85d04]/5 rounded-xl p-4 space-y-2">
+              <h4 className="text-sm font-[400] text-[#1c1917]">Kit Contents:</h4>
               {selectedKit.items.map((item) => {
                 const hasStock = item.warehouseStock >= item.quantity;
                 return (
@@ -1061,10 +1061,10 @@ export default function EmployeeDetailView({
                     className={`flex items-center justify-between text-xs p-2 rounded-lg ${
                       hasStock ? "bg-white" : "bg-red-50"
                     }`}>
-                    <span className={hasStock ? "text-[#005F6A]" : "text-red-600"}>
+                    <span className={hasStock ? "text-[#1c1917]" : "text-red-600"}>
                       {item.productName}
                     </span>
-                    <span className={hasStock ? "text-[#005F6A]/70" : "text-red-500"}>
+                    <span className={hasStock ? "text-[#1c1917]/70" : "text-red-500"}>
                       {item.quantity} {item.unit}
                       {!hasStock && ` (only ${item.warehouseStock} in stock)`}
                     </span>

@@ -155,13 +155,13 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
       <div className="h-full flex flex-col justify-between">
         <span
           className={`app-title-small ${
-            variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
+            variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"
           }`}>
           {label}
         </span>
         <p
           className={`h2-title ${
-            variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
+            variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"
           }`}>
           {value}
         </p>
@@ -173,10 +173,10 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             Payouts
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+          <p className="text-sm text-[#1c1917]/70 !font-light mt-1">
             Create pay periods and manage employee payouts
           </p>
         </div>
@@ -229,7 +229,7 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
 
       {showCreate && (
         <Card variant="cleano_light" className="p-6 mb-6">
-          <h2 className="text-lg font-[400] text-[#005F6A] mb-4">
+          <h2 className="text-lg font-[400] text-[#1c1917] mb-4">
             Create Pay Period
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -259,7 +259,7 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={creating}
                 placeholder="Optional"
-                className="w-full px-4 py-3 rounded-2xl bg-white text-sm text-[#005F6A] focus:outline-none placeholder:text-[#005F6A]/40"
+                className="w-full px-4 py-3 rounded-2xl bg-white text-sm text-[#1c1917] focus:outline-none placeholder:text-[#1c1917]/40"
               />
             </div>
           </div>
@@ -311,13 +311,13 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
       {initialPeriods.length === 0 ? (
         <div className="bg-white rounded-2xl">
           <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Wallet className="w-8 h-8 text-[#005F6A]/40" />
+            <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Wallet className="w-8 h-8 text-[#1c1917]/40" />
             </div>
-            <p className="text-sm font-[350] text-[#005F6A]/70">
+            <p className="text-sm font-[350] text-[#1c1917]/70">
               No pay periods yet
             </p>
-            <p className="text-xs font-[350] text-[#005F6A]/60 mt-1">
+            <p className="text-xs font-[350] text-[#1c1917]/60 mt-1">
               Create your first pay period to start managing payouts
             </p>
           </div>
@@ -329,17 +329,17 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
             return (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl border border-[#005F6A]/10 overflow-hidden">
+                className="bg-white rounded-2xl border border-[#1c1917]/10 overflow-hidden">
                 <div
-                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-[#005F6A]/2"
+                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-[#e85d04]/2"
                   onClick={() => setExpandedId(isExpanded ? null : p.id)}>
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-[#005F6A]/5 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 text-[#005F6A]" />
+                    <div className="w-10 h-10 rounded-xl bg-[#e85d04]/5 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-5 h-5 text-[#1c1917]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="app-title-small text-[#005F6A] font-[400]">
+                        <span className="app-title-small text-[#1c1917] font-[400]">
                           {formatDate(p.startDate)} — {formatDate(p.endDate)}
                         </span>
                         <span
@@ -347,7 +347,7 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
                           {p.status}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-[#005F6A]/60">
+                      <div className="flex items-center gap-4 mt-1 text-xs text-[#1c1917]/60">
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
                           {p.employeeCount} employees
@@ -364,15 +364,15 @@ export default function PayoutsPageClient({ initialPeriods }: Props) {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-[#005F6A]/60" />
+                      <ChevronUp className="w-4 h-4 text-[#1c1917]/60" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-[#005F6A]/60" />
+                      <ChevronDown className="w-4 h-4 text-[#1c1917]/60" />
                     )}
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-[#005F6A]/10">
+                  <div className="border-t border-[#1c1917]/10">
                     <PayPeriodDetail period={p} onError={setErrorMsg} />
                   </div>
                 )}

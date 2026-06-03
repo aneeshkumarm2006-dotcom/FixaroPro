@@ -166,13 +166,13 @@ export default function SignInPage() {
         className="hidden lg:flex flex-1 relative overflow-hidden m-4 rounded-2xl"
         style={{
           background:
-            "linear-gradient(135deg, #005F6A 0%, #007580 50%, #004952 100%)",
+            "linear-gradient(135deg, #1c1917 0%, #2a2520 50%, #0f0e0d 100%)",
         }}>
         {/* Background blobs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 left-[15%] w-[40rem] h-[40rem] rounded-full bg-[#81c6c7]/30 blur-[180px]" />
-          <div className="absolute top-[55%] -right-32 w-[48rem] h-[48rem] rounded-full bg-[#005F6A]/40 blur-[200px]" />
-          <div className="absolute bottom-[-15%] left-[-5%] w-[50rem] h-[50rem] rounded-full bg-[#003d45]/60 blur-[210px]" />
+          <div className="absolute -top-24 left-[15%] w-[40rem] h-[40rem] rounded-full bg-[#e85d04]/20 blur-[180px]" />
+          <div className="absolute top-[55%] -right-32 w-[48rem] h-[48rem] rounded-full bg-[#f48c06]/15 blur-[200px]" />
+          <div className="absolute bottom-[-15%] left-[-5%] w-[50rem] h-[50rem] rounded-full bg-[#1c1917]/80 blur-[210px]" />
         </div>
 
         {/* Hero Content */}
@@ -184,7 +184,7 @@ export default function SignInPage() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-[500] text-white tracking-tight">
-                Cleano
+Fixaro
               </span>
             </div> */}
 
@@ -192,8 +192,8 @@ export default function SignInPage() {
               Welcome Back
             </h1>
             <p className="max-w-md font-[350] text-white/80 text-lg !leading-relaxed">
-              Sign in to your Cleano account and continue managing your cleaning
-              operations with ease.
+              Sign in to your Fixaro account and continue managing your
+              service operations with ease.
             </p>
 
             {/* Decorative elements */}
@@ -207,7 +207,7 @@ export default function SignInPage() {
                 ))}
               </div>
               <span className="text-white/70 text-sm">
-                Trusted by cleaning teams everywhere
+                Trusted by service teams everywhere
               </span>
             </div>
           </div>
@@ -219,11 +219,11 @@ export default function SignInPage() {
         <div className="w-full max-w-md mx-auto px-4 md:px-8 py-8 md:py-12">
           {/* Mobile Logo */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-[#005F6A]/10 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-[#005F6A]" />
+            <div className="w-10 h-10 rounded-xl bg-[#e85d04]/10 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-[#1c1917]" />
             </div>
-            <span className="text-xl font-[500] text-[#005F6A] tracking-tight">
-              Cleano
+            <span className="text-xl font-[500] text-[#1c1917] tracking-tight">
+Fixaro
             </span>
           </div>
 
@@ -284,9 +284,9 @@ export default function SignInPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-4 flex items-center">
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors" />
+                      <EyeOff className="w-4 h-4 text-[#1c1917]/50 hover:text-[#1c1917] transition-colors" />
                     ) : (
-                      <Eye className="w-4 h-4 text-[#005F6A]/50 hover:text-[#005F6A] transition-colors" />
+                      <Eye className="w-4 h-4 text-[#1c1917]/50 hover:text-[#1c1917] transition-colors" />
                     )}
                   </button>
                 </div>
@@ -313,13 +313,13 @@ export default function SignInPage() {
                   checked={rememberMe}
                   onChange={() => setRememberMe(!rememberMe)}
                 />
-                <label className="ml-2 text-sm text-[#005F6A]">
+                <label className="ml-2 text-sm text-[#1c1917]">
                   Remember me
                 </label>
               </div>
               <Link
                 href="/forgot-password"
-                className="text-sm text-[#005F6A]/80 hover:text-[#005F6A] transition-colors">
+                className="text-sm text-[#1c1917]/80 hover:text-[#1c1917] transition-colors">
                 Forgot password?
               </Link>
             </div>
@@ -337,11 +337,11 @@ export default function SignInPage() {
             </div>
 
             {/* Sign Up Link */}
-            <p className="pt-4 text-center text-sm text-[#005F6A]/80">
+            <p className="pt-4 text-center text-sm text-[#1c1917]/80">
               Don&apos;t have an account?{" "}
               <Link
                 href="/sign-up"
-                className="font-medium text-[#005F6A] hover:text-[#005F6A]/80 transition-colors underline underline-offset-2">
+                className="font-medium text-[#1c1917] hover:text-[#1c1917]/80 transition-colors underline underline-offset-2">
                 Sign up
               </Link>
             </p>

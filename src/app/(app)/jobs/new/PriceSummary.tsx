@@ -49,8 +49,8 @@ export default function PriceSummary() {
       style={{
         marginTop: 20,
         padding: "16px 20px",
-        background: "rgba(0,95,106,0.04)",
-        border: "1px solid rgba(0,95,106,0.10)",
+        background: "rgba(232,93,4,0.04)",
+        border: "1px solid rgba(232,93,4,0.10)",
         borderRadius: 12,
         display: "flex",
         gap: 24,

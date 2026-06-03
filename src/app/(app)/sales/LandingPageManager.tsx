@@ -92,8 +92,8 @@ export default function LandingPageManager({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-[400] text-[#005F6A]">Landing Pages</h3>
-          <p className="text-xs text-[#005F6A]/50 mt-0.5">
+          <h3 className="text-sm font-[400] text-[#1c1917]">Landing Pages</h3>
+          <p className="text-xs text-[#1c1917]/50 mt-0.5">
             Create and manage public landing pages for marketing campaigns
           </p>
         </div>
@@ -112,9 +112,9 @@ export default function LandingPageManager({
 
       {landingPages.length === 0 ? (
         <Card variant="default" className="p-8 text-center">
-          <Globe className="w-8 h-8 text-[#005F6A]/30 mx-auto mb-2" />
-          <p className="text-sm text-[#005F6A]/60">No landing pages yet</p>
-          <p className="text-xs text-[#005F6A]/40 mt-1">
+          <Globe className="w-8 h-8 text-[#1c1917]/30 mx-auto mb-2" />
+          <p className="text-sm text-[#1c1917]/60">No landing pages yet</p>
+          <p className="text-xs text-[#1c1917]/40 mt-1">
             Create your first landing page to start capturing leads
           </p>
         </Card>
@@ -125,7 +125,7 @@ export default function LandingPageManager({
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-[400] text-[#005F6A] truncate">
+                    <h4 className="text-sm font-[400] text-[#1c1917] truncate">
                       {page.title}
                     </h4>
                     <Badge
@@ -142,19 +142,19 @@ export default function LandingPageManager({
                       )}
                     </Badge>
                   </div>
-                  <p className="text-xs text-[#005F6A]/50 mt-1">
+                  <p className="text-xs text-[#1c1917]/50 mt-1">
                     /{page.slug}
                     {page.campaignName && (
-                      <span className="ml-2 text-[#005F6A]/40">
+                      <span className="ml-2 text-[#1c1917]/40">
                         Campaign: {page.campaignName}
                       </span>
                     )}
                   </p>
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="text-xs text-[#005F6A]/60">
+                    <span className="text-xs text-[#1c1917]/60">
                       {page.totalVisits} total visits
                     </span>
-                    <span className="text-xs text-[#005F6A]/60">
+                    <span className="text-xs text-[#1c1917]/60">
                       {page.recentVisits} last 30d
                     </span>
                   </div>

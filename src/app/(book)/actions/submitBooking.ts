@@ -33,10 +33,7 @@ interface SubmitBookingInput {
   postalCode: string;
   // Step 2
   address: string;
-  bedCount: number;
-  bathCount: number;
-  halfBathCount: number;
-  squareFootage: number;
+  hours: number;
   serviceType: string;
   frequency: Frequency;
   addOns: { name: string; price: number }[];
@@ -172,8 +169,8 @@ export async function submitBooking(input: SubmitBookingInput) {
 
     // 5b. Server-authoritative pricing
     const pricing = await computeBookingPrice({
-      bedCount: input.bedCount,
-      bathCount: input.bathCount,
+      hours: input.hours,
+      serviceType: input.serviceType,
       addOns: input.addOns,
       travelFee: areaCheck.travelFee ?? 0,
       discountAmount,
@@ -215,15 +212,11 @@ export async function submitBooking(input: SubmitBookingInput) {
         clientName: client.name,
         client: { connect: { id: client.id } },
         location: input.address.trim(),
-        description: `${input.serviceType} cleaning`,
+        description: `${input.serviceType} — ${input.hours}h`,
         jobType: input.serviceType,
         jobDate: startTime,
         startTime,
         status: input.isFlexible ? "CREATED" : "SCHEDULED",
-        bedCount: input.bedCount,
-        bathCount: input.bathCount,
-        halfBathCount: input.halfBathCount,
-        squareFootage: input.squareFootage > 0 ? input.squareFootage : null,
         isFlexible: input.isFlexible,
         requiredCleaners: 1,
         price: pricing.total,
@@ -281,16 +274,15 @@ export async function submitBooking(input: SubmitBookingInput) {
     const recurrences = recurrenceCount(input.frequency);
     const childJobIds: string[] = [];
     if (recurrences > 0 && input.frequency !== "ONE_TIME") {
-      // Compute discounted price for 2nd+ cleanings (first cleaning is full price)
+      // Compute discounted price for 2nd+ visits (first visit is full price)
       const discountPct = recurringDiscountPercent(input.frequency);
       const recurringDiscount = discountPct > 0
         ? Math.round((pricing.basePrice * discountPct / 100) * 100) / 100
         : 0;
       const childPricing = recurringDiscount > 0
         ? await computeBookingPrice({
-            bedCount: input.bedCount,
-            bathCount: input.bathCount,
-            halfBathCount: input.halfBathCount ?? 0,
+            hours: input.hours,
+            serviceType: input.serviceType,
             addOns: input.addOns,
             travelFee: pricing.travelFee,
             discountAmount: discountAmount + recurringDiscount,
@@ -305,16 +297,11 @@ export async function submitBooking(input: SubmitBookingInput) {
             clientName: client.name,
             client: { connect: { id: client.id } },
             location: input.address.trim(),
-            description: `${input.serviceType} cleaning`,
+            description: `${input.serviceType} — ${input.hours}h`,
             jobType: input.serviceType,
             jobDate: cursor,
             startTime: cursor,
             status: input.isFlexible ? "CREATED" : "SCHEDULED",
-            bedCount: input.bedCount,
-            bathCount: input.bathCount,
-            halfBathCount: input.halfBathCount,
-            squareFootage:
-              input.squareFootage > 0 ? input.squareFootage : null,
             isFlexible: input.isFlexible,
             requiredCleaners: 1,
             price: childPricing.total,

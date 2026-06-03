@@ -1,10 +1,9 @@
-import { db } from "@/db";
 import { calculateTax, TaxBreakdown } from "./tax";
+import { computeHourlyPrice } from "@/app/(book)/book/types";
 
 export interface PricingInput {
-  bedCount: number;
-  bathCount: number;
-  halfBathCount?: number;
+  hours: number;
+  serviceType?: string;
   addOns: { name: string; price: number }[];
   travelFee?: number;
   discountAmount?: number;
@@ -20,11 +19,7 @@ export interface PricingResult extends TaxBreakdown {
 export async function computeBookingPrice(
   input: PricingInput
 ): Promise<PricingResult> {
-  const basePrice = await resolveBasePrice(
-    input.bedCount,
-    input.bathCount,
-    input.halfBathCount ?? 0
-  );
+  const basePrice = resolveBasePrice(input.hours, input.serviceType);
   const addOnTotal = input.addOns.reduce((s, a) => s + a.price, 0);
   const travelFee = input.travelFee ?? 0;
   const discountAmount = input.discountAmount ?? 0;
@@ -35,48 +30,20 @@ export async function computeBookingPrice(
   return { basePrice, addOnTotal, travelFee, discountAmount, ...tax };
 }
 
-async function resolveBasePrice(
-  bedCount: number,
-  bathCount: number,
-  halfBathCount: number
-): Promise<number> {
-  // Prefer flat per-unit rates set in Settings > Pricing Rules
-  const setting = await db.appSetting.findUnique({ where: { key: "pricing.perUnit" } });
-  if (setting?.value && typeof setting.value === "object") {
-    const v = setting.value as Record<string, unknown>;
-    // Flat base service price applied to every booking (default $100).
-    const baseServicePrice =
-      typeof v.baseServicePrice === "number" ? v.baseServicePrice : 100;
-    const perBedroom = typeof v.perBedroom === "number" ? v.perBedroom : null;
-    const perFullBath = typeof v.perFullBath === "number" ? v.perFullBath : null;
-    const perHalfBath = typeof v.perHalfBath === "number" ? v.perHalfBath : null;
-    if (perBedroom !== null && perFullBath !== null && perHalfBath !== null) {
-      return (
-        baseServicePrice +
-        bedCount * perBedroom +
-        bathCount * perFullBath +
-        halfBathCount * perHalfBath
-      );
-    }
+function resolveBasePrice(hours: number, serviceType?: string): number {
+  if (serviceType === "SILICONE_SEALING") {
+    return Math.max(1, hours) * 209;
   }
-
-  // Fall back to legacy PricingRule table rows
-  const exact = await db.pricingRule.findFirst({
-    where: { bedCount, bathCount, isActive: true },
-  });
-  if (exact) return exact.basePrice;
-
-  const closest = await db.pricingRule.findFirst({
-    where: { bedCount, isActive: true },
-    orderBy: { bathCount: "desc" },
-  });
-  if (closest) return closest.basePrice;
-
-  return 120 + bedCount * 30 + bathCount * 20;
+  if (serviceType === "WEATHERPROOFING") {
+    return 74.5;
+  }
+  if (serviceType === "PAINTING" || serviceType === "MOULDINGS") {
+    return 0;
+  }
+  return computeHourlyPrice(Math.max(2, hours));
 }
 
-// Returns the recurring discount percentage for the 2nd+ cleaning.
-// First cleaning is always full price.
+// Returns the recurring discount percentage for the 2nd+ visit.
 export function recurringDiscountPercent(
   frequency: "ONE_TIME" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY"
 ): number {
@@ -114,7 +81,6 @@ export function nextOccurrence(
 }
 
 // How many additional jobs to auto-create for recurring bookings.
-// Per spec: 4 weeks of jobs for WEEKLY (4 more), 4 visits for BIWEEKLY (3 more).
 export function recurrenceCount(
   frequency: "ONE_TIME" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY"
 ): number {

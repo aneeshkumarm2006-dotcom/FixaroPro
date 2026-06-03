@@ -4,13 +4,13 @@ import CustomerLogo from "./Logo";
 
 export const BRAND_IMAGES = {
   login:
-    "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=1400&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=1400&q=85&auto=format&fit=crop",
   setup:
-    "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1400&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1400&q=80&auto=format&fit=crop",
   rate:
-    "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1400&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1590402494682-d57ca57c0878?w=1400&q=80&auto=format&fit=crop",
   home:
-    "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1600&q=80&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1600&q=80&auto=format&fit=crop",
 } as const;
 
 interface SplitShellProps {
@@ -77,13 +77,13 @@ export default function SplitShell({
                 <Star
                   key={n}
                   size={11}
-                  fill="#facc15"
+                  fill="#cba35a"
                   stroke="none"
-                  style={{ color: "#facc15" }}
+                  style={{ color: "#cba35a" }}
                 />
               ))}
             </span>
-            <span>Loved by 2,400+ Montréal homes</span>
+            <span>Trusted by Montréal homeowners</span>
           </div>
         </aside>
 

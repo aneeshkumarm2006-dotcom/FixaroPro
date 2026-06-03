@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarClock, UserCircle, LogOut, Sparkles, Menu, X } from "lucide-react";
+import { Home, CalendarClock, UserCircle, LogOut, Menu, X } from "lucide-react";
+import Image from "next/image";
 
 interface PortalShellProps {
   user: { name: string; email: string };
@@ -54,7 +55,7 @@ export default function PortalShell({
           aria-label="Open menu">
           <Menu size={20} />
         </button>
-        <span className="cl-portal-topbar-title">cleano</span>
+        <span className="cl-portal-topbar-title">Fixaro</span>
         <span style={{ flex: 1 }} />
         <span className="cl-portal-topbar-avatar">{initials || "C"}</span>
       </header>
@@ -69,12 +70,23 @@ export default function PortalShell({
       <div className="cl-portal">
         <aside className={`cl-psidebar${open ? " cl-portal-open" : ""}`}>
           <div className="cl-psidebar-logo">
-            <span
-              className="cl-logo-mark"
-              style={{ background: "#fff", color: "var(--primary)" }}>
-              <Sparkles size={18} strokeWidth={1.8} />
-            </span>
-            <span>cleano</span>
+            <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+              <Image
+                src="/images/Fixaro-Logo.png"
+                alt="Fixaro"
+                width={36}
+                height={36}
+                style={{ objectFit: "contain" }}
+              />
+            </div>
+            <span style={{
+              fontFamily: "var(--font-dm-sans, 'DM Sans', system-ui, sans-serif)",
+              fontWeight: 600,
+              fontSize: 17,
+              letterSpacing: "-0.02em",
+              color: "#fff",
+              flex: 1,
+            }}>Fixaro</span>
             <button
               className="cl-portal-drawer-close"
               onClick={() => setOpen(false)}

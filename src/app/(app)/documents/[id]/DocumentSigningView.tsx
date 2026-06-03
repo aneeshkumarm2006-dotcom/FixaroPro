@@ -129,7 +129,7 @@ export default function DocumentSigningView({
 
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             {document.title}
           </h1>
           <Badge variant="default" size="md">
@@ -149,43 +149,43 @@ export default function DocumentSigningView({
           )}
         </div>
         {document.description && (
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-2 max-w-3xl">
+          <p className="text-sm text-[#1c1917]/70 !font-light mt-2 max-w-3xl">
             {document.description}
           </p>
         )}
         {document.dueDate && !isSigned && (
-          <p className="text-xs text-[#005F6A]/60 mt-1">
+          <p className="text-xs text-[#1c1917]/60 mt-1">
             Due {formatDate(document.dueDate)}
           </p>
         )}
       </div>
 
       <Card variant="default" className="p-6">
-        <h2 className="text-sm font-[400] text-[#005F6A] mb-4 uppercase tracking-wide">
+        <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
           Document
         </h2>
         {document.fileUrl ? (
           <div className="space-y-4">
             <iframe
               src={document.fileUrl}
-              className="w-full h-[60vh] rounded-xl border border-[#005F6A]/10 bg-white"
+              className="w-full h-[60vh] rounded-xl border border-[#1c1917]/10 bg-white"
               title={document.title}
             />
             <a
               href={document.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-[#005F6A] hover:underline">
+              className="inline-flex items-center gap-1 text-xs text-[#1c1917] hover:underline">
               Open in new tab
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         ) : document.content ? (
-          <div className="prose prose-sm max-w-none text-[#005F6A] whitespace-pre-wrap leading-relaxed bg-white p-4 rounded-xl border border-[#005F6A]/10">
+          <div className="prose prose-sm max-w-none text-[#1c1917] whitespace-pre-wrap leading-relaxed bg-white p-4 rounded-xl border border-[#1c1917]/10">
             {document.content}
           </div>
         ) : (
-          <p className="text-sm text-[#005F6A]/60">
+          <p className="text-sm text-[#1c1917]/60">
             This document has no content.
           </p>
         )}
@@ -193,12 +193,12 @@ export default function DocumentSigningView({
 
       {isSigned ? (
         <Card variant="default" className="p-6">
-          <h2 className="text-sm font-[400] text-[#005F6A] mb-4 uppercase tracking-wide">
+          <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
             Your Signature
           </h2>
           <div className="space-y-3">
             {signature.signatureUrl && (
-              <div className="border border-[#005F6A]/10 rounded-xl bg-white p-4 inline-block">
+              <div className="border border-[#1c1917]/10 rounded-xl bg-white p-4 inline-block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={signature.signatureUrl}
@@ -207,7 +207,7 @@ export default function DocumentSigningView({
                 />
               </div>
             )}
-            <p className="text-xs text-[#005F6A]/70">
+            <p className="text-xs text-[#1c1917]/70">
               Signed by {signer.name} on {formatDate(signature.signedAt)}
             </p>
           </div>
@@ -220,50 +220,50 @@ export default function DocumentSigningView({
         </Card>
       ) : (
         <Card variant="default" className="p-6">
-          <h2 className="text-sm font-[400] text-[#005F6A] mb-4 uppercase tracking-wide">
+          <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
             Sign
           </h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-[#005F6A]/70 block mb-1">
+              <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-1">
                 Name
               </label>
-              <div className="px-4 py-2.5 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A]">
+              <div className="px-4 py-2.5 rounded-xl bg-[#e85d04]/5 text-sm text-[#1c1917]">
                 {signer.name}
               </div>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wide text-[#005F6A]/70 block mb-1">
+              <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-1">
                 Date
               </label>
-              <div className="px-4 py-2.5 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A]">
+              <div className="px-4 py-2.5 rounded-xl bg-[#e85d04]/5 text-sm text-[#1c1917]">
                 {today}
               </div>
             </div>
           </div>
 
-          <label className="text-xs uppercase tracking-wide text-[#005F6A]/70 block mb-2">
+          <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-2">
             Signature
           </label>
-          <div className="border border-[#005F6A]/15 rounded-xl bg-white relative">
+          <div className="border border-[#1c1917]/15 rounded-xl bg-white relative">
             <SignatureCanvas
               ref={sigRef}
               canvasProps={{
                 className: "w-full h-48 rounded-xl",
               }}
               onEnd={() => setHasDrawn(true)}
-              penColor="#005F6A"
+              penColor="#e85d04"
             />
             <button
               type="button"
               onClick={clearSignature}
               disabled={!hasDrawn}
-              className="absolute top-2 right-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-[#005F6A]/5 text-[#005F6A] hover:bg-[#005F6A]/10 disabled:opacity-30">
+              className="absolute top-2 right-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10 disabled:opacity-30">
               <Eraser className="w-3 h-3" />
               Clear
             </button>
           </div>
-          <p className="text-xs text-[#005F6A]/60 mt-2">
+          <p className="text-xs text-[#1c1917]/60 mt-2">
             Sign with your finger, mouse, or stylus above.
           </p>
 
@@ -272,9 +272,9 @@ export default function DocumentSigningView({
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 accent-[#005F6A]"
+              className="mt-0.5 accent-[#e85d04]"
             />
-            <span className="text-sm text-[#005F6A]">
+            <span className="text-sm text-[#1c1917]">
               I have read and agree to the contents of this document. I
               understand my electronic signature is legally binding.
             </span>

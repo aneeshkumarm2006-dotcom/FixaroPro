@@ -199,7 +199,7 @@ export default function SuppliersTab({
         </Button>
       }>
       {suppliers.length === 0 ? (
-        <p className="text-sm text-[#005F6A]/60">No suppliers yet.</p>
+        <p className="text-sm text-[#1c1917]/60">No suppliers yet.</p>
       ) : (
         <div className="space-y-2">
           {suppliers.map((s) => {
@@ -207,28 +207,28 @@ export default function SuppliersTab({
             return (
               <div
                 key={s.id}
-                className="border border-[#005F6A]/10 rounded-xl overflow-hidden bg-white">
+                className="border border-[#1c1917]/10 rounded-xl overflow-hidden bg-white">
                 <div className="flex items-center justify-between p-3">
                   <button
                     type="button"
                     onClick={() => setExpanded(isOpen ? null : s.id)}
                     className="flex items-center gap-2 flex-1 text-left">
                     {isOpen ? (
-                      <ChevronDown className="w-4 h-4 text-[#005F6A]/60" />
+                      <ChevronDown className="w-4 h-4 text-[#1c1917]/60" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-[#005F6A]/60" />
+                      <ChevronRight className="w-4 h-4 text-[#1c1917]/60" />
                     )}
                     <div>
-                      <div className="text-sm font-[400] text-[#005F6A]">
+                      <div className="text-sm font-[400] text-[#1c1917]">
                         {s.name}
                         {!s.isActive && (
-                          <span className="ml-2 text-xs text-[#005F6A]/40">
+                          <span className="ml-2 text-xs text-[#1c1917]/40">
                             (inactive)
                           </span>
                         )}
                       </div>
                       {(s.contact || s.email || s.phone) && (
-                        <div className="text-xs text-[#005F6A]/60">
+                        <div className="text-xs text-[#1c1917]/60">
                           {[s.contact, s.email, s.phone]
                             .filter(Boolean)
                             .join(" · ")}
@@ -254,25 +254,25 @@ export default function SuppliersTab({
                 </div>
 
                 {isOpen && (
-                  <div className="border-t border-[#005F6A]/10 p-4 bg-[#005F6A]/3">
+                  <div className="border-t border-[#1c1917]/10 p-4 bg-[#e85d04]/3">
                     {products.length === 0 ? (
-                      <p className="text-xs text-[#005F6A]/60">
+                      <p className="text-xs text-[#1c1917]/60">
                         No products to price.
                       </p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left">
-                            <th className="py-2 pr-2 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                            <th className="py-2 pr-2 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                               Product
                             </th>
-                            <th className="py-2 pr-2 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                            <th className="py-2 pr-2 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                               Price ($)
                             </th>
-                            <th className="py-2 pr-2 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide">
+                            <th className="py-2 pr-2 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide">
                               Unit
                             </th>
-                            <th className="py-2 text-xs font-[350] text-[#005F6A]/70 uppercase tracking-wide text-right">
+                            <th className="py-2 text-xs font-[350] text-[#1c1917]/70 uppercase tracking-wide text-right">
                               Actions
                             </th>
                           </tr>
@@ -289,8 +289,8 @@ export default function SuppliersTab({
                             return (
                               <tr
                                 key={p.id}
-                                className="border-t border-[#005F6A]/10">
-                                <td className="py-2 pr-2 text-sm text-[#005F6A]">
+                                className="border-t border-[#1c1917]/10">
+                                <td className="py-2 pr-2 text-sm text-[#1c1917]">
                                   {p.name}
                                 </td>
                                 <td className="py-2 pr-2">
@@ -430,14 +430,14 @@ export default function SuppliersTab({
               }
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-[#005F6A] select-none">
+          <label className="flex items-center gap-2 text-sm text-[#1c1917] select-none">
             <input
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) =>
                 setDraft((prev) => ({ ...prev, isActive: e.target.checked }))
               }
-              className="accent-[#005F6A]"
+              className="accent-[#e85d04]"
             />
             Active
           </label>

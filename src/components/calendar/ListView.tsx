@@ -117,11 +117,11 @@ export const ListView: React.FC<ListViewProps> = ({ view }) => {
               </Badge>
             )}
           </div>
-          <div className="app-subtitle !text-[#005F6A]/70">
+          <div className="app-subtitle !text-[#1c1917]/70">
             {formatTimeRange(event, timeFormatter)}
           </div>
           {event.description && (
-            <div className="text-xs text-[#005F6A]/70 line-clamp-2">
+            <div className="text-xs text-[#1c1917]/70 line-clamp-2">
               {event.description}
             </div>
           )}
@@ -140,14 +140,14 @@ export const ListView: React.FC<ListViewProps> = ({ view }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="app-title">{format(day, "EEEE, d MMMM yyyy")}</p>
-              <p className="app-subtitle !text-[#005F6A]/60">
+              <p className="app-subtitle !text-[#1c1917]/60">
                 {dayEvents.length} event{dayEvents.length === 1 ? "" : "s"}
               </p>
             </div>
           </div>
 
           {dayEvents.length === 0 ? (
-            <div className="text-sm text-[#005F6A]/50">No events</div>
+            <div className="text-sm text-[#1c1917]/50">No events</div>
           ) : (
             <div className="space-y-2">
               {dayEvents.map((event) => renderEvent(event))}

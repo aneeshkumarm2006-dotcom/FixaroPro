@@ -77,9 +77,9 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
           marginBottom: 20,
           paddingBottom: 10,
           borderBottomWidth: 1,
-          borderBottomColor: "#005F6A",
+          borderBottomColor: "#e85d04",
         },
-        title: { fontSize: 18, color: "#005F6A" },
+        title: { fontSize: 18, color: "#e85d04" },
         meta: { fontSize: 9, color: "#666" },
         section: { marginBottom: 14 },
         sectionTitle: {
@@ -97,7 +97,7 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
           borderRadius: 6,
         },
         kpiLabel: { fontSize: 8, color: "#666", marginBottom: 3 },
-        kpiValue: { fontSize: 14, color: "#005F6A" },
+        kpiValue: { fontSize: 14, color: "#e85d04" },
         tableHeader: {
           flexDirection: "row",
           paddingVertical: 6,
@@ -121,7 +121,7 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
           flexDirection: "row",
           paddingVertical: 8,
           borderTopWidth: 1,
-          borderTopColor: "#005F6A",
+          borderTopColor: "#e85d04",
           marginTop: 8,
           fontSize: 12,
         },
@@ -147,7 +147,7 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
                 </Text>
               </View>
               <View>
-                <Text style={{ fontSize: 14, color: "#005F6A" }}>Cleano</Text>
+                <Text style={{ fontSize: 14, color: "#e85d04" }}>Fixaro</Text>
                 <Text style={styles.meta}>Annual Income Statement</Text>
               </View>
             </View>
@@ -246,7 +246,7 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
   if (loading) {
     return (
       <SectionCard title="My Income" icon={DollarSign}>
-        <p className="text-sm text-[#005F6A]/60">Loading income...</p>
+        <p className="text-sm text-[#1c1917]/60">Loading income...</p>
       </SectionCard>
     );
   }
@@ -277,7 +277,7 @@ export default function IncomeSection({ employeeId }: IncomeSectionProps) {
           <div className="cl-income-mini"><div className="label">Gross YTD</div><div className="val">{formatCurrency(data.grossYTD)}</div></div>
           <div className="cl-income-mini"><div className="label">Net income</div><div className="val">{formatCurrency(data.netYTD)}</div></div>
           <div className="cl-income-mini"><div className="label">Est. taxes ({(data.estimatedTaxRate * 100).toFixed(1)}%)</div><div className="val amber">{formatCurrency(data.estimatedTaxes)}</div></div>
-          <div className="cl-income-mini"><div className="label">Cleano deductions</div><div className="val red">{formatCurrency(data.deductionsYTD)}</div></div>
+          <div className="cl-income-mini"><div className="label">Fixaro deductions</div><div className="val red">{formatCurrency(data.deductionsYTD)}</div></div>
           <div className="cl-income-mini"><div className="label">Adjustments</div><div className="val blue">{formatCurrency(data.adjustmentsYTD)}</div></div>
           <div className="cl-income-mini"><div className="label">Reimbursements</div><div className="val">{formatCurrency(data.reimbursementsYTD)}</div></div>
           <div className="cl-income-mini"><div className="label">Hours worked</div><div className="val">{data.totalHoursYTD.toFixed(1)}h</div></div>
@@ -320,10 +320,10 @@ function Stat({
         ? "text-amber-700"
         : tone === "blue"
           ? "text-blue-600"
-          : "text-[#005F6A]";
+          : "text-[#1c1917]";
   return (
-    <div className="rounded-2xl bg-[#005F6A]/5 p-4">
-      <p className="text-[10px] uppercase tracking-wider text-[#005F6A]/50 mb-1">
+    <div className="rounded-2xl bg-[#e85d04]/5 p-4">
+      <p className="text-[10px] uppercase tracking-wider text-[#1c1917]/50 mb-1">
         {label}
       </p>
       <p

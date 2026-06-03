@@ -14,7 +14,7 @@ const SERVICE_TYPES = [
 
 const inputStyle: React.CSSProperties = {
   width: "100%", height: 48, borderRadius: 12,
-  border: "1px solid rgba(0,95,106,0.16)", background: "#fff",
+  border: "1px solid rgba(232,93,4,0.16)", background: "#fff",
   padding: "0 16px", fontSize: 14, color: "#1a1a1a",
   fontFamily: "inherit", outline: "none",
   transition: "border-color .15s, box-shadow .15s",
@@ -33,7 +33,7 @@ const textareaStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const,
-  letterSpacing: "0.09em", color: "rgba(0,95,106,0.65)", marginBottom: 6,
+  letterSpacing: "0.09em", color: "rgba(232,93,4,0.65)", marginBottom: 6,
 };
 
 export default function JoinWaitlistPage() {
@@ -86,18 +86,18 @@ export default function JoinWaitlistPage() {
           }}>
             {successData.name ? `You're on the list, ${successData.name.split(" ")[0]}!` : "You're on the list!"}
           </h1>
-          <p style={{ fontSize: 15, color: "rgba(0,95,106,0.65)", lineHeight: 1.6, margin: "0 0 8px" }}>
-            We&rsquo;ll reach out to <strong style={{ color: "#005F6A" }}>{successData.email}</strong> as soon as a slot opens up
+          <p style={{ fontSize: 15, color: "rgba(232,93,4,0.65)", lineHeight: 1.6, margin: "0 0 8px" }}>
+            We&rsquo;ll reach out to <strong style={{ color: "#e85d04" }}>{successData.email}</strong> as soon as a slot opens up
             {successData.date ? ` on or near ${new Date(successData.date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })}` : ""}.
           </p>
-          <p style={{ fontSize: 13, color: "rgba(0,95,106,0.45)", lineHeight: 1.5, margin: 0 }}>
+          <p style={{ fontSize: 13, color: "rgba(232,93,4,0.45)", lineHeight: 1.5, margin: 0 }}>
             We typically confirm within 24 hours.
           </p>
 
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32, flexWrap: "wrap" }}>
             <a href="/" style={{
               display: "inline-flex", alignItems: "center", height: 44, padding: "0 24px",
-              borderRadius: 12, background: "#005F6A", color: "#fff",
+              borderRadius: 12, background: "#e85d04", color: "#fff",
               fontSize: 14, fontWeight: 600, textDecoration: "none",
               fontFamily: "inherit",
             }}>
@@ -105,8 +105,8 @@ export default function JoinWaitlistPage() {
             </a>
             <a href="/book" style={{
               display: "inline-flex", alignItems: "center", height: 44, padding: "0 24px",
-              borderRadius: 12, background: "#fff", color: "#005F6A",
-              border: "1.5px solid rgba(0,95,106,0.2)",
+              borderRadius: 12, background: "#fff", color: "#e85d04",
+              border: "1.5px solid rgba(232,93,4,0.2)",
               fontSize: 14, fontWeight: 600, textDecoration: "none",
               fontFamily: "inherit",
             }}>
@@ -125,11 +125,11 @@ export default function JoinWaitlistPage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "20px 32px", maxWidth: 760, margin: "0 auto",
       }}>
-        <a href="/" style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 400, color: "#005F6A", textDecoration: "none", letterSpacing: "-0.01em" }}>
-          Cleano
+        <a href="/" style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 400, color: "#e85d04", textDecoration: "none", letterSpacing: "-0.01em" }}>
+Fixaro
         </a>
-        <a href="/book" style={{ fontSize: 13, color: "#005F6A", textDecoration: "none", fontWeight: 600, opacity: 0.7 }}>
-          Book a cleaning →
+        <a href="/book" style={{ fontSize: 13, color: "#e85d04", textDecoration: "none", fontWeight: 600, opacity: 0.7 }}>
+          Book a service →
         </a>
       </header>
 
@@ -138,7 +138,7 @@ export default function JoinWaitlistPage() {
         <div style={{ padding: "32px 0 36px", textAlign: "center" }}>
           <p style={{
             fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em",
-            color: "rgba(0,95,106,0.55)", margin: "0 0 14px",
+            color: "rgba(232,93,4,0.55)", margin: "0 0 14px",
           }}>
             Waitlist
           </p>
@@ -148,9 +148,9 @@ export default function JoinWaitlistPage() {
             letterSpacing: "-0.025em", margin: "0 0 14px",
           }}>
             Booked up? Join the{" "}
-            <em style={{ fontStyle: "italic", color: "#005F6A" }}>waitlist.</em>
+            <em style={{ fontStyle: "italic", color: "#e85d04" }}>waitlist.</em>
           </h1>
-          <p style={{ fontSize: 15, color: "rgba(0,95,106,0.6)", lineHeight: 1.6, margin: 0 }}>
+          <p style={{ fontSize: 15, color: "rgba(232,93,4,0.6)", lineHeight: 1.6, margin: 0 }}>
             Leave your details and we&rsquo;ll reach out the moment a slot opens up on your preferred date.
           </p>
         </div>
@@ -158,7 +158,7 @@ export default function JoinWaitlistPage() {
         {/* Form card */}
         <div style={{
           background: "#fff", borderRadius: 20,
-          boxShadow: "0 2px 24px rgba(0,95,106,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: "0 2px 24px rgba(232,93,4,0.08), 0 1px 4px rgba(0,0,0,0.04)",
           padding: "32px",
         }}>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -257,16 +257,16 @@ export default function JoinWaitlistPage() {
               disabled={isPending}
               style={{
                 width: "100%", height: 52, borderRadius: 14,
-                background: isPending ? "rgba(0,95,106,0.5)" : "#005F6A",
+                background: isPending ? "rgba(232,93,4,0.5)" : "#e85d04",
                 color: "#fff", fontSize: 15, fontWeight: 600,
                 fontFamily: "inherit", border: 0, cursor: isPending ? "not-allowed" : "pointer",
                 transition: "background .15s",
-                boxShadow: "0 4px 16px rgba(0,95,106,0.25)",
+                boxShadow: "0 4px 16px rgba(232,93,4,0.25)",
               }}>
               {isPending ? "Submitting…" : "Join the Waitlist"}
             </button>
 
-            <p style={{ textAlign: "center", fontSize: 12, color: "rgba(0,95,106,0.4)", margin: 0 }}>
+            <p style={{ textAlign: "center", fontSize: 12, color: "rgba(232,93,4,0.4)", margin: 0 }}>
               We&rsquo;ll never share your information. No spam, ever.
             </p>
           </form>

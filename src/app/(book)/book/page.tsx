@@ -106,10 +106,10 @@ export default function BookPage() {
         postalCode: draft.postalCode,
         dropOffStep: step,
         serviceType: draft.serviceType,
-        bedCount: draft.bedCount,
-        bathCount: draft.bathCount,
-        halfBathCount: draft.halfBathCount,
-        squareFootage: draft.squareFootage,
+        bedCount: draft.hours,
+        bathCount: 0,
+        halfBathCount: 0,
+        squareFootage: 0,
         preferredDate: draft.date || null,
         isFlexible: draft.isFlexible,
         preferredSlot: draft.timeSlot,
@@ -131,12 +131,12 @@ export default function BookPage() {
   // Live quote refresh on Property/Review steps
   useEffect(() => {
     if (step < 1) return;
-    getQuote({ bedCount: draft.bedCount, bathCount: draft.bathCount })
+    getQuote({ hours: draft.hours, serviceType: draft.serviceType })
       .then((r) => {
         if (r.success && r.basePrice) setBasePrice(r.basePrice);
       })
       .catch(() => {});
-  }, [step, draft.bedCount, draft.bathCount]);
+  }, [step, draft.hours, draft.serviceType]);
 
   function patch(p: Partial<BookingDraft>) {
     setDraft((d) => ({ ...d, ...p }));
@@ -147,7 +147,7 @@ export default function BookPage() {
       case 0:
         return draft.postalCovered === true;
       case 1:
-        return !!(draft.address.trim() && draft.serviceType && draft.frequency);
+        return !!(draft.address.trim() && draft.serviceType && draft.frequency && draft.hours > 0);
       case 2:
         return !!(draft.date && (draft.isFlexible || draft.timeSlot));
       case 3:
@@ -206,10 +206,7 @@ export default function BookPage() {
     const res = await submitBooking({
       postalCode: draft.postalCode,
       address: draft.address,
-      bedCount: draft.bedCount,
-      bathCount: draft.bathCount,
-      halfBathCount: draft.halfBathCount,
-      squareFootage: draft.squareFootage,
+      hours: draft.hours,
       serviceType: draft.serviceType,
       frequency: draft.frequency,
       addOns: draft.addOns
@@ -304,7 +301,7 @@ export default function BookPage() {
               <p
                 className="cl-subtitle"
                 style={{ maxWidth: 520, margin: "0 auto", fontSize: 16 }}>
-                Your cleaning is scheduled for{" "}
+                Your appointment is scheduled for{" "}
                 <strong style={{ color: "var(--ink)" }}>
                   {new Date(draft.date).toLocaleDateString("en-US", {
                     weekday: "long",
@@ -333,7 +330,7 @@ export default function BookPage() {
                     }}>
                     ${confirmedTotal.toFixed(2)} CAD
                   </strong>{" "}
-                  — $20 deposit charged, remaining balance after cleaning.
+                  — $20 deposit charged, remaining balance after the visit.
                 </p>
               ) : null}
 
@@ -417,7 +414,7 @@ export default function BookPage() {
                 fontSize: 18,
                 letterSpacing: "-0.01em",
               }}>
-              cleano
+              fixaro
             </span>
           </div>
 
@@ -431,7 +428,7 @@ export default function BookPage() {
                 fontWeight: 600,
                 margin: 0,
               }}>
-              Book a cleaning
+              Book a service
             </p>
             <h1
               style={{
@@ -527,7 +524,7 @@ export default function BookPage() {
               lineHeight: 1.55,
               marginTop: "auto",
             }}>
-            A $20 deposit is charged at booking. The remaining balance is due after your cleaning.
+            A $20 deposit is charged at booking. The remaining balance is due after your visit.
           </p>
         </aside>
 
@@ -584,7 +581,7 @@ export default function BookPage() {
                       lineHeight: 1.55,
                       color: "var(--ink-soft)",
                     }}>
-                    I agree to Cleano's <a className="cl-link">terms of service</a> and
+                    I agree to Fixaro's <a className="cl-link">terms of service</a> and
                     understand that prices may adjust after on-site assessment.
                   </span>
                 </label>

@@ -126,7 +126,7 @@ export async function uploadJobPhoto(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const folder = `cleano/jobs/${jobId}`;
+    const folder = `fixaro/jobs/${jobId}`;
     const publicId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const result = await streamUpload(buffer, folder, publicId);

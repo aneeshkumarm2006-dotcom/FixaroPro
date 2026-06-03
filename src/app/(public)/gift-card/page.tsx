@@ -2,9 +2,9 @@ import GiftCardPurchaseClient from "./GiftCardPurchaseClient";
 import { GIFT_CARD_COVERS, GIFT_CARD_TIERS, MIN_JOB_PRICE_USD } from "@/lib/gift-cards/covers";
 
 export const metadata = {
-  title: "Buy a Gift Card · Cleano",
+  title: "Buy a Gift Card · Fixaro",
   description:
-    "Send a Cleano cleaning service gift card to someone you appreciate.",
+    "Send a Fixaro home services gift card to someone you appreciate.",
 };
 
 export default function GiftCardPurchasePage() {
@@ -22,10 +22,10 @@ export default function GiftCardPurchasePage() {
               fontSize: 12,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: "#005F6A",
+              color: "#e85d04",
               fontWeight: 700,
             }}>
-            Cleano gift cards
+            Fixaro gift cards
           </div>
           <h1
             style={{
@@ -44,8 +44,8 @@ export default function GiftCardPurchasePage() {
               color: "#3a5a62",
               lineHeight: 1.5,
             }}>
-            A Cleano gift card adds credit to the recipient's account and
-            auto-applies the next time they book a cleaning. Our minimum
+            A Fixaro gift card adds credit to the recipient's account and
+            auto-applies the next time they book a service. Our minimum
             job price is <strong>${MIN_JOB_PRICE_USD}</strong>, so pick a
             value that comfortably covers a service for them.
           </p>

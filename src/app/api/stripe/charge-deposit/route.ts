@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       customer: customerId,
       setup_future_usage: "off_session",
       automatic_payment_methods: { enabled: true },
-      description: "Cleano booking deposit",
+      description: "Fixaro booking deposit",
       metadata: { type: "deposit" },
     });
 

@@ -23,7 +23,7 @@ interface ExportButtonProps {
   };
 }
 
-const BRAND = "#005F6A";
+const BRAND = "#e85d04";
 
 function formatMoney(v: number | string) {
   if (v === "" || v === null || v === undefined) return "-";
@@ -40,7 +40,7 @@ async function buildJobsPdf(
     "@react-pdf/renderer"
   );
 
-  const tint = (alpha: number) => `rgba(0, 95, 106, ${alpha})`;
+  const tint = (alpha: number) => `rgba(232, 93, 4, ${alpha})`;
 
   const styles = StyleSheet.create({
     page: {
@@ -182,13 +182,13 @@ async function buildJobsPdf(
       <Page size="A4" orientation="landscape" style={styles.page}>
         <View style={styles.header} fixed>
           <View>
-            <Text style={styles.title}>Cleaning Jobs</Text>
+            <Text style={styles.title}>Service Jobs</Text>
             <Text style={styles.subtitle}>
-              Manage your cleaning jobs and track your revenue
+              Manage your service jobs and track your revenue
             </Text>
           </View>
           <View>
-            <Text style={styles.brand}>Cleano</Text>
+            <Text style={styles.brand}>Fixaro</Text>
             <Text style={styles.metaLine}>Generated {generatedAt}</Text>
           </View>
         </View>
@@ -292,7 +292,7 @@ async function buildJobsPdf(
         )}
 
         <View style={styles.footer} fixed>
-          <Text>Cleano — Jobs Export</Text>
+          <Text>Fixaro — Jobs Export</Text>
           <Text
             render={({ pageNumber, totalPages }) =>
               `Page ${pageNumber} of ${totalPages}`
@@ -368,7 +368,7 @@ export default function ExportButton({ filters }: ExportButtonProps) {
   };
 
   const dateInputClass =
-    "h-[42px] w-full px-3 rounded-xl bg-[#005F6A]/5 text-sm text-[#005F6A] border-0 focus:outline-none focus:ring-1 focus:ring-[#005F6A]/20";
+    "h-[42px] w-full px-3 rounded-xl bg-[#e85d04]/5 text-sm text-[#1c1917] border-0 focus:outline-none focus:ring-1 focus:ring-[#e85d04]/20";
 
   return (
     <>
@@ -411,7 +411,7 @@ export default function ExportButton({ filters }: ExportButtonProps) {
         subheader="Choose a date range. Leave empty to export all jobs.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
           <div className="flex flex-col">
-            <label className="text-[11px] uppercase tracking-wider text-[#005F6A]/50 font-[400] mb-1.5">
+            <label className="text-[11px] uppercase tracking-wider text-[#1c1917]/50 font-[400] mb-1.5">
               Start Date
             </label>
             <DatePicker
@@ -422,7 +422,7 @@ export default function ExportButton({ filters }: ExportButtonProps) {
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[11px] uppercase tracking-wider text-[#005F6A]/50 font-[400] mb-1.5">
+            <label className="text-[11px] uppercase tracking-wider text-[#1c1917]/50 font-[400] mb-1.5">
               End Date
             </label>
             <DatePicker

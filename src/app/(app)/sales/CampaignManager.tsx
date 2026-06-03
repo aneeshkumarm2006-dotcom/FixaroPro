@@ -124,10 +124,10 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-[400] text-[#005F6A]">
+          <h3 className="text-sm font-[400] text-[#1c1917]">
             Marketing Campaigns
           </h3>
-          <p className="text-xs text-[#005F6A]/50 mt-0.5">
+          <p className="text-xs text-[#1c1917]/50 mt-0.5">
             Track campaign budgets, channels, and performance
           </p>
         </div>
@@ -155,9 +155,9 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
 
       {campaigns.length === 0 ? (
         <Card variant="default" className="p-8 text-center">
-          <Megaphone className="w-8 h-8 text-[#005F6A]/30 mx-auto mb-2" />
-          <p className="text-sm text-[#005F6A]/60">No campaigns yet</p>
-          <p className="text-xs text-[#005F6A]/40 mt-1">
+          <Megaphone className="w-8 h-8 text-[#1c1917]/30 mx-auto mb-2" />
+          <p className="text-sm text-[#1c1917]/60">No campaigns yet</p>
+          <p className="text-xs text-[#1c1917]/40 mt-1">
             Create your first marketing campaign to start tracking performance
           </p>
         </Card>
@@ -173,8 +173,8 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                 {confirmDeleteId === campaign.id ? (
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm font-[400] text-[#005F6A]">Delete &ldquo;{campaign.name}&rdquo;?</p>
-                      <p className="text-xs text-[#005F6A]/50 mt-0.5">This cannot be undone.</p>
+                      <p className="text-sm font-[400] text-[#1c1917]">Delete &ldquo;{campaign.name}&rdquo;?</p>
+                      <p className="text-xs text-[#1c1917]/50 mt-0.5">This cannot be undone.</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
@@ -198,7 +198,7 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-[400] text-[#005F6A] truncate">
+                        <h4 className="text-sm font-[400] text-[#1c1917] truncate">
                           {campaign.name}
                         </h4>
                         <Badge
@@ -208,31 +208,31 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                         </Badge>
                       </div>
                       {campaign.description && (
-                        <p className="text-xs text-[#005F6A]/50 mt-1 line-clamp-1">
+                        <p className="text-xs text-[#1c1917]/50 mt-1 line-clamp-1">
                           {campaign.description}
                         </p>
                       )}
                       <div className="flex items-center gap-4 mt-2 flex-wrap">
                         {campaign.channel && (
-                          <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                          <span className="text-xs text-[#1c1917]/60 flex items-center gap-1">
                             <Megaphone className="w-3 h-3" />
                             {campaign.channel}
                           </span>
                         )}
-                        <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                        <span className="text-xs text-[#1c1917]/60 flex items-center gap-1">
                           <DollarSign className="w-3 h-3" />$
                           {campaign.spent.toFixed(0)} / $
                           {campaign.budget.toFixed(0)}
                         </span>
                         {campaign.startDate && (
-                          <span className="text-xs text-[#005F6A]/60 flex items-center gap-1">
+                          <span className="text-xs text-[#1c1917]/60 flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             {new Date(campaign.startDate).toLocaleDateString("en-US")}
                             {campaign.endDate &&
                               ` - ${new Date(campaign.endDate).toLocaleDateString("en-US")}`}
                           </span>
                         )}
-                        <span className="text-xs text-[#005F6A]/40">
+                        <span className="text-xs text-[#1c1917]/40">
                           {campaign.landingPageCount} landing page
                           {campaign.landingPageCount !== 1 ? "s" : ""}
                         </span>
@@ -246,7 +246,7 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
                                   ? "bg-red-400"
                                   : budgetUsed > 80
                                     ? "bg-yellow-400"
-                                    : "bg-[#005F6A]"
+                                    : "bg-[#e85d04]"
                               }`}
                               style={{
                                 width: `${Math.min(budgetUsed, 100)}%`,

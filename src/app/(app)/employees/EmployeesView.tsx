@@ -156,13 +156,13 @@ export default function EmployeesView({
       <div className="h-full flex flex-col justify-between">
         <span
           className={`app-title-small ${
-            variant === "warning" ? "text-yellow-700" : "!text-[#005F6A]/70"
+            variant === "warning" ? "text-yellow-700" : "!text-[#1c1917]/70"
           }`}>
           {label}
         </span>
         <p
           className={`h2-title ${
-            variant === "warning" ? "text-yellow-700" : "text-[#005F6A]"
+            variant === "warning" ? "text-yellow-700" : "text-[#1c1917]"
           }`}>
           {value}
         </p>
@@ -175,10 +175,10 @@ export default function EmployeesView({
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             Employees
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+          <p className="text-sm text-[#1c1917]/70 !font-light mt-1">
             Manage your team members and their assignments
           </p>
         </div>
@@ -212,7 +212,7 @@ export default function EmployeesView({
         {/* Search */}
         <div className="flex-1">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#005F6A]/60 z-[10] w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#1c1917]/60 z-[10] w-4 h-4" />
             <Input
               placeholder="Search by name, email, or phone..."
               value={searchTerm}
@@ -222,7 +222,7 @@ export default function EmployeesView({
                 onPageChange(1);
                 updateURLParams({ search: e.target.value, page: 1 });
               }}
-              className="pl-10 h-[42px] py-3 placeholder:!text-[#005F6A]/40 placeholder:!font-[350]"
+              className="pl-10 h-[42px] py-3 placeholder:!text-[#1c1917]/40 placeholder:!font-[350]"
               variant="form"
               border={false}
             />
@@ -375,8 +375,8 @@ export default function EmployeesView({
       {isLoading ? (
         <div className="bg-white rounded-2xl">
           <div className="text-center py-12">
-            <Loader className="w-4 h-4 animate-spin text-[#005F6A] mx-auto mb-2" />
-            <span className="text-sm text-[#005F6A]/70">
+            <Loader className="w-4 h-4 animate-spin text-[#1c1917] mx-auto mb-2" />
+            <span className="text-sm text-[#1c1917]/70">
               Loading employees...
             </span>
           </div>
@@ -386,13 +386,13 @@ export default function EmployeesView({
           {totalEmployees === 0 ? (
             <div className="bg-white rounded-2xl">
               <div className="text-center py-12">
-                <div className="w-16 h-16 bg-[#005F6A]/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-8 h-8 text-[#005F6A]/40" />
+                <div className="w-16 h-16 bg-[#e85d04]/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-8 h-8 text-[#1c1917]/40" />
                 </div>
-                <p className="text-sm font-[350] text-[#005F6A]/70">
+                <p className="text-sm font-[350] text-[#1c1917]/70">
                   No employees found
                 </p>
-                <p className="text-xs font-[350] text-[#005F6A]/60 mt-1">
+                <p className="text-xs font-[350] text-[#1c1917]/60 mt-1">
                   Add employees to get started
                 </p>
               </div>
@@ -403,7 +403,7 @@ export default function EmployeesView({
               <div className="hidden lg:block overflow-x-auto rounded-t-2xl">
                 <div className="min-w-max">
                   {/* Header */}
-                  <div className="flex bg-[#005F6A]/5 rounded-t-2xl">
+                  <div className="flex bg-[#e85d04]/5 rounded-t-2xl">
                     {[
                       { label: "Name", className: "w-[200px] text-left" },
                       { label: "Email", className: "w-[220px] text-left" },
@@ -419,18 +419,18 @@ export default function EmployeesView({
                     ].map((col) => (
                       <div
                         key={col.label}
-                        className={`p-4 text-xs font-[350] !text-[#005F6A]/40 uppercase !tracking-wider ${col.className}`}>
+                        className={`p-4 text-xs font-[350] !text-[#1c1917]/40 uppercase !tracking-wider ${col.className}`}>
                         {col.label}
                       </div>
                     ))}
                   </div>
 
                   {/* Rows */}
-                  <div className="divide-y divide-[#005F6A]/4">
+                  <div className="divide-y divide-[#e85d04]/4">
                     {paginatedEmployees.map((employee) => (
                       <div
                         key={employee.id}
-                        className="flex items-center hover:bg-[#005F6A]/1 transition-colors">
+                        className="flex items-center hover:bg-[#e85d04]/1 transition-colors">
                         {/* Name */}
                         <div className="w-[200px] p-4">
                           <p className="app-title-small truncate">
@@ -440,14 +440,14 @@ export default function EmployeesView({
 
                         {/* Email */}
                         <div className="w-[220px] p-4">
-                          <p className="app-title-small !text-[#005F6A]/50 truncate">
+                          <p className="app-title-small !text-[#1c1917]/50 truncate">
                             {employee.email}
                           </p>
                         </div>
 
                         {/* Phone */}
                         <div className="w-[140px] p-4">
-                          <p className="app-title-small !text-[#005F6A]/50 truncate">
+                          <p className="app-title-small !text-[#1c1917]/50 truncate">
                             {employee.phone || "-"}
                           </p>
                         </div>
@@ -459,7 +459,7 @@ export default function EmployeesView({
 
                         {/* Completed Jobs */}
                         <div className="w-[100px] p-4 text-center">
-                          <p className="app-title-small !text-[#005F6A]/70">
+                          <p className="app-title-small !text-[#1c1917]/70">
                             {employee.completedJobsCount}
                           </p>
                         </div>
@@ -474,7 +474,7 @@ export default function EmployeesView({
                               {employee.activeJobsCount}
                             </Badge>
                           ) : (
-                            <span className="app-title-small !text-[#005F6A]/40">
+                            <span className="app-title-small !text-[#1c1917]/40">
                               -
                             </span>
                           )}
@@ -482,7 +482,7 @@ export default function EmployeesView({
 
                         {/* Revenue */}
                         <div className="w-[120px] p-4 text-right">
-                          <p className="app-title-small text-[#005F6A]">
+                          <p className="app-title-small text-[#1c1917]">
                             ${employee.totalRevenue.toFixed(2)}
                           </p>
                         </div>
@@ -524,10 +524,10 @@ export default function EmployeesView({
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             {employee.name}
                           </p>
-                          <p className="text-xs text-[#005F6A]/60 mt-0.5">
+                          <p className="text-xs text-[#1c1917]/60 mt-0.5">
                             {employee.email}
                           </p>
                         </div>
@@ -535,21 +535,21 @@ export default function EmployeesView({
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-[#005F6A]/5 rounded-xl p-2">
-                          <p className="text-xs text-[#005F6A]/60">Completed</p>
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                        <div className="bg-[#e85d04]/5 rounded-xl p-2">
+                          <p className="text-xs text-[#1c1917]/60">Completed</p>
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             {employee.completedJobsCount}
                           </p>
                         </div>
-                        <div className="bg-[#005F6A]/5 rounded-xl p-2">
-                          <p className="text-xs text-[#005F6A]/60">Active</p>
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                        <div className="bg-[#e85d04]/5 rounded-xl p-2">
+                          <p className="text-xs text-[#1c1917]/60">Active</p>
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             {employee.activeJobsCount}
                           </p>
                         </div>
-                        <div className="bg-[#005F6A]/5 rounded-xl p-2">
-                          <p className="text-xs text-[#005F6A]/60">Revenue</p>
-                          <p className="text-sm font-[400] text-[#005F6A]">
+                        <div className="bg-[#e85d04]/5 rounded-xl p-2">
+                          <p className="text-xs text-[#1c1917]/60">Revenue</p>
+                          <p className="text-sm font-[400] text-[#1c1917]">
                             ${employee.totalRevenue.toFixed(0)}
                           </p>
                         </div>
@@ -590,8 +590,8 @@ export default function EmployeesView({
 
               {/* Pagination */}
               {totalEmployees > 0 && (
-                <div className="flex items-center justify-between p-2 px-3 bg-[#005F6A]/4 rounded-b-2xl">
-                  <div className="text-xs text-[#005F6A]/70 font-[350]">
+                <div className="flex items-center justify-between p-2 px-3 bg-[#e85d04]/4 rounded-b-2xl">
+                  <div className="text-xs text-[#1c1917]/70 font-[350]">
                     Showing {startIndex + 1} to{" "}
                     {Math.min(endIndex, totalEmployees)} of {totalEmployees}{" "}
                     employees
@@ -639,7 +639,7 @@ export default function EmployeesView({
                               size="md"
                               onClick={() => goToPage(pageNum)}
                               className="px-3 min-w-8 rounded-xl">
-                              <span className="text-sm font-[350] text-[#005F6A]">
+                              <span className="text-sm font-[350] text-[#1c1917]">
                                 {pageNum}
                               </span>
                             </Button>

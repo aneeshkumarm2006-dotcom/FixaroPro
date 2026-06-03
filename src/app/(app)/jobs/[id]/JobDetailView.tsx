@@ -8,6 +8,8 @@ import { saveJob } from "../../actions/saveJob";
 import { deleteJob as deleteJobAction } from "../../actions/deleteJob";
 import { togglePaymentReceived } from "../../actions/toggleJobPaymentStatus";
 import { chargeJob } from "../../actions/chargeJob";
+import { sendAddCardLink } from "../../actions/sendAddCardLink";
+import { resendReceipt } from "../../actions/resendReceipt";
 import { generateInvoiceFromJob } from "../../actions/generateInvoiceFromJob";
 import { markJobComplete } from "../../actions/markJobComplete";
 import { createRatingToken } from "../../actions/createRatingToken";
@@ -72,7 +74,14 @@ interface Job {
   rescheduleRequestedAt?: string | null;
 }
 
-interface ClientLite { id: string; name: string; }
+interface ClientLite {
+  id: string;
+  name: string;
+  email?: string | null;
+  address?: string | null;
+  discountPercent?: number | null;
+  defaultPaymentMethodId?: string | null;
+}
 
 interface ProductUsage {
   id: string;
@@ -673,7 +682,7 @@ export default function JobDetailView({
           </div>
 
           {job.depositPaid && (
-            <div className="pay-toggle" style={{ background: 'rgba(0,95,106,0.06)', borderRadius: 10, marginBottom: 4 }}>
+            <div className="pay-toggle" style={{ background: 'rgba(232,93,4,0.06)', borderRadius: 10, marginBottom: 4 }}>
               <div className="pay-toggle-info">
                 <div className="icon-bubble" style={{ background: 'rgba(22,163,74,0.12)' }}>
                   <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
@@ -740,6 +749,13 @@ export default function JobDetailView({
 
           {!paymentReceived && isAdmin && !job.isCashJob && (
             <ChargeButton jobId={job.id} amount={grossRevenue} />
+          )}
+
+          {isAdmin && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+              <SendAddCardLinkButton jobId={job.id} />
+              {paymentReceived && <ResendReceiptButton jobId={job.id} />}
+            </div>
           )}
         </div>
       </div>
@@ -1605,16 +1621,16 @@ export default function JobDetailView({
         />
       )}
 
-      {/* Cancel cleaning */}
-      <Modal isOpen={showCancelModal} onClose={() => !isCancelling && setShowCancelModal(false)} title="Cancel cleaning?">
+      {/* Cancel job */}
+      <Modal isOpen={showCancelModal} onClose={() => !isCancelling && setShowCancelModal(false)} title="Cancel job?">
         <div className="space-y-4">
-          <p className="text-sm text-[#005F6A]/70">
+          <p className="text-sm text-[#1c1917]/70">
             This sets the job status to <strong>Cancelled</strong> and logs the change. The customer&apos;s saved card is not charged.
           </p>
           <div>
-            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Reason (optional)</label>
+            <label className="block text-xs font-semibold text-[#1c1917]/70 mb-1">Reason (optional)</label>
             <textarea
-              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+              className="w-full rounded-xl border border-[#1c1917]/15 bg-[#e85d04]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#1c1917]/40"
               rows={2}
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
@@ -1622,7 +1638,7 @@ export default function JobDetailView({
             />
           </div>
           {depositRemaining > 0 && (
-            <label className="flex items-center gap-2 text-sm text-[#005F6A] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-[#1c1917] cursor-pointer">
               <input
                 type="checkbox"
                 checked={refundDepositOnCancel}
@@ -1641,7 +1657,7 @@ export default function JobDetailView({
               Keep booking
             </Button>
             <Button variant="destructive" border={false} onClick={handleCancelJob} disabled={isCancelling}>
-              {isCancelling ? "Cancelling…" : "Cancel cleaning"}
+              {isCancelling ? "Cancelling…" : "Cancel job"}
             </Button>
           </div>
         </div>
@@ -1650,7 +1666,7 @@ export default function JobDetailView({
       {/* Refund modal */}
       <Modal isOpen={showRefundModal} onClose={() => !isRefunding && setShowRefundModal(false)} title="Issue refund">
         <div className="space-y-4">
-          <p className="text-sm text-[#005F6A]/70">
+          <p className="text-sm text-[#1c1917]/70">
             {job.stripePaymentIntentId
               ? `Refundable: $${refundCap.toFixed(2)} (already refunded $${refundedSoFar.toFixed(2)}).`
               : depositRemaining > 0
@@ -1658,7 +1674,7 @@ export default function JobDetailView({
               : "Nothing left to refund."}
           </p>
           <div>
-            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Amount ($)</label>
+            <label className="block text-xs font-semibold text-[#1c1917]/70 mb-1">Amount ($)</label>
             <input
               type="number"
               step="0.01"
@@ -1666,13 +1682,13 @@ export default function JobDetailView({
               max={refundCap}
               value={refundAmount}
               onChange={(e) => setRefundAmount(e.target.value)}
-              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+              className="w-full rounded-xl border border-[#1c1917]/15 bg-[#e85d04]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#1c1917]/40"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#005F6A]/70 mb-1">Reason (optional)</label>
+            <label className="block text-xs font-semibold text-[#1c1917]/70 mb-1">Reason (optional)</label>
             <textarea
-              className="w-full rounded-xl border border-[#005F6A]/15 bg-[#005F6A]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#005F6A]/40"
+              className="w-full rounded-xl border border-[#1c1917]/15 bg-[#e85d04]/5 px-3 py-2 text-sm outline-none focus:bg-white focus:border-[#1c1917]/40"
               rows={2}
               value={refundReason}
               onChange={(e) => setRefundReason(e.target.value)}
@@ -1772,12 +1788,12 @@ function ChargeButton({ jobId, amount, compact }: { jobId: string; amount: numbe
 
       <Modal isOpen={open} onClose={() => !busy && setOpen(false)} title="Charge client?">
         <div className="space-y-4">
-          <p className="text-sm text-[#005F6A]/70">
+          <p className="text-sm text-[#1c1917]/70">
             This will charge the client&apos;s saved card via Stripe. The customer will receive a receipt email automatically.
           </p>
-          <div className="rounded-xl bg-[#005F6A]/5 px-4 py-3 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[#005F6A]/70">Amount</span>
-            <span className="text-lg font-semibold text-[#005F6A]">${amount.toFixed(2)}</span>
+          <div className="rounded-xl bg-[#e85d04]/5 px-4 py-3 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#1c1917]/70">Amount</span>
+            <span className="text-lg font-semibold text-[#1c1917]">${amount.toFixed(2)}</span>
           </div>
           {result && !result.ok && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -1795,5 +1811,89 @@ function ChargeButton({ jobId, amount, compact }: { jobId: string; amount: numbe
         </div>
       </Modal>
     </>
+  );
+}
+
+// ── Send "Add card" link button ──────────────────────────────────────────
+function SendAddCardLinkButton({ jobId }: { jobId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleClick() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await sendAddCardLink({ jobId });
+    if (res.success) {
+      setMsg({ ok: true, text: "Add-card link emailed to the customer." });
+    } else {
+      setMsg({ ok: false, text: res.error ?? "Could not send link." });
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Button
+        variant="default"
+        border={false}
+        onClick={handleClick}
+        disabled={busy}
+        className="px-4 py-2 text-sm bg-[#fce7f3] text-[#9d174d] hover:bg-[#fbcfe8]">
+        {busy ? "Sending…" : 'Send "Add card" link'}
+      </Button>
+      {msg && (
+        <span
+          style={{
+            fontSize: 11,
+            color: msg.ok ? "var(--primary)" : "#dc2626",
+            fontWeight: 600,
+          }}>
+          {msg.text}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Resend receipt button ────────────────────────────────────────────────
+function ResendReceiptButton({ jobId }: { jobId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleClick() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await resendReceipt(jobId);
+    if (res.success) {
+      setMsg({ ok: true, text: "Receipt re-sent." });
+    } else {
+      setMsg({ ok: false, text: res.error ?? "Could not resend." });
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Button
+        variant="default"
+        border={false}
+        onClick={handleClick}
+        disabled={busy}
+        className="px-4 py-2 text-sm bg-[#e0e7ff] text-[#3730a3] hover:bg-[#c7d2fe]">
+        {busy ? "Resending…" : "Resend Receipt"}
+      </Button>
+      {msg && (
+        <span
+          style={{
+            fontSize: 11,
+            color: msg.ok ? "var(--primary)" : "#dc2626",
+            fontWeight: 600,
+          }}>
+          {msg.text}
+        </span>
+      )}
+    </div>
   );
 }

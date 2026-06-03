@@ -64,7 +64,7 @@ export function Feedback({ msg }: { msg: NonNullable<Msg> }) {
     <div
       style={{
         padding: "12px 16px", borderRadius: 12, fontSize: 13,
-        background: msg.type === "success" ? "rgba(0,95,106,0.08)" : "#fee2e2",
+        background: msg.type === "success" ? "rgba(232,93,4,0.08)" : "#fee2e2",
         color: msg.type === "success" ? "var(--primary)" : "#dc2626",
       }}>
       {msg.text}
@@ -73,15 +73,15 @@ export function Feedback({ msg }: { msg: NonNullable<Msg> }) {
 }
 
 /**
- * Themed input that matches the Cleano teal palette used across pages
+ * Themed input that matches the Fixaro orange palette used across pages
  * like Analytics. Use this for any new free-form input inside settings tabs
  * (the shared `Input` component defaults to a neutral grey border).
  */
 export const themedInputClass =
-  "w-full px-4 py-2.5 rounded-xl border border-transparent bg-[#005F6A]/5 text-sm text-[#005F6A] placeholder:text-[#005F6A]/40 focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20";
+  "w-full px-4 py-2.5 rounded-xl border border-transparent bg-[#e85d04]/5 text-sm text-[#1c1917] placeholder:text-[#1c1917]/40 focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20";
 
 /**
- * Themed select that matches Cleano teal palette.
+ * Themed select that matches Fixaro orange palette.
  */
 export const themedSelectClass =
-  "w-full px-4 py-2.5 rounded-xl border border-transparent bg-[#005F6A]/5 text-sm text-[#005F6A] focus:outline-none focus:ring-2 focus:ring-[#005F6A]/20";
+  "w-full px-4 py-2.5 rounded-xl border border-transparent bg-[#e85d04]/5 text-sm text-[#1c1917] focus:outline-none focus:ring-2 focus:ring-[#e85d04]/20";

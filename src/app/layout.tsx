@@ -1,27 +1,35 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Fraunces } from "next/font/google";
+import { DM_Sans, Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 import "./customer.css";
 
-const manrope = Manrope({
+const dmSans = DM_Sans({
   subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-dm-sans",
   display: "swap",
 });
 
-const fraunces = Fraunces({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Cleano",
-  description: "Cleano — bookings, jobs, and crew workspace.",
-  applicationName: "Cleano",
+  title: "Fixaro",
+  description: "Fixaro — bookings, jobs, and crew workspace.",
+  applicationName: "Fixaro",
   appleWebApp: {
     capable: true,
-    title: "Cleano",
+    title: "Fixaro",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {
@@ -30,7 +38,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#005F6A",
+  themeColor: "#e85d04",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -45,8 +53,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${fraunces.variable}`}>
-      <body className={`!font-tt-norms-pro`} suppressHydrationWarning>{children}</body>
+    <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable} ${inter.variable}`}>
+      <body className={`!font-dm-sans`} suppressHydrationWarning>{children}</body>
     </html>
   );
 }

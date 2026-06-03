@@ -1,7 +1,7 @@
 import GiftCardRedeemClient from "./GiftCardRedeemClient";
 
 export const metadata = {
-  title: "Redeem a Gift Card · Cleano",
+  title: "Redeem a Gift Card · Fixaro",
 };
 
 export default async function GiftCardRedeemPage({
@@ -24,10 +24,10 @@ export default async function GiftCardRedeemPage({
               fontSize: 12,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: "#005F6A",
+              color: "#e85d04",
               fontWeight: 700,
             }}>
-            Cleano gift cards
+            Fixaro gift cards
           </div>
           <h1
             style={{
@@ -40,7 +40,7 @@ export default async function GiftCardRedeemPage({
             Redeem your code
           </h1>
           <p style={{ marginTop: 12, fontSize: 14, color: "#3a5a62", lineHeight: 1.5 }}>
-            Sign in to your Cleano customer account, paste the gift card code,
+            Sign in to your Fixaro customer account, paste the gift card code,
             and we'll add the credit to your account. It will auto-apply the
             next time you book.
           </p>

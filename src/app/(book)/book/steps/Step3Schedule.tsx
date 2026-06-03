@@ -82,7 +82,7 @@ export default function Step3Schedule({ draft, onChange }: Props) {
 
       {draft.isFlexible && (
         <div style={{
-          background: "rgba(0,95,106,0.06)",
+          background: "rgba(232,93,4,0.06)",
           borderRadius: 12,
           padding: "12px 16px",
           fontSize: 14,

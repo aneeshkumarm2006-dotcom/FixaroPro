@@ -37,7 +37,7 @@ export default async function PortalHome() {
           recently booked, please contact us so we can link your account.
         </p>
         <Link href="/book" className="cl-btn cl-btn-primary">
-          Book a cleaning
+          Book a service
         </Link>
       </div>
     );
@@ -72,7 +72,7 @@ export default async function PortalHome() {
         </h1>
         {nextOne ? (
           <p className="cl-subtitle" style={{ fontSize: 16, marginTop: 12 }}>
-            Your next cleaning is{" "}
+            Your next appointment is{" "}
             <strong style={{ color: "var(--ink)" }}>
               {new Date(nextOne.startTime).toLocaleDateString("en-US", {
                 weekday: "long",
@@ -91,7 +91,7 @@ export default async function PortalHome() {
           </p>
         ) : (
           <p className="cl-subtitle" style={{ fontSize: 16, marginTop: 12 }}>
-            No upcoming cleanings.{" "}
+            No upcoming appointments.{" "}
             <Link href="/book" className="cl-link">
               Book your next one →
             </Link>
@@ -104,7 +104,7 @@ export default async function PortalHome() {
           icon={<CalendarClock size={20} />}
           label="Upcoming"
           value={String(upcoming.length)}
-          hint={upcoming.length === 1 ? "cleaning scheduled" : "cleanings scheduled"}
+          hint={upcoming.length === 1 ? "visit scheduled" : "visits scheduled"}
         />
         <StatTile
           icon={<MapPin size={20} />}

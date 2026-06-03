@@ -261,10 +261,10 @@ export function EmployeeModal({
             {/* Header */}
             <div className="w-full flex items-start justify-between gap-1 mb-8">
               <div>
-                <h1 className="text-3xl font-[350] tracking-tight text-[#005F6A] max-w-[40rem]">
+                <h1 className="text-3xl font-[350] tracking-tight text-[#1c1917] max-w-[40rem]">
                   {mode === "create" ? "Add New Employee" : "Edit Employee"}
                 </h1>
-                <p className="text-sm text-[#005F6A]/80">
+                <p className="text-sm text-[#1c1917]/80">
                   {mode === "create"
                     ? "Add a new team member to your organization"
                     : "Update employee details"}
@@ -346,7 +346,7 @@ export function EmployeeModal({
                   Full Name <span className="text-red-500 ml-1">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
                   <Input
                     variant="form"
                     type="text"
@@ -372,7 +372,7 @@ export function EmployeeModal({
                   Email Address <span className="text-red-500 ml-1">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
                   <Input
                     variant="form"
                     type="email"
@@ -398,7 +398,7 @@ export function EmployeeModal({
                   Phone Number
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
                   <Input
                     variant="form"
                     type="tel"
@@ -410,7 +410,7 @@ export function EmployeeModal({
                     border={false}
                   />
                 </div>
-                <p className="text-xs text-[#005F6A]/60 mt-1">
+                <p className="text-xs text-[#1c1917]/60 mt-1">
                   Optional contact number
                 </p>
               </div>
@@ -422,7 +422,7 @@ export function EmployeeModal({
                     Password <span className="text-red-500 ml-1">*</span>
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#005F6A]/50" />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
                     <Input
                       variant="form"
                       type="password"
@@ -440,7 +440,7 @@ export function EmployeeModal({
                       {(errors as any).password.message}
                     </p>
                   )}
-                  <p className="text-xs text-[#005F6A]/60 mt-1">
+                  <p className="text-xs text-[#1c1917]/60 mt-1">
                     Initial password - they can change it later
                   </p>
                 </div>
@@ -459,10 +459,10 @@ export function EmployeeModal({
                       border={false}
                       type="button"
                       disabled={disableForm}
-                      className="w-full h-[42px] px-4 py-3 flex items-center justify-between bg-[#005F6A]/5">
+                      className="w-full h-[42px] px-4 py-3 flex items-center justify-between bg-[#e85d04]/5">
                       <div className="flex items-center gap-3">
-                        <Shield className="w-4 h-4 text-[#005F6A]/50" />
-                        <span className="text-sm font-[350] text-[#005F6A]">
+                        <Shield className="w-4 h-4 text-[#1c1917]/50" />
+                        <span className="text-sm font-[350] text-[#1c1917]">
                           {
                             roleOptions.find((r) => r.value === selectedRole)
                               ?.label
@@ -470,7 +470,7 @@ export function EmployeeModal({
                         </span>
                       </div>
                       <svg
-                        className="w-4 h-4 text-[#005F6A]/50"
+                        className="w-4 h-4 text-[#1c1917]/50"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24">
@@ -489,9 +489,9 @@ export function EmployeeModal({
                   }))}
                   maxHeight="12rem"
                 />
-                <div className="mt-3 p-3 bg-[#005F6A]/5 rounded-xl">
-                  <p className="text-xs text-[#005F6A]/80">
-                    <strong className="text-[#005F6A]">
+                <div className="mt-3 p-3 bg-[#e85d04]/5 rounded-xl">
+                  <p className="text-xs text-[#1c1917]/80">
+                    <strong className="text-[#1c1917]">
                       {roleOptions.find((r) => r.value === selectedRole)?.label}
                       :
                     </strong>{" "}

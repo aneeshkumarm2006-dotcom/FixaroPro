@@ -92,10 +92,10 @@ export default function RatingPopup({ pending }: Props) {
               color: "#111",
               margin: "0 0 6px",
             }}>
-            How was your cleaning?
+            How was your service?
           </h2>
           <p style={{ fontSize: 14, color: "#666", margin: "0 0 24px" }}>
-            Rate your cleaner <strong>{pending.cleanerName}</strong> from job #{pending.jobNumber}
+            Rate your technician <strong>{pending.cleanerName}</strong> from job #{pending.jobNumber}
           </p>
 
           <div
@@ -139,7 +139,7 @@ export default function RatingPopup({ pending }: Props) {
             style={{
               width: "100%",
               padding: "13px 0",
-              background: stars > 0 ? "#005F6A" : "#e0e0e0",
+              background: stars > 0 ? "#e85d04" : "#e0e0e0",
               color: stars > 0 ? "#fff" : "#aaa",
               border: "none",
               borderRadius: 12,

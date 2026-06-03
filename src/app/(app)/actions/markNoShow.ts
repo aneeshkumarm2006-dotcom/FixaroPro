@@ -51,7 +51,7 @@ export async function markNoShow(jobId: string) {
         payment_method: client.defaultPaymentMethodId,
         off_session: true,
         confirm: true,
-        description: `Cleano no-show fee — job #${job.jobNumber}`,
+        description: `Fixaro no-show fee — job #${job.jobNumber}`,
         metadata: {
           jobId,
           jobNumber: String(job.jobNumber),

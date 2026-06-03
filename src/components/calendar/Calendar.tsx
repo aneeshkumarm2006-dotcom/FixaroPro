@@ -433,7 +433,7 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButto
                   border={false}
                   variant={view === v ? "action" : "ghost"}
                   size="md"
-                  className="text-[#005F6A] !px-6 !py-4"
+                  className="text-[#1c1917] !px-6 !py-4"
                   onClick={() => setView(v)}>
                   {v.charAt(0).toUpperCase() + v.slice(1)}
                 </Button>
@@ -446,7 +446,7 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButto
               <Button
                 variant={listMode ? "ghost" : "action"}
                 size="md"
-                className="text-[#005F6A] !px-6 py-3"
+                className="text-[#1c1917] !px-6 py-3"
                 onClick={() => setListMode(false)}
                 aria-label="Calendar view">
                 <CalendarDays className="w-4 h-4" />
@@ -454,7 +454,7 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButto
               <Button
                 variant={listMode ? "action" : "ghost"}
                 size="md"
-                className="text-[#005F6A] !px-6 py-3"
+                className="text-[#1c1917] !px-6 py-3"
                 onClick={() => setListMode(true)}
                 aria-label="List view">
                 <svg
@@ -477,7 +477,7 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButto
                 className="px-3 py-3"
                 onClick={handlePrev}>
                 <ChevronLeft
-                  className="w-4 h-4 text-[#005F6A]"
+                  className="w-4 h-4 text-[#1c1917]"
                   strokeWidth={1.5}
                 />
               </Button>
@@ -497,7 +497,7 @@ const Calendar = React.forwardRef<CalendarRef, CalendarProps>(({ hideNewJobButto
                 className="px-3 py-3"
                 onClick={handleNext}>
                 <ChevronRight
-                  className="w-4 h-4 text-[#005F6A]"
+                  className="w-4 h-4 text-[#1c1917]"
                   strokeWidth={1.5}
                 />
               </Button>

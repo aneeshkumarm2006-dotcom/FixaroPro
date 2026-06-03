@@ -1,6 +1,6 @@
 import { db } from "@/db";
 
-const BRAND = "#005F6A";
+const BRAND = "#e85d04";
 
 export interface ReceiptData {
   jobId: string;
@@ -64,7 +64,7 @@ export async function buildReceiptPdfBuffer(
   );
   // React.createElement avoids needing JSX in this .ts file.
   const React = await import("react");
-  const tint = (a: number) => `rgba(0, 95, 106, ${a})`;
+  const tint = (a: number) => `rgba(232, 93, 4, ${a})`;
 
   const styles = StyleSheet.create({
     page: {
@@ -151,11 +151,11 @@ export async function buildReceiptPdfBuffer(
         React.createElement(
           View,
           null,
-          React.createElement(Text, { style: styles.brand }, "Cleano"),
+          React.createElement(Text, { style: styles.brand }, "Fixaro"),
           React.createElement(
             Text,
             { style: styles.subtitle },
-            "Professional cleaning services · Montreal"
+            "Home services · Montreal"
           )
         ),
         React.createElement(
@@ -287,7 +287,7 @@ export async function buildReceiptPdfBuffer(
       React.createElement(
         Text,
         { style: styles.footer },
-        "Thank you for choosing Cleano. Questions? hello@cleano.example"
+        "Thank you for choosing Fixaro. Questions? contact@fixaropro.com"
       )
     )
   );

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="cleano-receipt-${data.jobNumber}.pdf"`,
+      "Content-Disposition": `inline; filename="fixaro-receipt-${data.jobNumber}.pdf"`,
       "Cache-Control": "no-store",
     },
   });

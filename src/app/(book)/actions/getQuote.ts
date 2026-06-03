@@ -1,56 +1,34 @@
 "use server";
 
-import { db } from "@/db";
+import { HOURLY_RATE, THREE_HOUR_PACKAGE, computeHourlyPrice } from "../book/types";
 
 interface GetQuoteInput {
-  bedCount: number;
-  bathCount: number;
-  halfBathCount?: number;
+  hours: number;
+  serviceType?: string;
 }
 
-async function getPerUnitRates() {
-  const setting = await db.appSetting.findUnique({ where: { key: "pricing.perUnit" } });
-  if (setting?.value && typeof setting.value === "object") {
-    const v = setting.value as Record<string, unknown>;
-    const baseServicePrice =
-      typeof v.baseServicePrice === "number" ? v.baseServicePrice : 100;
-    const perBedroom = typeof v.perBedroom === "number" ? v.perBedroom : null;
-    const perFullBath = typeof v.perFullBath === "number" ? v.perFullBath : null;
-    const perHalfBath = typeof v.perHalfBath === "number" ? v.perHalfBath : null;
-    if (perBedroom !== null && perFullBath !== null && perHalfBath !== null) {
-      return { baseServicePrice, perBedroom, perFullBath, perHalfBath };
-    }
-  }
-  return null;
-}
-
-export async function getQuote({ bedCount, bathCount, halfBathCount = 0 }: GetQuoteInput) {
+export async function getQuote({ hours, serviceType }: GetQuoteInput) {
   try {
-    // Prefer flat per-unit rates (new model set in Settings > Pricing Rules)
-    const rates = await getPerUnitRates();
-    if (rates) {
-      const basePrice =
-        rates.baseServicePrice +
-        bedCount * rates.perBedroom +
-        bathCount * rates.perFullBath +
-        halfBathCount * rates.perHalfBath;
-      return { success: true, basePrice };
+    // Silicone Sealing: $209/room (hours field is reused as room count)
+    if (serviceType === "SILICONE_SEALING") {
+      const rooms = Math.max(1, hours);
+      return { success: true, basePrice: rooms * 209, isFixed: true };
     }
 
-    // Fall back to legacy PricingRule table rows
-    const exact = await db.pricingRule.findFirst({
-      where: { bedCount, bathCount, isActive: true },
-    });
-    if (exact) return { success: true, basePrice: exact.basePrice };
+    // Weatherproofing: fixed range, show midpoint for display
+    if (serviceType === "WEATHERPROOFING") {
+      return { success: true, basePrice: 74.5, isFixed: true };
+    }
 
-    const closest = await db.pricingRule.findFirst({
-      where: { bedCount, isActive: true },
-      orderBy: { bathCount: "desc" },
-    });
-    if (closest) return { success: true, basePrice: closest.basePrice };
+    // Quote-only services: return 0 so UI can show "quote required"
+    if (serviceType === "PAINTING" || serviceType === "MOULDINGS") {
+      return { success: true, basePrice: 0, isQuote: true };
+    }
 
-    const fallback = 120 + bedCount * 30 + bathCount * 20;
-    return { success: true, basePrice: fallback, fallback: true as const };
+    // Standard hourly: 2h min, 3h package = $209, others = hours × $79
+    const safeHours = Math.max(2, hours);
+    const basePrice = computeHourlyPrice(safeHours);
+    return { success: true, basePrice, hourlyRate: HOURLY_RATE, threeHourPackage: THREE_HOUR_PACKAGE };
   } catch (error) {
     console.error("Error fetching quote:", error);
     return { success: false, error: "Failed to compute quote" };

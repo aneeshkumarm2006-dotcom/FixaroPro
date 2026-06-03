@@ -24,7 +24,7 @@ const defaultIcon = L.icon({
 });
 
 const TYPE_COLORS: Record<string, string> = {
-  DOOR_KNOCK: "#005F6A",
+  DOOR_KNOCK: "#e85d04",
   FLYER_DROP: "#0EA5E9",
   REFERRAL: "#10B981",
   ONLINE_AD: "#8B5CF6",
@@ -126,7 +126,7 @@ export default function SalesMapView({
             }}>
             <Popup>
               <div className="text-sm">
-                <p className="font-[500] text-[#005F6A]">{area.name}</p>
+                <p className="font-[500] text-[#1c1917]">{area.name}</p>
                 <p className="text-xs text-gray-500">
                   {TYPE_LABELS[area.type] || area.type}
                 </p>

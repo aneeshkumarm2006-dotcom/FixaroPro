@@ -86,7 +86,15 @@ export default async function JobFormPage({
   // Get all clients for the client selector
   const clients = await db.client.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, address: true, email: true, phone: true },
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      email: true,
+      phone: true,
+      discountPercent: true,
+      defaultPaymentMethodId: true,
+    },
   });
 
   async function saveJob(formData: FormData) {
@@ -272,9 +280,9 @@ export default async function JobFormPage({
           }}
         >
           {isEditing ? (
-            <>Edit <em style={{ fontStyle: "italic" }}>cleaning job.</em></>
+            <>Edit <em style={{ fontStyle: "italic" }}>service job.</em></>
           ) : (
-            <>New <em style={{ fontStyle: "italic" }}>cleaning job.</em></>
+            <>New <em style={{ fontStyle: "italic" }}>service job.</em></>
           )}
         </h1>
         <p style={{ marginTop: 10, fontSize: 15, color: "var(--primary-60)" }}>
@@ -406,19 +414,6 @@ export default async function JobFormPage({
             <MoneyFieldWrap label="Parking" id="parking" name="parking" defaultValue={existingJob?.parking} />
             <MoneyFieldWrap label="Discount amount" id="discountAmount" name="discountAmount" defaultValue={existingJob?.discountAmount} />
 
-            <FieldWrap label="Pay rate multiplier" hint="1.5 for overtime, 2.0 for holidays">
-              <Input
-                type="number"
-                step="0.1"
-                min="0.5"
-                max="3"
-                id="payRateMultiplier"
-                name="payRateMultiplier"
-                defaultValue={existingJob?.payRateMultiplier ?? 1.0}
-                placeholder="1.0"
-              />
-            </FieldWrap>
-
             <FieldWrap label="Payment type">
               <PaymentTypeSelect defaultValue={existingJob?.paymentType || ""} />
             </FieldWrap>
@@ -473,7 +468,7 @@ export default async function JobFormPage({
             right: 0,
             background: "rgba(250, 247, 242, 0.92)",
             backdropFilter: "blur(8px)",
-            borderTop: "1px solid rgba(0,95,106,0.10)",
+            borderTop: "1px solid rgba(232,93,4,0.10)",
             padding: "14px 32px",
             display: "flex",
             justifyContent: "flex-end",
@@ -514,10 +509,10 @@ function SectionCard({
     <section
       style={{
         background: "#fff",
-        border: "1px solid rgba(0,95,106,0.08)",
+        border: "1px solid rgba(232,93,4,0.08)",
         borderRadius: 16,
         padding: "24px 28px",
-        boxShadow: "0 1px 6px rgba(0,95,106,0.05)",
+        boxShadow: "0 1px 6px rgba(232,93,4,0.05)",
       }}
     >
       <div style={{ marginBottom: 20 }}>

@@ -1,9 +1,9 @@
 import QuoteFormClient from "./QuoteFormClient";
 
 export const metadata = {
-  title: "Request a Quote · Cleano",
+  title: "Request a Quote · Fixaro",
   description:
-    "Tell us about your space and we'll send you a tailored cleaning quote.",
+    "Tell us about your space and we'll send you a tailored service quote.",
 };
 
 export default function QuotePage() {
@@ -21,10 +21,10 @@ export default function QuotePage() {
               fontSize: 12,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
-              color: "#005F6A",
+              color: "#e85d04",
               fontWeight: 700,
             }}>
-            Cleano
+Fixaro
           </div>
           <h1
             style={{

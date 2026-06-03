@@ -13,7 +13,7 @@ export interface NotificationGate {
   key: string;
 }
 
-const FROM = process.env.EMAIL_FROM ?? "Cleano <no-reply@cleano.ca>";
+const FROM = process.env.EMAIL_FROM ?? "Fixaro <no-reply@fixaropro.com>";
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) {
@@ -47,12 +47,12 @@ function layout(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f2ed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px">
 <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07)">
-<tr><td style="background:#00424a;padding:28px 32px">
-<span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px">Cleano</span>
+<tr><td style="background:#c44c03;padding:28px 32px">
+<span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px">Fixaro</span>
 </td></tr>
 <tr><td style="padding:32px">${body}</td></tr>
 <tr><td style="background:#f5f2ed;padding:20px 32px;font-size:12px;color:#888;text-align:center">
-© ${new Date().getFullYear()} Cleano · care@cleano.ca
+© ${new Date().getFullYear()} Fixaro · contact@fixaropro.com
 </td></tr>
 </table>
 </td></tr></table>
@@ -60,7 +60,7 @@ function layout(body: string) {
 }
 
 function h1(text: string) {
-  return `<h1 style="margin:0 0 8px;font-size:26px;font-weight:700;color:#00424a">${text}</h1>`;
+  return `<h1 style="margin:0 0 8px;font-size:26px;font-weight:700;color:#c44c03">${text}</h1>`;
 }
 function p(text: string) {
   return `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#333">${text}</p>`;
@@ -76,7 +76,7 @@ function section(rows: [string, string][]) {
   return `<table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;border-bottom:1px solid #eee;margin:20px 0">${inner}</table>`;
 }
 function btn(label: string, href: string) {
-  return `<a href="${href}" style="display:inline-block;margin-top:8px;padding:12px 28px;background:#00424a;color:#fff;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">${label}</a>`;
+  return `<a href="${href}" style="display:inline-block;margin-top:8px;padding:12px 28px;background:#c44c03;color:#fff;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">${label}</a>`;
 }
 
 // ── Send + log helper ──────────────────────────────────────────────────────
@@ -198,12 +198,12 @@ export async function sendBookingConfirmation(opts: {
   }
 
   const chargeNote = opts.depositPaid
-    ? "A $20 deposit was collected at booking. The remaining balance is charged only after your cleaning is complete."
-    : "Your card will be charged only after your cleaning is complete. You'll receive a receipt by email.";
+    ? "A $20 deposit was collected at booking. The remaining balance is charged only after your visit is complete."
+    : "Your card will be charged only after your visit is complete. You'll receive a receipt by email.";
 
   const html = layout(
     h1(`Booking confirmed, ${opts.clientName.split(" ")[0]}!`) +
-      p(`We've got you down for a ${opts.serviceType ?? "cleaning"} on <strong>${fmtDate(opts.startTime)}</strong>.`) +
+      p(`We've got you down for a ${opts.serviceType ?? "service"} on <strong>${fmtDate(opts.startTime)}</strong>.`) +
       section(sectionRows) +
       p(chargeNote) +
       btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`) +
@@ -212,7 +212,7 @@ export async function sendBookingConfirmation(opts: {
 
   return deliver({
     to: opts.to,
-    subject: `Cleano booking confirmed — ${fmtDate(opts.startTime)}`,
+    subject: `Fixaro booking confirmed — ${fmtDate(opts.startTime)}`,
     html,
     logId: opts.logId,
     notification: {
@@ -238,8 +238,8 @@ export async function sendReminder24h(opts: {
       : "We're finalizing your cleaner assignment.";
 
   const html = layout(
-    h1("Your cleaning is tomorrow!") +
-      p(`Hi ${opts.clientName.split(" ")[0]}, just a friendly reminder about your ${opts.serviceType ?? "cleaning"} tomorrow.`) +
+    h1("Your appointment is tomorrow!") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, just a friendly reminder about your ${opts.serviceType ?? "service"} tomorrow.`) +
       section([
         ["Date", fmtDate(opts.startTime)],
         ["Time", fmtTime(opts.startTime)],
@@ -253,7 +253,7 @@ export async function sendReminder24h(opts: {
 
   return deliver({
     to: opts.to,
-    subject: `Reminder: your Cleano cleaning is tomorrow`,
+    subject: `Reminder: your Fixaro appointment is tomorrow`,
     html,
     logId: opts.logId,
     notification: { recipient: "CUSTOMER", key: "cust.reminders.booking_reminder" },
@@ -276,7 +276,7 @@ export async function sendReceipt(opts: {
   logId?: string;
 }) {
   const ratingSection = opts.ratingToken
-    ? btn("Rate your cleaning", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/rate/${opts.ratingToken}`)
+    ? btn("Rate your service", `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/rate/${opts.ratingToken}`)
     : "";
 
   const html = layout(
@@ -299,7 +299,7 @@ export async function sendReceipt(opts: {
 
   return deliver({
     to: opts.to,
-    subject: `Cleano receipt — job #${opts.jobNumber}`,
+    subject: `Fixaro receipt — job #${opts.jobNumber}`,
     html,
     logId: opts.logId,
     notification: { recipient: "CUSTOMER", key: "cust.fee.service_receipt" },
@@ -326,7 +326,7 @@ export async function sendRefundConfirmation(opts: {
 
   return deliver({
     to: opts.to,
-    subject: `Cleano refund — job #${opts.jobNumber}`,
+    subject: `Fixaro refund — job #${opts.jobNumber}`,
     html,
     logId: opts.logId,
     notification: { recipient: "CUSTOMER", key: "cust.fee.refund_given" },
@@ -708,7 +708,7 @@ export async function sendCustomerBookingConfirmed(opts: LifecycleJobInfo & {
 
   return deliver({
     to: opts.to,
-    subject: `Cleaner confirmed for your Cleano booking #${opts.jobNumber}`,
+    subject: `Cleaner confirmed for your Fixaro booking #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.booking.confirmed" },
   });
@@ -722,7 +722,7 @@ export async function sendCustomerBookingModified(opts: LifecycleJobInfo & {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1(`Your booking was updated`) +
-      p(`Hi ${opts.clientName.split(" ")[0]}, we've made a change to your upcoming cleaning.`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, we've made a change to your upcoming appointment.`) +
       section([
         ["Booking #", String(opts.jobNumber)],
         ["Date", fmtDate(opts.startTime)],
@@ -737,7 +737,7 @@ export async function sendCustomerBookingModified(opts: LifecycleJobInfo & {
 
   return deliver({
     to: opts.to,
-    subject: `Cleano booking updated — #${opts.jobNumber}`,
+    subject: `Fixaro booking updated — #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.booking.modified" },
   });
@@ -752,7 +752,7 @@ export async function sendCustomerBookingCancellation(opts: LifecycleJobInfo & {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1(`Your booking was canceled`) +
-      p(`Hi ${opts.clientName.split(" ")[0]}, your Cleano booking has been canceled.`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your Fixaro booking has been canceled.`) +
       section([
         ["Booking #", String(opts.jobNumber)],
         ["Was scheduled", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
@@ -763,12 +763,12 @@ export async function sendCustomerBookingCancellation(opts: LifecycleJobInfo & {
       (opts.refundIssued
         ? p("A refund has been issued and will appear on your card within 5–10 business days.")
         : p("If you have any questions, just reply to this email.")) +
-      btn("Book another cleaning", `${appUrl}/book`)
+      btn("Book another service", `${appUrl}/book`)
   );
 
   return deliver({
     to: opts.to,
-    subject: `Cleano booking canceled — #${opts.jobNumber}`,
+    subject: `Fixaro booking canceled — #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.cancel.booking_cancellation" },
   });
@@ -800,7 +800,7 @@ export async function sendCustomerBookingCharged(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `Cleano payment received — #${opts.jobNumber}`,
+    subject: `Fixaro payment received — #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.fee.booking_charged" },
   });
@@ -853,12 +853,12 @@ export async function sendCustomerBookingsPrepaid(opts: {
   const html = layout(
     h1("Deposit received") +
       p(`Hi ${opts.clientName.split(" ")[0]}, we collected your ${fmt(opts.amount)} deposit for booking #${opts.jobNumber}.`) +
-      p("The balance will be charged after your cleaning is complete.") +
+      p("The balance will be charged after your visit is complete.") +
       btn("View booking", `${appUrl}/portal/bookings/${opts.jobId}`)
   );
   return deliver({
     to: opts.to,
-    subject: `Cleano deposit received — #${opts.jobNumber}`,
+    subject: `Fixaro deposit received — #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.fee.bookings_prepaid" },
   });
@@ -894,7 +894,7 @@ export async function sendCustomerCardDeclined(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `Cleano card declined — #${opts.jobNumber}`,
+    subject: `Fixaro card declined — #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: keyMap[opts.context] },
   });
@@ -1005,13 +1005,13 @@ export async function sendCustomerRateUs(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1(`How did we do?`) +
-      p(`Hi ${opts.clientName.split(" ")[0]}, your cleaning is done — would you mind sharing how it went? It takes 10 seconds and helps our team a lot.`) +
-      btn("Rate your cleaning", `${appUrl}/rate/${opts.ratingToken}`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your service visit is done — would you mind sharing how it went? It takes 10 seconds and helps our team a lot.`) +
+      btn("Rate your service", `${appUrl}/rate/${opts.ratingToken}`) +
       p(`<small>If the button doesn't work, paste this link in your browser: ${appUrl}/rate/${opts.ratingToken}</small>`)
   );
   return deliver({
     to: opts.to,
-    subject: `Rate your Cleano cleaning — job #${opts.jobNumber}`,
+    subject: `Rate your Fixaro service — job #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.rating.rate_us" },
   });
@@ -1109,7 +1109,7 @@ export async function sendProviderNewReview(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `${opts.rating}/5 review on your Cleano work`,
+    subject: `${opts.rating}/5 review on your Fixaro work`,
     html,
     notification: { recipient: "PROVIDER", key: "prov.rating.new_review" },
   });
@@ -1255,47 +1255,47 @@ const ACCOUNT_KEY_MAP: Record<
 
 const ACCOUNT_COPY: Record<AccountEvent, { subject: string; title: string; body: (name: string, link?: string) => string }> = {
   new_account: {
-    subject: "Welcome to Cleano",
-    title: "Welcome to Cleano",
-    body: (n) => `Hi ${n.split(" ")[0]}, thanks for joining Cleano. We're glad to have you.`,
+    subject: "Welcome to Fixaro",
+    title: "Welcome to Fixaro",
+    body: (n) => `Hi ${n.split(" ")[0]}, thanks for joining Fixaro. We're glad to have you.`,
   },
   setup_password: {
-    subject: "Set up your Cleano password",
+    subject: "Set up your Fixaro password",
     title: "Set your password",
-    body: (n, l) => `Hi ${n.split(" ")[0]}, set your password to finish creating your Cleano account.${l ? ` <a href="${l}">Set my password</a>` : ""}`,
+    body: (n, l) => `Hi ${n.split(" ")[0]}, set your password to finish creating your Fixaro account.${l ? ` <a href="${l}">Set my password</a>` : ""}`,
   },
   reset_password: {
-    subject: "Reset your Cleano password",
+    subject: "Reset your Fixaro password",
     title: "Password reset",
     body: (n, l) => `Hi ${n.split(" ")[0]}, click the link below to choose a new password. It expires in 1 hour.${l ? ` <a href="${l}">Reset my password</a>` : ""}`,
   },
   password_changed: {
-    subject: "Your Cleano password was changed",
+    subject: "Your Fixaro password was changed",
     title: "Password updated",
     body: (n) => `Hi ${n.split(" ")[0]}, your password was just changed. If this wasn't you, please contact us right away.`,
   },
   profile_changed: {
-    subject: "Your Cleano profile was updated",
+    subject: "Your Fixaro profile was updated",
     title: "Profile updated",
     body: (n) => `Hi ${n.split(" ")[0]}, your profile information was just updated. If this wasn't you, please get in touch.`,
   },
   activated: {
-    subject: "Your Cleano account is active",
+    subject: "Your Fixaro account is active",
     title: "Account activated",
-    body: (n) => `Hi ${n.split(" ")[0]}, your Cleano account is active and ready to use.`,
+    body: (n) => `Hi ${n.split(" ")[0]}, your Fixaro account is active and ready to use.`,
   },
   deactivated: {
-    subject: "Your Cleano account was deactivated",
+    subject: "Your Fixaro account was deactivated",
     title: "Account deactivated",
-    body: (n) => `Hi ${n.split(" ")[0]}, your Cleano account has been deactivated. Reach out if you have any questions.`,
+    body: (n) => `Hi ${n.split(" ")[0]}, your Fixaro account has been deactivated. Reach out if you have any questions.`,
   },
   add_card: {
-    subject: "Add a card to your Cleano account",
+    subject: "Add a card to your Fixaro account",
     title: "Add a payment method",
     body: (n, l) => `Hi ${n.split(" ")[0]}, please add a card to your profile to complete the booking flow.${l ? ` <a href="${l}">Add card</a>` : ""}`,
   },
   how_it_works: {
-    subject: "How Cleano works",
+    subject: "How Fixaro works",
     title: "Quick tour",
     body: (n) =>
       `Hi ${n.split(" ")[0]}, here's the rundown:<br><br>` +
@@ -1305,19 +1305,19 @@ const ACCOUNT_COPY: Record<AccountEvent, { subject: string; title: string; body:
       `Reach out anytime via the Messages tab — admin is one tap away.`,
   },
   email_verification: {
-    subject: "Verify your Cleano email",
+    subject: "Verify your Fixaro email",
     title: "Verify your email",
     body: (n, l) => `Hi ${n.split(" ")[0]}, click the link below to verify your email and continue onboarding.${l ? ` <a href="${l}">Verify email</a>` : ""}`,
   },
   signup_submitted: {
-    subject: "We received your Cleano application",
+    subject: "We received your Fixaro application",
     title: "Application received",
-    body: (n) => `Hi ${n.split(" ")[0]}, thanks for applying to join Cleano. We'll review and get back to you within 2–3 business days.`,
+    body: (n) => `Hi ${n.split(" ")[0]}, thanks for applying to join Fixaro. We'll review and get back to you within 2–3 business days.`,
   },
   signup_rejected: {
-    subject: "Update on your Cleano application",
+    subject: "Update on your Fixaro application",
     title: "Application update",
-    body: (n) => `Hi ${n.split(" ")[0]}, after reviewing your application we're not able to move forward at this time. We appreciate your interest in Cleano.`,
+    body: (n) => `Hi ${n.split(" ")[0]}, after reviewing your application we're not able to move forward at this time. We appreciate your interest in Fixaro.`,
   },
 };
 
@@ -1384,7 +1384,7 @@ const INVOICE_KEY_MAP: Record<"ADMIN" | "CUSTOMER", Partial<Record<InvoiceEvent,
 
 const INVOICE_COPY: Record<InvoiceEvent, { subject: (n: string | number) => string; title: string; body: (opts: InvoiceEmailOpts) => string }> = {
   new: {
-    subject: (n) => `New Cleano invoice #${n}`,
+    subject: (n) => `New Fixaro invoice #${n}`,
     title: "New invoice",
     body: (o) => `Hi ${(o.clientName ?? "there").split(" ")[0]}, a new invoice has been generated${o.amount ? ` for ${fmt(o.amount)}` : ""}.${o.link ? ` <a href="${o.link}">View invoice</a>` : ""}`,
   },
@@ -1434,7 +1434,7 @@ const INVOICE_COPY: Record<InvoiceEvent, { subject: (n: string | number) => stri
     body: (o) => `Your bank needs you to confirm this charge. ${o.link ? `<a href="${o.link}">Confirm payment</a>` : ""}`,
   },
   contract_otp: {
-    subject: () => `Your Cleano contract code`,
+    subject: () => `Your Fixaro contract code`,
     title: "Verification code",
     body: (o) => `Your one-time code: <strong>${o.amount ?? "—"}</strong>`,
   },
@@ -1463,7 +1463,7 @@ export async function sendProviderDocumentUploaded(opts: {
   documentTitle: string;
 }) {
   const html = layout(
-    h1("New document on your Cleano drive") +
+    h1("New document on your Fixaro drive") +
       p(`Hi ${opts.providerName.split(" ")[0]}, <strong>${opts.documentTitle}</strong> was added to your drive.`)
   );
   return deliver({
@@ -1814,8 +1814,8 @@ export async function sendAdminPoorRatingTwiceWeek(opts: {
 export async function sendCustomerReminder48h(opts: JobReminderOpts) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
-    h1("Your Cleano cleaning is in 2 days") +
-      p(`Hi ${opts.recipientName.split(" ")[0]}, just a heads-up that your cleaning is coming up in about 48 hours.`) +
+    h1("Your Fixaro appointment is in 2 days") +
+      p(`Hi ${opts.recipientName.split(" ")[0]}, just a heads-up that your appointment is coming up in about 48 hours.`) +
       section([
         ["Date", fmtDate(opts.startTime)],
         ["Time", fmtTime(opts.startTime)],
@@ -1828,7 +1828,7 @@ export async function sendCustomerReminder48h(opts: JobReminderOpts) {
   );
   return deliver({
     to: opts.to,
-    subject: `Reminder: your Cleano cleaning is in 2 days`,
+    subject: `Reminder: your Fixaro appointment is in 2 days`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.reminders.booking_reminder_2" },
     logId: opts.logId,
@@ -1852,7 +1852,7 @@ export async function sendCustomerNeverFoundProvider(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `We couldn't staff your Cleano booking #${opts.jobNumber}`,
+    subject: `We couldn't staff your Fixaro booking #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.cancel.never_found_provider" },
     logId: opts.logId,
@@ -1920,7 +1920,7 @@ export async function sendProviderJobReminder(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `${subjMap[opts.window]} — Cleano`,
+    subject: `${subjMap[opts.window]} — Fixaro`,
     html,
     notification: { recipient: "PROVIDER", key: keyMap[opts.window] },
     logId: opts.logId,
@@ -1971,8 +1971,8 @@ export async function sendCustomerRequestResolved(opts: {
         ? `Hi ${opts.clientName.split(" ")[0]}, your cancellation has been approved. The booking won't proceed and you won't be charged.`
         : `Hi ${opts.clientName.split(" ")[0]}, we've received your reschedule request and we'll be in touch shortly to confirm a new time that works for both sides. There is no reschedule fee, and your deposit carries over to the rescheduled booking.`
       : opts.kind === "cancellation"
-      ? `Hi ${opts.clientName.split(" ")[0]}, after reviewing your cancellation request we're not able to cancel this booking. The cleaning will go ahead as planned.`
-      : `Hi ${opts.clientName.split(" ")[0]}, after reviewing your reschedule request we're keeping the original date and time. The cleaning will go ahead as planned. There is no reschedule fee, and your deposit stays on the booking.`;
+      ? `Hi ${opts.clientName.split(" ")[0]}, after reviewing your cancellation request we're not able to cancel this booking. The service will go ahead as planned.`
+      : `Hi ${opts.clientName.split(" ")[0]}, after reviewing your reschedule request we're keeping the original date and time. The service will go ahead as planned. There is no reschedule fee, and your deposit stays on the booking.`;
 
   const html = layout(
     h1(title) +
@@ -2075,7 +2075,7 @@ export async function sendProviderWeeklyPerformance(opts: {
   tipsTotal: number;
 }) {
   const html = layout(
-    h1(`Your week with Cleano`) +
+    h1(`Your week with Fixaro`) +
       p(`Hi ${opts.providerName.split(" ")[0]}, here's a quick look at ${opts.weekLabel}.`) +
       section([
         ["Jobs completed", String(opts.jobsCompleted)],
@@ -2087,7 +2087,7 @@ export async function sendProviderWeeklyPerformance(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `Your week at Cleano — ${opts.weekLabel}`,
+    subject: `Your week at Fixaro — ${opts.weekLabel}`,
     html,
     notification: { recipient: "PROVIDER", key: "prov.report.weekly_performance" },
   });
@@ -2209,22 +2209,22 @@ export async function sendGiftCardToRecipient(opts: {
     `<div style="margin-bottom:24px;border-radius:14px;overflow:hidden;background:${cover.gradient};min-height:180px;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;padding:36px 24px;">
       <img src="${imageUrl}" alt="" style="display:none;max-width:100%;height:auto;" />
       <div>
-        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.9;">Cleano gift card</div>
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.9;">Fixaro gift card</div>
         <div style="margin-top:10px;font-size:42px;font-weight:700;">$${opts.amount.toFixed(0)}</div>
       </div>
     </div>` +
-      h1(`${opts.recipientName.split(" ")[0]}, you've got a Cleano gift card.`) +
-      p(`<strong>${opts.purchaserName}</strong> sent you a $${opts.amount.toFixed(2)} Cleano gift card. It can be applied to any cleaning booking. Our minimum job price is $119, and the balance carries forward if there is any left.`) +
+      h1(`${opts.recipientName.split(" ")[0]}, you've got a Fixaro gift card.`) +
+      p(`<strong>${opts.purchaserName}</strong> sent you a $${opts.amount.toFixed(2)} Fixaro gift card. It can be applied to any service booking. The balance carries forward if there is any left.`) +
       (opts.personalMessage
         ? p(`<em>"${opts.personalMessage}"</em>`)
         : "") +
       section([["Gift card code", `<code style="font-family:monospace;font-size:16px;letter-spacing:0.06em;">${opts.code}</code>`]]) +
       btn("Redeem your gift card", `${appUrl}/gift-card/redeem?code=${encodeURIComponent(opts.code)}`) +
-      p(`<small>You can redeem it now to add credit to your Cleano account, then apply it next time you book.</small>`)
+      p(`<small>You can redeem it now to add credit to your Fixaro account, then apply it next time you book.</small>`)
   );
   return deliver({
     to: opts.to,
-    subject: `${opts.purchaserName.split(" ")[0]} sent you a Cleano gift card`,
+    subject: `${opts.purchaserName.split(" ")[0]} sent you a Fixaro gift card`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.gift.delivery" },
   });
@@ -2244,12 +2244,12 @@ export async function sendGiftCardPurchaserReceipt(opts: {
     : `We've sent it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) just now.`;
   const html = layout(
     h1(`Thanks for your gift card purchase`) +
-      p(`Hi ${opts.purchaserName.split(" ")[0]}, your $${opts.amount.toFixed(2)} Cleano gift card is paid and confirmed. ${sentLine}`) +
+      p(`Hi ${opts.purchaserName.split(" ")[0]}, your $${opts.amount.toFixed(2)} Fixaro gift card is paid and confirmed. ${sentLine}`) +
       p(`If you need to make changes (recipient address, scheduled date), reply to this email and we'll sort it.`)
   );
   return deliver({
     to: opts.to,
-    subject: `Your Cleano gift card receipt`,
+    subject: `Your Fixaro gift card receipt`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.gift.purchase_receipt" },
   });
@@ -2264,7 +2264,7 @@ export async function sendGiftCardRedeemedConfirmation(opts: {
 }) {
   const html = layout(
     h1(`Gift card redeemed`) +
-      p(`Hi ${opts.recipientName.split(" ")[0]}, we've added <strong>$${opts.amount.toFixed(2)}</strong> to your Cleano account. Your current credit balance is <strong>$${opts.newBalance.toFixed(2)}</strong>, and it will auto-apply the next time you're charged for a booking.`)
+      p(`Hi ${opts.recipientName.split(" ")[0]}, we've added <strong>$${opts.amount.toFixed(2)}</strong> to your Fixaro account. Your current credit balance is <strong>$${opts.newBalance.toFixed(2)}</strong>, and it will auto-apply the next time you're charged for a booking.`)
   );
   return deliver({
     to: opts.to,
@@ -2319,8 +2319,8 @@ export async function sendCustomerHoldPlaced(opts: {
 }) {
   const html = layout(
     h1(`We placed a hold on your card`) +
-      p(`Hi ${opts.clientName.split(" ")[0]}, we've placed a temporary <strong>${fmt(opts.amountUsd)}</strong> authorization on your card for booking #${opts.jobNumber}. This is not a charge — it secures the funds until the cleaning is complete, at which point we'll capture the final amount.`) +
-      p(`If your booking is cancelled before the cleaning, the hold is released and nothing is charged.`)
+      p(`Hi ${opts.clientName.split(" ")[0]}, we've placed a temporary <strong>${fmt(opts.amountUsd)}</strong> authorization on your card for booking #${opts.jobNumber}. This is not a charge — it secures the funds until the visit is complete, at which point we'll capture the final amount.`) +
+      p(`If your booking is cancelled before the visit, the hold is released and nothing is charged.`)
   );
   return deliver({
     to: opts.to,
@@ -2381,7 +2381,7 @@ export async function sendCustomerQuoteReceived(opts: {
   );
   return deliver({
     to: opts.to,
-    subject: `Cleano quote request received`,
+    subject: `Fixaro quote request received`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.quote.received" },
   });
@@ -2449,16 +2449,16 @@ export async function sendCustomerMonthlyStatement(opts: {
         ["Total paid", fmt(opts.totalPaid)],
         ["Outstanding", fmt(opts.totalOutstanding)],
       ]) +
-      p(`Thanks for being a Cleano customer.`)
+      p(`Thanks for being a Fixaro customer.`)
   );
   return deliver({
     to: opts.to,
-    subject: `Your ${opts.monthLabel} Cleano statement`,
+    subject: `Your ${opts.monthLabel} Fixaro statement`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.reports.monthly_statement" },
     attachments: [
       {
-        filename: `cleano-statement-${opts.monthLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        filename: `fixaro-statement-${opts.monthLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`,
         content: opts.pdf,
       },
     ],

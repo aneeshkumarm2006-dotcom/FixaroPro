@@ -144,7 +144,7 @@ export default function BookingsClient({ bookings }: { bookings: Booking[] }) {
       <header className="cl-row-between" style={{ marginBottom: 36, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div className="cl-stack-8">
           <p className="cl-eyebrow">Your bookings</p>
-          <h1 className="cl-display" style={{ fontSize: "clamp(34px, 4.2vw, 48px)" }}>All cleanings.</h1>
+          <h1 className="cl-display" style={{ fontSize: "clamp(34px, 4.2vw, 48px)" }}>All bookings.</h1>
         </div>
         <Link href="/book" className="cl-btn cl-btn-primary">+ New booking</Link>
       </header>

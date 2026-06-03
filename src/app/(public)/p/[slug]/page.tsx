@@ -50,7 +50,7 @@ export default async function LandingPageRoute({
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
-      <h1 className="text-4xl font-[300] tracking-tight text-[#005F6A] mb-6">
+      <h1 className="text-4xl font-[300] tracking-tight text-[#1c1917] mb-6">
         {page.title}
       </h1>
 
@@ -64,7 +64,7 @@ export default async function LandingPageRoute({
       <div className="mt-10 flex justify-center">
         <a
           href={page.ctaLink}
-          className="inline-flex items-center px-8 py-3 bg-[#005F6A] text-white rounded-xl text-base font-[400] hover:bg-[#004a53] transition-colors shadow-sm">
+          className="inline-flex items-center px-8 py-3 bg-[#e85d04] text-white rounded-xl text-base font-[400] hover:bg-[#004a53] transition-colors shadow-sm">
           {page.ctaText}
         </a>
       </div>
@@ -80,6 +80,6 @@ export async function generateMetadata({ params }: { params: Params }) {
   });
 
   return {
-    title: page ? `${page.title} | Cleano` : "Page Not Found",
+    title: page ? `${page.title} | Fixaro` : "Page Not Found",
   };
 }

@@ -539,7 +539,7 @@ export async function uploadChatAttachment(formData: FormData): Promise<
   try {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const folder = `cleano/chat/${a.user.id}`;
+    const folder = `fixaro/chat/${a.user.id}`;
     const publicId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const result = await streamUploadAttachment(buffer, folder, publicId);

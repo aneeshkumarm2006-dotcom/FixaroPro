@@ -45,10 +45,10 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
 
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl !font-light tracking-tight text-[#005F6A]">
+          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
             Rag Wash Tracking
           </h1>
-          <p className="text-sm text-[#005F6A]/70 !font-light mt-1">
+          <p className="text-sm text-[#1c1917]/70 !font-light mt-1">
             Track and manage rag washing for all cleaners
           </p>
         </div>
@@ -61,30 +61,30 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card variant="cleano_light" className="p-6 h-[7rem]">
           <div className="h-full flex flex-col justify-between">
-            <span className="app-title-small !text-[#005F6A]/70">
+            <span className="app-title-small !text-[#1c1917]/70">
               Total Washes
             </span>
-            <p className="h2-title text-[#005F6A]">
+            <p className="h2-title text-[#1c1917]">
               {employees.reduce((sum, e) => sum + e.totalWashes, 0)}
             </p>
           </div>
         </Card>
         <Card variant="cleano_light" className="p-6 h-[7rem]">
           <div className="h-full flex flex-col justify-between">
-            <span className="app-title-small !text-[#005F6A]/70">
+            <span className="app-title-small !text-[#1c1917]/70">
               Total Rags Washed
             </span>
-            <p className="h2-title text-[#005F6A]">
+            <p className="h2-title text-[#1c1917]">
               {employees.reduce((sum, e) => sum + e.totalRags, 0)}
             </p>
           </div>
         </Card>
         <Card variant="cleano_light" className="p-6 h-[7rem]">
           <div className="h-full flex flex-col justify-between">
-            <span className="app-title-small !text-[#005F6A]/70">
+            <span className="app-title-small !text-[#1c1917]/70">
               Active Washers
             </span>
-            <p className="h2-title text-[#005F6A]">
+            <p className="h2-title text-[#1c1917]">
               {employeesWithWashes.length}
             </p>
           </div>
@@ -93,15 +93,15 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
 
       {/* Employee List */}
       <div className="space-y-4">
-        <h2 className="text-lg font-[350] tracking-tight text-[#005F6A]">
-          Cleaners
+        <h2 className="text-lg font-[350] tracking-tight text-[#1c1917]">
+          Technicians
         </h2>
 
         {/* Desktop Table */}
         <div className="hidden md:block bg-white rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-max">
-              <div className="flex bg-[#005F6A]/5 rounded-t-2xl">
+              <div className="flex bg-[#e85d04]/5 rounded-t-2xl">
                 {[
                   { label: "Employee", className: "w-[250px]" },
                   { label: "Total Washes", className: "w-[150px]" },
@@ -111,49 +111,49 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
                 ].map((col) => (
                   <div
                     key={col.label}
-                    className={`${col.className} p-4 text-left text-xs font-[350] !text-[#005F6A]/40 uppercase tracking-wide`}>
+                    className={`${col.className} p-4 text-left text-xs font-[350] !text-[#1c1917]/40 uppercase tracking-wide`}>
                     {col.label}
                   </div>
                 ))}
               </div>
-              <div className="divide-y divide-[#005F6A]/4">
+              <div className="divide-y divide-[#e85d04]/4">
                 {employees.map((emp) => (
                   <div
                     key={emp.id}
-                    className="flex items-center hover:bg-[#005F6A]/1 transition-colors cursor-pointer"
+                    className="flex items-center hover:bg-[#e85d04]/1 transition-colors cursor-pointer"
                     onClick={() =>
                       router.push(`/inventory/rag-wash/${emp.id}`)
                     }>
                     <div className="w-[250px] p-4">
-                      <p className="text-sm font-[350] text-[#005F6A]">
+                      <p className="text-sm font-[350] text-[#1c1917]">
                         {emp.name}
                       </p>
-                      <p className="text-xs text-[#005F6A]/50 mt-0.5">
+                      <p className="text-xs text-[#1c1917]/50 mt-0.5">
                         {emp.email}
                       </p>
                     </div>
                     <div className="w-[150px] p-4">
-                      <span className="text-sm font-[350] text-[#005F6A]">
+                      <span className="text-sm font-[350] text-[#1c1917]">
                         {emp.totalWashes}
                       </span>
                     </div>
                     <div className="w-[150px] p-4">
-                      <span className="text-sm font-[350] text-[#005F6A]">
+                      <span className="text-sm font-[350] text-[#1c1917]">
                         {emp.totalRags}
                       </span>
                     </div>
                     <div className="w-[200px] p-4">
                       {emp.lastWashDate ? (
                         <div>
-                          <p className="text-sm font-[350] text-[#005F6A]">
+                          <p className="text-sm font-[350] text-[#1c1917]">
                             {new Date(emp.lastWashDate).toLocaleDateString("en-US")}
                           </p>
-                          <p className="text-xs text-[#005F6A]/50">
+                          <p className="text-xs text-[#1c1917]/50">
                             {emp.lastWashRagCount} rags
                           </p>
                         </div>
                       ) : (
-                        <span className="text-sm text-[#005F6A]/30">
+                        <span className="text-sm text-[#1c1917]/30">
                           No washes
                         </span>
                       )}
@@ -189,16 +189,16 @@ export default function RagWashClient({ employees }: RagWashClientProps) {
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm font-[400] text-[#005F6A]">
+                    <p className="text-sm font-[400] text-[#1c1917]">
                       {emp.name}
                     </p>
-                    <p className="text-xs text-[#005F6A]/60">{emp.email}</p>
+                    <p className="text-xs text-[#1c1917]/60">{emp.email}</p>
                   </div>
                   <Badge variant="cleano" size="sm">
                     {emp.totalWashes} washes
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between text-xs text-[#005F6A]/60">
+                <div className="flex items-center justify-between text-xs text-[#1c1917]/60">
                   <span>{emp.totalRags} rags total</span>
                   {emp.lastWashDate && (
                     <span>

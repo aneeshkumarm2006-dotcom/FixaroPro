@@ -37,9 +37,9 @@ const VARIANT_CLASSES = {
   cleano_light_bordered_high: "bg-[#77C8CC]/20 border-[#77C8CC]/20",
   cleano_light_bordered: "bg-[#77C8CC]/10 border-[#77C8CC]/10",
   cleano_light_lighter: "bg-[#77C8CC]/5 text-[#77C8CC] hover:bg-[#77C8CC]/10",
-  cleano_dark: "bg-[#005F6A]/10 text-[#005F6A] hover:bg-[#005F6A]/30",
-  cleano_dark_lighter: "bg-[#005F6A]/5 text-[#005F6A] hover:bg-[#005F6A]/10",
-  cleano_dark_solid: "bg-[#005F6A]/4 text-white",
+  cleano_dark: "bg-[#e85d04]/10 text-[#1c1917] hover:bg-[#e85d04]/30",
+  cleano_dark_lighter: "bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10",
+  cleano_dark_solid: "bg-[#e85d04]/4 text-white",
   cleano_light_solid: "bg-[#77C8CC]/40 text-white",
   error: "bg-red-50/50 border-red-100",
   ghost: "bg-transparent border-none",
@@ -47,7 +47,7 @@ const VARIANT_CLASSES = {
   alert: "bg-amber-50/50 border-amber-100 text-amber-600",
   glassy: "bg-white/10 border-white/10",
   glassy_high: "bg-white/20 border-white/20 backdrop-blur-[3px]",
-  glassy_dark: "bg-[#005F6A]/10 border-[#005F6A]/5",
+  glassy_dark: "bg-[#e85d04]/10 border-[#1c1917]/5",
 } as const;
 
 function Card({

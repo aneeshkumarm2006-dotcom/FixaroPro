@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, DollarSign, Sparkles, BedDouble, Bath } from "lucide-react";
+import { Plus, Trash2, DollarSign, Sparkles, Clock } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
@@ -14,10 +14,16 @@ interface PricingRulesTabProps {
 }
 
 interface PerUnitRates {
-  baseServicePrice: number;
-  perBedroom: number;
-  perFullBath: number;
-  perHalfBath: number;
+  hourlyRate: number;
+  threeHourPackage: number;
+  siliconePerRoom: number;
+  weatherproofingMin: number;
+  weatherproofingMax: number;
+  // Legacy fields (kept for backward compat)
+  baseServicePrice?: number;
+  perBedroom?: number;
+  perFullBath?: number;
+  perHalfBath?: number;
 }
 
 export type RoomType =
@@ -55,10 +61,11 @@ function uid() {
 
 export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   const initialRates = getSetting<PerUnitRates>(settings, PER_UNIT_KEY, {
-    baseServicePrice: 100,
-    perBedroom: 19,
-    perFullBath: 19,
-    perHalfBath: 10,
+    hourlyRate: 79,
+    threeHourPackage: 209,
+    siliconePerRoom: 209,
+    weatherproofingMin: 59,
+    weatherproofingMax: 90,
   });
 
   // Legacy key still used by add-ons fallback
@@ -72,10 +79,12 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
     ]
   );
 
-  // Default baseServicePrice to 100 for settings saved before it existed.
   const [rates, setRates] = useState<PerUnitRates>({
-    ...initialRates,
-    baseServicePrice: initialRates.baseServicePrice ?? 100,
+    hourlyRate: initialRates.hourlyRate ?? 79,
+    threeHourPackage: initialRates.threeHourPackage ?? 209,
+    siliconePerRoom: initialRates.siliconePerRoom ?? 209,
+    weatherproofingMin: initialRates.weatherproofingMin ?? 59,
+    weatherproofingMax: initialRates.weatherproofingMax ?? 90,
   });
   const [addOns, setAddOns] = useState<AddOn[]>(initialAddOns);
   const [saving, setSaving] = useState(false);
@@ -110,76 +119,79 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
     setSaving(false);
   }
 
-  const examplePrice =
-    rates.baseServicePrice +
-    2 * rates.perBedroom +
-    1 * rates.perFullBath +
-    0 * rates.perHalfBath;
-
   return (
     <div className="space-y-6">
-      {/* Per-Unit Rates */}
+      {/* Hourly Rates */}
       <SectionCard
-        title="Per-Unit Pricing"
-        description="Base price = base service price + (bedrooms × rate) + (full baths × rate) + (half baths × rate)."
-        icon={BedDouble}>
-        <div className="mb-4">
-          <Field label="Base service price ($)">
+        title="Hourly Pricing"
+        description="Standard rate: $79/hr · 2-hour minimum. 3-hour package is a flat discounted price."
+        icon={Clock}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Hourly rate ($/hr)">
             <Input
               variant="form"
               type="number"
               min="0"
               step="1"
-              value={rates.baseServicePrice}
+              value={rates.hourlyRate}
               onChange={(e) =>
-                setRates((r) => ({
-                  ...r,
-                  baseServicePrice: parseFloat(e.target.value) || 0,
-                }))
+                setRates((r) => ({ ...r, hourlyRate: parseFloat(e.target.value) || 79 }))
               }
             />
           </Field>
+          <Field label="3-hour package price ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.threeHourPackage}
+              onChange={(e) =>
+                setRates((r) => ({ ...r, threeHourPackage: parseFloat(e.target.value) || 209 }))
+              }
+            />
+          </Field>
+          <Field label="Silicone Sealing — per room ($)">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="1"
+              value={rates.siliconePerRoom}
+              onChange={(e) =>
+                setRates((r) => ({ ...r, siliconePerRoom: parseFloat(e.target.value) || 209 }))
+              }
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Weatherproofing min ($)">
+              <Input
+                variant="form"
+                type="number"
+                min="0"
+                step="1"
+                value={rates.weatherproofingMin}
+                onChange={(e) =>
+                  setRates((r) => ({ ...r, weatherproofingMin: parseFloat(e.target.value) || 59 }))
+                }
+              />
+            </Field>
+            <Field label="Max ($)">
+              <Input
+                variant="form"
+                type="number"
+                min="0"
+                step="1"
+                value={rates.weatherproofingMax}
+                onChange={(e) =>
+                  setRates((r) => ({ ...r, weatherproofingMax: parseFloat(e.target.value) || 90 }))
+                }
+              />
+            </Field>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Per Bedroom ($)">
-            <Input
-              variant="form"
-              type="number"
-              min="0"
-              step="1"
-              value={rates.perBedroom}
-              onChange={(e) =>
-                setRates((r) => ({ ...r, perBedroom: parseFloat(e.target.value) || 0 }))
-              }
-            />
-          </Field>
-          <Field label="Per Full Bathroom ($)">
-            <Input
-              variant="form"
-              type="number"
-              min="0"
-              step="1"
-              value={rates.perFullBath}
-              onChange={(e) =>
-                setRates((r) => ({ ...r, perFullBath: parseFloat(e.target.value) || 0 }))
-              }
-            />
-          </Field>
-          <Field label="Per Half Bathroom ($)">
-            <Input
-              variant="form"
-              type="number"
-              min="0"
-              step="1"
-              value={rates.perHalfBath}
-              onChange={(e) =>
-                setRates((r) => ({ ...r, perHalfBath: parseFloat(e.target.value) || 0 }))
-              }
-            />
-          </Field>
-        </div>
-        <p className="text-sm text-[#005F6A]/60 mt-3">
-          Example: 2 bed + 1 full bath = <strong>${examplePrice.toFixed(2)}</strong>
+        <p className="text-sm text-[#1c1917]/60 mt-3">
+          Example: 2h = <strong>${(rates.hourlyRate * 2).toFixed(0)}</strong> · 3h = <strong>${rates.threeHourPackage.toFixed(0)}</strong> · 4h = <strong>${(rates.hourlyRate * 4).toFixed(0)}</strong>
         </p>
       </SectionCard>
 
@@ -201,7 +213,7 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
         }>
         <div className="space-y-3">
           {addOns.length === 0 && (
-            <p className="text-sm text-[#005F6A]/60">No add-ons configured.</p>
+            <p className="text-sm text-[#1c1917]/60">No add-ons configured.</p>
           )}
           {addOns.map((addon) => (
             <div key={addon.id} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.4fr_auto] gap-3 items-end">
@@ -231,7 +243,7 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
                   onChange={(e) =>
                     updateAddOn(addon.id, { roomType: e.target.value as RoomType })
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-[#005F6A]/15 bg-white text-[#003C46] text-sm focus:outline-none focus:border-[#005F6A] focus:ring-2 focus:ring-[#005F6A]/10">
+                  className="w-full px-3 py-2 rounded-xl border border-[#1c1917]/15 bg-white text-[#003C46] text-sm focus:outline-none focus:border-[#1c1917] focus:ring-2 focus:ring-[#e85d04]/10">
                   {ROOM_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}

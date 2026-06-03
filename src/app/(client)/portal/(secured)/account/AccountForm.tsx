@@ -70,7 +70,7 @@ export default function AccountForm({ initial }: { initial: Initial }) {
           Your <em>details.</em>
         </h1>
         <p className="cl-subtitle" style={{ fontSize: 15 }}>
-          Keep your contact info current so we can reach you about cleanings.
+          Keep your contact info current so we can reach you about your bookings.
         </p>
       </header>
 
@@ -225,7 +225,7 @@ export default function AccountForm({ initial }: { initial: Initial }) {
                 margin: 0,
                 lineHeight: 1.55,
               }}>
-              Email <a className="cl-link">care@cleano.ca</a> or text us at{" "}
+              Email <a className="cl-link">contact@fixaropro.com</a> or text us at{" "}
               <a className="cl-link">(514) 555-CLEAN</a>. We answer within an
               hour, 7 days.
             </p>

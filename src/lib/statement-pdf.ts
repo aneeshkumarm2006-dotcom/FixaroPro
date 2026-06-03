@@ -3,7 +3,7 @@
  * a running totals block. Uses @react-pdf/renderer (already a dep).
  */
 
-const BRAND = "#005F6A";
+const BRAND = "#e85d04";
 
 export interface StatementBookingRow {
   jobNumber: number;
@@ -31,7 +31,7 @@ export async function buildStatementPdfBuffer(
     "@react-pdf/renderer"
   );
   const React = await import("react");
-  const tint = (a: number) => `rgba(0, 95, 106, ${a})`;
+  const tint = (a: number) => `rgba(232, 93, 4, ${a})`;
 
   const styles = StyleSheet.create({
     page: {
@@ -115,7 +115,7 @@ export async function buildStatementPdfBuffer(
         el(
           View,
           null,
-          el(Text, { style: styles.brand }, "Cleano"),
+          el(Text, { style: styles.brand }, "Fixaro"),
           el(Text, { style: styles.subtitle }, "Monthly statement"),
         ),
         el(
@@ -197,7 +197,7 @@ export async function buildStatementPdfBuffer(
       el(
         Text,
         { style: styles.footer },
-        "Thank you for choosing Cleano. Questions about this statement? Reply to this email.",
+        "Thank you for choosing Fixaro. Questions about this statement? Reply to this email.",
       ),
     ),
   );

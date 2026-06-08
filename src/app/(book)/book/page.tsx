@@ -220,6 +220,7 @@ export default function BookPage() {
       email: draft.email,
       notes: draft.notes,
       referralCode: draft.referralCode,
+      afterPhotoConsent: draft.afterPhotoConsent,
       depositPaymentIntentId,
       stripeCustomerId: draft.stripeCustomerId,
       stripePaymentMethodId,
@@ -581,6 +582,26 @@ export default function BookPage() {
                     }}>
                     I agree to Fixaro's <a className="cl-link">terms of service</a> and
                     understand that prices may adjust after on-site assessment.
+                  </span>
+                </label>
+                <label
+                  className="cl-check-row"
+                  style={{ alignItems: "flex-start", marginTop: 14 }}>
+                  <input
+                    type="checkbox"
+                    className="cl-check"
+                    checked={draft.afterPhotoConsent}
+                    onChange={(e) => patch({ afterPhotoConsent: e.target.checked })}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.55,
+                      color: "var(--ink-soft)",
+                    }}>
+                    I consent to the team photographing the finished work for quality
+                    assurance. <span style={{ opacity: 0.7 }}>(Optional)</span>
                   </span>
                 </label>
               </>

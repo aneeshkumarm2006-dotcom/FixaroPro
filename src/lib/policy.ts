@@ -59,3 +59,13 @@ export const POOR_RATING_FOLLOWUP_STARS = 1;
 
 /** Default low-stock threshold applied to a product if none is set. */
 export const DEFAULT_INVENTORY_LOW_STOCK = 10;
+
+/**
+ * After-photo consent shown at booking. Cleaners may only photograph the
+ * finished work when the customer consented (or an admin overrides). Bump
+ * the version whenever the wording materially changes so we record which
+ * version each customer agreed to.
+ */
+export const AFTER_PHOTO_CONSENT_VERSION = "v1";
+export const AFTER_PHOTO_CONSENT_TEXT =
+  "I consent to the cleaning team taking photos of the finished work for quality assurance and to confirm the service was completed. Photos are stored securely and are never shared publicly without my permission.";

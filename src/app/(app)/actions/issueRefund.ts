@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { queueAndSendRefund } from "@/lib/email";
+import { applyStrike } from "@/lib/strikes";
+import { STRIKE_REFUND_FRACTION } from "@/lib/strikes-constants";
 
 interface IssueRefundInput {
   jobId: string;
@@ -28,7 +30,10 @@ export async function issueRefund(input: IssueRefundInput) {
 
     const job = await db.job.findUnique({
       where: { id: input.jobId },
-      include: { client: { select: { email: true, name: true } } },
+      include: {
+        client: { select: { email: true, name: true } },
+        cleaners: { select: { id: true } },
+      },
     });
     if (!job) return { success: false, error: "Job not found" };
 
@@ -129,6 +134,25 @@ export async function issueRefund(input: IssueRefundInput) {
     ]);
 
     queueAndSendRefund(input.jobId, input.amount, input.reason).catch(() => {});
+
+    // Three-strike accountability: a refund of half or more of the job price
+    // strikes each assigned cleaner (deduped per job + reason).
+    if (totalCharged > 0 && input.amount >= STRIKE_REFUND_FRACTION * totalCharged) {
+      const cleanerIds = new Set<string>();
+      if (job.employeeId) cleanerIds.add(job.employeeId);
+      for (const c of job.cleaners) cleanerIds.add(c.id);
+      for (const cleanerId of cleanerIds) {
+        await applyStrike({
+          cleanerId,
+          jobId: input.jobId,
+          reason: "REFUND_ISSUED",
+          note: `Refund of $${input.amount.toFixed(2)} on job #${job.jobNumber} (${Math.round(
+            (input.amount / totalCharged) * 100
+          )}% of price).`,
+          actionBy: session.user.id,
+        }).catch((e) => console.error("refund strike", e));
+      }
+    }
 
     revalidatePath(`/jobs/${input.jobId}`);
     revalidatePath("/jobs");

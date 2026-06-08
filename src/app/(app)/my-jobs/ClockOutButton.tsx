@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { clockOut } from "../actions/clockOut";
 
@@ -27,6 +27,7 @@ interface EmployeeProduct {
 interface ClockOutButtonProps {
   jobId: string;
   employeeProducts: EmployeeProduct[];
+  autoOpen?: boolean;
 }
 
 // Per the Post-Job Inventory Usage spec.
@@ -45,10 +46,15 @@ const MOP_OPTIONS = [
 const DISPOSABLE_OPTIONS = [0, 1, 2, 3];
 const ML_PER_SPRAY = 1.25;
 
-export default function ClockOutButton({ jobId, employeeProducts }: ClockOutButtonProps) {
+export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: ClockOutButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (autoOpen) handleOpen();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
 
   // category-keyed selections: productId → option index
   const [sprayPick, setSprayPick] = useState<Record<string, number>>({});

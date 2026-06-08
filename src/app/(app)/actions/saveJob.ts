@@ -71,8 +71,6 @@ export async function saveJob(formData: FormData) {
 
     const startDate = formData.get("startDate") as string;
     const startTime = formData.get("startTime") as string;
-    const endDate = formData.get("endDate") as string;
-    const endTime = formData.get("endTime") as string;
 
     const paymentTypeRaw = (formData.get("paymentType") as string) || "";
     const paymentType = VALID_PAYMENT_TYPES.includes(paymentTypeRaw as any)
@@ -112,12 +110,12 @@ export async function saveJob(formData: FormData) {
       description: (formData.get("description") as string) || null,
       jobType: (formData.get("jobType") as string) || null,
       location: (formData.get("location") as string) || null,
+      apartmentNumber: (formData.get("apartmentNumber") as string) || null,
       jobDate: startDate ? new Date(startDate) : null,
       startTime:
         startDate && startTime
           ? new Date(`${startDate}T${startTime}`)
           : new Date(),
-      endTime: endDate && endTime ? new Date(`${endDate}T${endTime}`) : null,
       price,
       employeePay: parseOptionalFloat(formData.get("employeePay")),
       totalTip: parseOptionalFloat(formData.get("totalTip")),
@@ -129,6 +127,7 @@ export async function saveJob(formData: FormData) {
       discountAmount,
       bedCount: parseOptionalInt(formData.get("bedCount")),
       bathCount: parseOptionalInt(formData.get("bathCount")),
+      halfBathCount: parseOptionalInt(formData.get("halfBathCount")),
       payRateMultiplier:
         parseOptionalFloat(formData.get("payRateMultiplier")) ?? 1.0,
     };

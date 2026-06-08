@@ -21,6 +21,12 @@ export default async function MyRagWashPage() {
     redirect("/sign-in");
   }
 
+  // Rag wash logging is admin-only; cleaners are redirected away
+  const role = (session.user as any).role;
+  if (role === "EMPLOYEE") {
+    redirect("/my-inventory");
+  }
+
   const userId = session.user.id;
 
   const [user, ragWashes, recentJobs, payouts] = await Promise.all([

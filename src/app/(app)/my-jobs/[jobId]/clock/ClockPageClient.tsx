@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clockIn } from "../../../actions/clockIn";
+import { BUSINESS_TZ } from "@/lib/timezone";
 
 interface ClockPageClientProps {
   jobId: string;
@@ -20,17 +21,18 @@ function pad(n: number) {
 }
 
 function fmtClock(d: Date) {
-  let h = d.getHours();
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  return `${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric", minute: "2-digit", second: "2-digit",
+    hour12: true, timeZone: BUSINESS_TZ,
+  }).formatToParts(d);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? "00";
+  return `${get("hour").padStart(2, "0")}:${get("minute")}:${get("second")} ${get("dayPeriod")}`;
 }
 
 function fmtShort(d: Date) {
-  let h = d.getHours();
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  return `${h}:${pad(d.getMinutes())} ${ampm}`;
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true, timeZone: BUSINESS_TZ,
+  });
 }
 
 function fmtDuration(ms: number) {
@@ -232,7 +234,7 @@ export default function ClockPageClient({
           {!isDone ? (
             <button
               className={`clk-action${isLive ? " out" : ""}`}
-              onClick={isLive ? () => router.push(`/my-jobs/${jobId}`) : handleClockIn}
+              onClick={isLive ? () => router.push(`/my-jobs/${jobId}?clockout=1`) : handleClockIn}
               disabled={loading}
             >
               {isLive ? (

@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import BookingsClient from "./BookingsClient";
+import CancelRecurringCard from "./CancelRecurringCard";
+import { RECURRING_FREQUENCIES } from "@/lib/retention-constants";
 
 export default async function BookingsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -72,5 +74,16 @@ export default async function BookingsPage() {
     };
   });
 
-  return <BookingsClient bookings={serialized} />;
+  const isRecurringClient =
+    !!client.serviceFrequency &&
+    (RECURRING_FREQUENCIES as readonly string[]).includes(client.serviceFrequency);
+
+  return (
+    <div className="space-y-4">
+      {isRecurringClient && (
+        <CancelRecurringCard frequency={client.serviceFrequency as string} />
+      )}
+      <BookingsClient bookings={serialized} />
+    </div>
+  );
 }

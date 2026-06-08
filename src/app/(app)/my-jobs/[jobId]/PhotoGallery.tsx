@@ -11,9 +11,17 @@ import PhotoUpload from "./PhotoUpload";
 interface PhotoGalleryProps {
   jobId: string;
   canUpload: boolean;
+  // When true, the after-photo consent gate is blocking uploads: the customer
+  // didn't consent and no admin override is set. Show an explanatory banner
+  // instead of the uploader.
+  consentBlocked?: boolean;
 }
 
-export default function PhotoGallery({ jobId, canUpload }: PhotoGalleryProps) {
+export default function PhotoGallery({
+  jobId,
+  canUpload,
+  consentBlocked = false,
+}: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<JobPhotoDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,12 +97,31 @@ export default function PhotoGallery({ jobId, canUpload }: PhotoGalleryProps) {
 
   return (
     <div className="space-y-6">
-      {canUpload && (
-        <PhotoUpload
-          jobId={jobId}
-          currentPhotoCount={photos.length}
-          onUploaded={load}
-        />
+      {consentBlocked ? (
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "#fffbeb",
+            border: "1px solid #fcd34d",
+            color: "#92400e",
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+          <strong>After-photos disabled.</strong> The customer didn't consent to photos
+          of the finished work for this job. Ask an admin to override if photos are
+          required.
+        </div>
+      ) : (
+        canUpload && (
+          <PhotoUpload
+            jobId={jobId}
+            currentPhotoCount={photos.length}
+            onUploaded={load}
+          />
+        )
       )}
 
       {error && (

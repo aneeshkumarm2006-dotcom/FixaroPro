@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { Calendar, Users, Package, Zap, Camera, ListChecks, MapPin, DollarSign } from "lucide-react";
+import { BUSINESS_TZ } from "@/lib/timezone";
 import Link from "next/link";
 import BackButton from "../BackButton";
 import ClockInButton from "../ClockInButton";
@@ -14,6 +15,7 @@ import JobChecklistPanel from "./JobChecklistPanel";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
+  searchParams?: Promise<{ clockout?: string }>;
 };
 
 function jobTypeLabel(type: string | null) {
@@ -39,11 +41,13 @@ function jobTypeSlug(type: string | null) {
   }
 }
 
-export default async function JobDetailPage({ params }: PageProps) {
+export default async function JobDetailPage({ params, searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
   const { jobId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const autoOpenClockOut = sp.clockout === "1";
 
   const job = await db.job.findUnique({
     where: { id: jobId },
@@ -115,7 +119,7 @@ export default async function JobDetailPage({ params }: PageProps) {
         {job.location && (
           <div className="loc">
             <MapPin size={14} />
-            {job.location}
+            {job.location}{job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
           </div>
         )}
         <h1>{job.clientName}</h1>
@@ -136,7 +140,7 @@ export default async function JobDetailPage({ params }: PageProps) {
               <div className="lbl">Date</div>
               <div className="val">
                 {new Date(job.jobDate).toLocaleDateString("en-US", {
-                  weekday: "short", month: "short", day: "numeric",
+                  weekday: "short", month: "short", day: "numeric", timeZone: BUSINESS_TZ,
                 })}
               </div>
             </div>
@@ -146,7 +150,7 @@ export default async function JobDetailPage({ params }: PageProps) {
               <div className="lbl">Start time</div>
               <div className="val">
                 {new Date(job.startTime).toLocaleTimeString("en-US", {
-                  hour: "numeric", minute: "2-digit", hour12: true,
+                  hour: "numeric", minute: "2-digit", hour12: true, timeZone: BUSINESS_TZ,
                 })}
               </div>
             </div>
@@ -212,7 +216,7 @@ export default async function JobDetailPage({ params }: PageProps) {
               <ClockInButton jobId={job.id} jobStartTime={job.startTime ?? null} />
             )}
             {canClockOut && (
-              <ClockOutButton jobId={job.id} employeeProducts={employeeProducts} />
+              <ClockOutButton jobId={job.id} employeeProducts={employeeProducts} autoOpen={autoOpenClockOut} />
             )}
           </div>
         </div>
@@ -451,7 +455,16 @@ export default async function JobDetailPage({ params }: PageProps) {
             Photos
           </h2>
           <div className="cl-jd-photos-wrap">
-            <PhotoGallery jobId={job.id} canUpload={job.status !== "PAID"} />
+            <PhotoGallery
+              jobId={job.id}
+              canUpload={
+                job.status !== "PAID" &&
+                (job.afterPhotoConsent || job.afterPhotoOverrideAt != null)
+              }
+              consentBlocked={
+                !(job.afterPhotoConsent || job.afterPhotoOverrideAt != null)
+              }
+            />
           </div>
         </>
       )}

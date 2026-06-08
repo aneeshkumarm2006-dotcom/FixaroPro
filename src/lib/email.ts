@@ -2389,6 +2389,59 @@ export async function sendCustomerQuoteReceived(opts: {
   });
 }
 
+/** Confirmation to a job applicant that we received their application. */
+export async function sendCustomerApplicationReceived(opts: {
+  to: string;
+  applicantName: string;
+  position?: string | null;
+}) {
+  const html = layout(
+    h1(`Application received`) +
+      p(`Hi ${opts.applicantName.split(" ")[0]}, thanks for applying${opts.position ? ` for the ${opts.position} role` : ""}! We've received your application and our team will review it shortly. If it's a match, we'll be in touch about next steps.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `We received your Fixaro application`,
+    html,
+  });
+}
+
+/** Admin alert that a new job application landed in the inbox. */
+export async function sendAdminJobApplication(opts: {
+  applicationId: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  position: string | null;
+  resumeUrl: string | null;
+}) {
+  const admins = await fetchAdmins();
+  if (admins.length === 0) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1(`New job application — ${opts.name}`) +
+      section([
+        ["Name", opts.name],
+        ["Email", opts.email],
+        ["Phone", opts.phone ?? "—"],
+        ["Position", opts.position ?? "—"],
+      ]) +
+      (opts.resumeUrl ? p(`<a href="${opts.resumeUrl}">View résumé</a>`) : "") +
+      btn("Open applications", `${appUrl}/job-applications`)
+  );
+  for (const admin of admins) {
+    try {
+      await deliver({
+        to: admin.email,
+        subject: `New job application — ${opts.name}`,
+        html,
+      });
+    } catch (e) {
+      console.error("admin application email failed for", admin.email, e);
+    }
+  }
+}
+
 /** Admin alert that a new quote landed in the inbox. */
 export async function sendAdminQuoteRequest(opts: {
   quoteId: string;
@@ -2519,5 +2572,46 @@ export async function sendProviderLastMinuteOpening(opts: {
     subject: `Last minute booking — $${opts.bonusUsd.toFixed(0)} bonus`,
     html,
     notification: { recipient: "PROVIDER", key: "prov.unassigned.last_minute" },
+  });
+}
+
+/**
+ * Retention "save offer" sent after a customer cancels their recurring
+ * service. Includes an open-tracking pixel and a click-tracked CTA that routes
+ * through /api/track/recurring/[id]/click before landing on the booking page
+ * with the promo code pre-applied. No notification gate — this is a brand-new
+ * email and should always send.
+ */
+export async function sendRecurringSaveOffer(opts: {
+  to: string;
+  clientName: string;
+  cancellationId: string;
+  headline: string;
+  body: string;
+  buttonLabel: string;
+  offerLabel: string;
+  offerCode: string;
+  expiresAt: string;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const openPixel = `${appUrl}/api/track/recurring/${opts.cancellationId}/open`;
+  const clickUrl = `${appUrl}/api/track/recurring/${opts.cancellationId}/click`;
+
+  const html = layout(
+    h1(opts.headline) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, ${opts.body}`) +
+      section([
+        ["Your offer", opts.offerLabel],
+        ["Promo code", opts.offerCode],
+        ["Valid until", fmtDate(opts.expiresAt)],
+      ]) +
+      btn(opts.buttonLabel, clickUrl) +
+      `<img src="${openPixel}" width="1" height="1" alt="" style="display:none" />`
+  );
+
+  return deliver({
+    to: opts.to,
+    subject: opts.headline,
+    html,
   });
 }

@@ -115,6 +115,19 @@ export async function uploadJobPhoto(formData: FormData) {
       return { success: false, error: "Not authorized for this job" };
     }
 
+    // After-photo consent gate. Admins are the override authority and bypass
+    // it; cleaners may only upload when the customer consented OR an admin set
+    // an override on this job. Enforced here on the server, not just by hiding
+    // the uploader in the UI.
+    const consentOk = job.afterPhotoConsent || job.afterPhotoOverrideAt != null;
+    if (!isAdmin && !consentOk) {
+      return {
+        success: false,
+        error:
+          "The customer didn't consent to after-photos for this job. Ask an admin to override if photos are required.",
+      };
+    }
+
     const existingCount = await db.jobPhoto.count({ where: { jobId } });
     if (existingCount >= MAX_PHOTOS_PER_JOB) {
       return {

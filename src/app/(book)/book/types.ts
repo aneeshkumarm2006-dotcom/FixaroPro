@@ -54,6 +54,8 @@ export interface BookingDraft {
   email: string;
   notes: string;
   referralCode: string;
+  // After-photo consent (opt-in checkbox, unchecked by default).
+  afterPhotoConsent: boolean;
   promoCode?: string;
   promoDiscount?: number;
   promoApplied?: boolean;
@@ -80,6 +82,7 @@ export const EMPTY_DRAFT: BookingDraft = {
   email: "",
   notes: "",
   referralCode: "",
+  afterPhotoConsent: false,
 };
 
 // ── Service catalog ────────────────────────────────────────────────────────

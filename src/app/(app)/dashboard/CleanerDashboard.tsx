@@ -4,6 +4,8 @@ import {
   MapPin, CheckCircle2, AlertTriangle, Package, DollarSign,
   Calendar, Briefcase,
 } from "lucide-react";
+import { getStrikeSummary } from "@/lib/strikes";
+import { STRIKE_THRESHOLD, STRIKE_WINDOW_DAYS } from "@/lib/strikes-constants";
 
 interface Props {
   userId: string;
@@ -136,6 +138,8 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
   const { g, firstName } = greeting(userName);
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
+  const strikeSummary = await getStrikeSummary(userId);
+
   return (
     <div className="cl-dash-shell">
       {/* Greeting */}
@@ -143,6 +147,33 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
         <h1>{g}, <em>{firstName}.</em></h1>
         <p>{dateStr} &middot; {todayJobs.length === 0 ? "No jobs today — nice and easy." : `${todayJobs.length} ${todayJobs.length === 1 ? "job" : "jobs"} today.`}</p>
       </div>
+
+      {/* Strike accountability banner */}
+      {strikeSummary.level !== "none" && (
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "flex-start",
+            padding: "12px 14px",
+            borderRadius: 12,
+            marginBottom: 16,
+            background: strikeSummary.level === "critical" ? "#fee2e2" : "#fffbeb",
+            color: strikeSummary.level === "critical" ? "#991b1b" : "#92400e",
+          }}
+        >
+          <AlertTriangle size={18} style={{ flex: "0 0 auto", marginTop: 1 }} />
+          <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+            <strong>
+              You have {strikeSummary.activeCount} active strike
+              {strikeSummary.activeCount === 1 ? "" : "s"} (last {STRIKE_WINDOW_DAYS} days).
+            </strong>{" "}
+            {strikeSummary.activeCount >= STRIKE_THRESHOLD
+              ? "You've reached the strike threshold — please speak with your manager."
+              : "Arrive on time and avoid late cancellations to keep your record clean."}
+          </div>
+        </div>
+      )}
 
       {/* Next job hero */}
       {nextJob ? (

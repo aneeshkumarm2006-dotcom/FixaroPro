@@ -20,6 +20,7 @@ import {
   sendCustomerBookingsPrepaid,
 } from "@/lib/email";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
+import { AFTER_PHOTO_CONSENT_VERSION } from "@/lib/policy";
 
 type Frequency =
   | "ONE_TIME"
@@ -47,6 +48,8 @@ interface SubmitBookingInput {
   email: string;
   notes: string;
   referralCode: string;
+  // After-photo consent (checkbox at booking, unchecked by default).
+  afterPhotoConsent?: boolean;
   promoCode?: string;
   promoDiscount?: number;
   // Optional
@@ -228,6 +231,11 @@ export async function submitBooking(input: SubmitBookingInput) {
         promoDiscountAmount: input.promoDiscount && input.promoDiscount > 0 ? input.promoDiscount : null,
         bookingSource: "web",
         notes: input.notes?.trim() || null,
+        afterPhotoConsent: input.afterPhotoConsent === true,
+        ...(input.afterPhotoConsent === true && {
+          afterPhotoConsentAt: new Date(),
+          afterPhotoConsentVersion: AFTER_PHOTO_CONSENT_VERSION,
+        }),
         ...(input.depositPaymentIntentId && {
           depositPaymentIntentId: input.depositPaymentIntentId,
           depositPaid: true,
@@ -268,6 +276,26 @@ export async function submitBooking(input: SubmitBookingInput) {
         where: { code: input.promoCode.trim().toUpperCase(), isActive: true },
         data: { usesCount: { increment: 1 } },
       }).catch(() => {});
+    }
+
+    // 6c. Retention reactivation hook — if this client previously cancelled
+    // their recurring service and there's an open save offer, mark it
+    // reactivated. A booking that used the offer's own code is the strongest
+    // signal, but any new booking counts as a win-back.
+    {
+      const openOffer = await db.recurringCancellation.findFirst({
+        where: { clientId: client.id, reactivatedAt: null },
+        orderBy: { cancelledAt: "desc" },
+        select: { id: true },
+      });
+      if (openOffer) {
+        await db.recurringCancellation
+          .update({
+            where: { id: openOffer.id },
+            data: { reactivatedAt: new Date(), offerStatus: "REACTIVATED" },
+          })
+          .catch(() => {});
+      }
     }
 
     // 7. Recurring jobs — copy the primary across future dates
@@ -311,6 +339,11 @@ export async function submitBooking(input: SubmitBookingInput) {
             discountAmount: childPricing.discountAmount > 0 ? childPricing.discountAmount : null,
             parentJob: { connect: { id: primaryJob.id } },
             bookingSource: "web",
+            afterPhotoConsent: input.afterPhotoConsent === true,
+            ...(input.afterPhotoConsent === true && {
+              afterPhotoConsentAt: new Date(),
+              afterPhotoConsentVersion: AFTER_PHOTO_CONSENT_VERSION,
+            }),
             addOns: {
               create: input.addOns.map((a) => ({
                 name: a.name,

@@ -13,6 +13,9 @@ import { resendReceipt } from "../../actions/resendReceipt";
 import { generateInvoiceFromJob } from "../../actions/generateInvoiceFromJob";
 import { markJobComplete } from "../../actions/markJobComplete";
 import { createRatingToken } from "../../actions/createRatingToken";
+import { setAfterPhotoOverride } from "../../actions/setAfterPhotoOverride";
+import { duplicateJob } from "../../actions/duplicateJob";
+import { BUSINESS_TZ } from "@/lib/timezone";
 import {
   ArrowLeft, MapPin, Clock, DollarSign, Users,
   CheckCircle2, Package, Pencil, History, Activity,
@@ -42,6 +45,7 @@ interface Job {
   clientName: string;
   clientId?: string | null;
   location: string | null;
+  apartmentNumber?: string | null;
   description: string | null;
   jobType: string | null;
   jobDate: string | null;
@@ -62,6 +66,7 @@ interface Job {
   discountAmount?: number | null;
   bedCount?: number | null;
   bathCount?: number | null;
+  halfBathCount?: number | null;
   payRateMultiplier?: number | null;
   depositPaid?: boolean;
   depositPaymentIntentId?: string | null;
@@ -72,6 +77,9 @@ interface Job {
   cleaners: Array<{ id: string; name: string }>;
   cancellationRequestedAt?: string | null;
   rescheduleRequestedAt?: string | null;
+  afterPhotoConsent?: boolean;
+  afterPhotoConsentAt?: string | null;
+  afterPhotoOverrideAt?: string | null;
 }
 
 interface ClientLite {
@@ -124,6 +132,12 @@ interface JobDetailViewProps {
   onDeleteJob?: () => Promise<void>;
   users: User[];
   clients?: ClientLite[];
+  ratingStatus?: {
+    state: "none" | "sent" | "shown" | "rated" | "skipped";
+    stars: number | null;
+    emailSentAt: string | null;
+    ratedAt: string | null;
+  } | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -204,6 +218,7 @@ export default function JobDetailView({
   onDeleteJob,
   users,
   clients = [],
+  ratingStatus = null,
 }: JobDetailViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -290,6 +305,8 @@ export default function JobDetailView({
   const [isTogglingInvoice, setIsTogglingInvoice] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [reviewLink, setReviewLink] = useState<string | null>(null);
+  const [photoOverride, setPhotoOverride] = useState(!!job.afterPhotoOverrideAt);
+  const [isTogglingOverride, setIsTogglingOverride] = useState(false);
   const [isSendingReview, setIsSendingReview] = useState(false);
   const [reviewCopied, setReviewCopied] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(job.status);
@@ -313,6 +330,20 @@ export default function JobDetailView({
   );
   const [refundReason, setRefundReason] = useState("");
   const [refundError, setRefundError] = useState<string | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+
+  async function handleDuplicate() {
+    if (isDuplicating) return;
+    setIsDuplicating(true);
+    try {
+      const result = await duplicateJob(job.id);
+      if (result.success && result.newJobId) {
+        router.push(`/jobs/${result.newJobId}`);
+      }
+    } finally {
+      setIsDuplicating(false);
+    }
+  }
 
   const handleCancelJob = async () => {
     setCancelError(null);
@@ -433,6 +464,16 @@ export default function JobDetailView({
     setTimeout(() => setReviewCopied(false), 2000);
   };
 
+  const handleTogglePhotoOverride = async () => {
+    if (isTogglingOverride) return;
+    const next = !photoOverride;
+    setIsTogglingOverride(true);
+    setPhotoOverride(next); // optimistic
+    const result = await setAfterPhotoOverride(job.id, next);
+    if (!result.success) setPhotoOverride(!next); // revert
+    setIsTogglingOverride(false);
+  };
+
   const handleGenerateInvoice = async () => {
     if (!isAdmin || isTogglingInvoice) return;
     setIsTogglingInvoice(true);
@@ -446,9 +487,10 @@ export default function JobDetailView({
     finally { setIsTogglingInvoice(false); }
   };
 
-  // Derived values
-  const duration = job.endTime && job.startTime
-    ? Math.round((new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / 60000)
+  // Derived values — use clock-out as the actual end time, fall back to endTime
+  const effectiveEndTime = job.clockOutTime || job.endTime;
+  const duration = effectiveEndTime && job.clockInTime
+    ? Math.round((new Date(effectiveEndTime).getTime() - new Date(job.clockInTime).getTime()) / 60000)
     : null;
 
   const netProfit = (job.price || 0) - (job.employeePay || 0) - (job.parking || 0) - totalProductCost;
@@ -459,11 +501,11 @@ export default function JobDetailView({
 
   // Date hero values
   const jobDateObj = job.jobDate ? new Date(job.jobDate) : new Date(job.startTime);
-  const dayOfWeek = jobDateObj.toLocaleDateString('en-US', { weekday: 'long' });
-  const dayNum    = jobDateObj.toLocaleDateString('en-US', { day: 'numeric' });
-  const mon       = jobDateObj.toLocaleDateString('en-US', { month: 'short' });
-  const startTimeStr = new Date(job.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const endTimeStr   = job.endTime ? new Date(job.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : null;
+  const dayOfWeek = jobDateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: BUSINESS_TZ });
+  const dayNum    = jobDateObj.toLocaleDateString('en-US', { day: 'numeric', timeZone: BUSINESS_TZ });
+  const mon       = jobDateObj.toLocaleDateString('en-US', { month: 'short', timeZone: BUSINESS_TZ });
+  const startTimeStr = new Date(job.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: BUSINESS_TZ });
+  const endTimeStr   = job.endTime ? new Date(job.endTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: BUSINESS_TZ }) : null;
 
   // ── Tab content ────────────────────────────────────────────────────────────
 
@@ -576,7 +618,10 @@ export default function JobDetailView({
           <div className="dcard-head"><h3>Location</h3></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink)' }}>
             <MapPin size={16} style={{ color: 'var(--primary-50)' }} />
-            {job.location}
+            <span>
+              {job.location}
+              {job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
+            </span>
           </div>
         </div>
       )}
@@ -858,10 +903,10 @@ export default function JobDetailView({
                     )}
                   </div>
                   <div className="tline-ts">
-                    {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: BUSINESS_TZ })}
                     <br />
                     <span style={{ fontSize: 11, color: 'var(--primary-40)' }}>
-                      {new Date(log.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      {new Date(log.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: BUSINESS_TZ })}
                     </span>
                   </div>
                 </div>
@@ -1009,8 +1054,8 @@ export default function JobDetailView({
                       </span>
                       <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--ink)' }}>
                         <strong>{job.clientName}</strong> asked to cancel this booking on{' '}
-                        {new Date(job.cancellationRequestedAt!).toLocaleString(undefined, {
-                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                        {new Date(job.cancellationRequestedAt!).toLocaleString('en-US', {
+                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: BUSINESS_TZ,
                         })}.
                       </p>
                     </div>
@@ -1090,8 +1135,8 @@ export default function JobDetailView({
                       </span>
                       <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--ink)' }}>
                         <strong>{job.clientName}</strong> asked to reschedule this booking on{' '}
-                        {new Date(job.rescheduleRequestedAt!).toLocaleString(undefined, {
-                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                        {new Date(job.rescheduleRequestedAt!).toLocaleString('en-US', {
+                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: BUSINESS_TZ,
                         })}.
                       </p>
                       <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--primary-50)' }}>
@@ -1174,7 +1219,7 @@ export default function JobDetailView({
             </div>
             {(job.location || job.description) && (
               <p className="jdetail-desc">
-                {job.location}
+                {job.location}{job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
                 {job.description ? <> · <span style={{ color: 'var(--ink-soft)' }}>{job.description}</span></> : null}
               </p>
             )}
@@ -1200,6 +1245,16 @@ export default function JobDetailView({
               >
                 <Star size={14} className="mr-2" />
                 {isSendingReview ? "Generating…" : "Get Review Link"}
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="default" border={false}
+                onClick={handleDuplicate}
+                disabled={isDuplicating}
+                className="rounded-xl px-4 py-2"
+              >
+                <Copy size={14} className="mr-2" /> {isDuplicating ? "Duplicating…" : "Duplicate"}
               </Button>
             )}
             <Button
@@ -1280,6 +1335,106 @@ export default function JobDetailView({
               {reviewCopied ? <Check size={13} /> : <Copy size={13} />}
               {reviewCopied ? "Copied!" : "Copy"}
             </button>
+          </div>
+        )}
+
+        {/* Customer rating status banner */}
+        {ratingStatus && ratingStatus.state !== "none" && (
+          <div
+            className="banner"
+            style={
+              ratingStatus.state === "rated"
+                ? { background: "#ecfdf5", borderColor: "#6ee7b7", color: "#065f46" }
+                : ratingStatus.state === "skipped"
+                ? { background: "#f3f4f6", borderColor: "#d1d5db", color: "#374151" }
+                : { background: "#fffbeb", borderColor: "#fcd34d", color: "#92400e" }
+            }
+          >
+            <Star size={16} style={{ flex: "0 0 auto" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {ratingStatus.state === "rated" && (
+                <>
+                  <strong>Customer rated {ratingStatus.stars}/5.</strong>{" "}
+                  {ratingStatus.ratedAt
+                    ? `Submitted ${new Date(ratingStatus.ratedAt).toLocaleDateString()}.`
+                    : ""}
+                </>
+              )}
+              {ratingStatus.state === "skipped" && (
+                <>
+                  <strong>Customer declined to rate.</strong> They chose “rather not answer.”
+                </>
+              )}
+              {ratingStatus.state === "shown" && (
+                <>
+                  <strong>Rating requested — awaiting response.</strong> The customer has seen the
+                  prompt but hasn’t rated yet.
+                </>
+              )}
+              {ratingStatus.state === "sent" && (
+                <>
+                  <strong>Rating request sent.</strong>{" "}
+                  {ratingStatus.emailSentAt
+                    ? `Emailed ${new Date(ratingStatus.emailSentAt).toLocaleDateString()}.`
+                    : ""}{" "}
+                  Awaiting the customer’s response.
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* After-photo consent banner (admin) */}
+        {isAdmin && (
+          <div
+            className="banner"
+            style={
+              job.afterPhotoConsent || photoOverride
+                ? { background: "#ecfdf5", borderColor: "#6ee7b7", color: "#065f46" }
+                : { background: "#fffbeb", borderColor: "#fcd34d", color: "#92400e" }
+            }
+          >
+            <Camera size={16} style={{ flex: "0 0 auto" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {job.afterPhotoConsent ? (
+                <>
+                  <strong>After-photos allowed.</strong> The customer consented at booking.
+                </>
+              ) : photoOverride ? (
+                <>
+                  <strong>After-photos allowed by admin override.</strong> The customer did
+                  not consent at booking.
+                </>
+              ) : (
+                <>
+                  <strong>After-photos blocked.</strong> The customer didn&apos;t consent at
+                  booking. Cleaners can&apos;t upload unless you override.
+                </>
+              )}
+            </div>
+            {!job.afterPhotoConsent && (
+              <button
+                type="button"
+                onClick={handleTogglePhotoOverride}
+                disabled={isTogglingOverride}
+                style={{
+                  fontSize: 12,
+                  padding: "4px 10px",
+                  borderRadius: 8,
+                  background: photoOverride ? "#fff" : "#92400e",
+                  color: photoOverride ? "#92400e" : "#fff",
+                  border: photoOverride ? "1px solid #fcd34d" : "none",
+                  cursor: isTogglingOverride ? "default" : "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                {isTogglingOverride
+                  ? "Saving…"
+                  : photoOverride
+                  ? "Remove override"
+                  : "Override & allow"}
+              </button>
+            )}
           </div>
         )}
 

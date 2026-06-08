@@ -92,6 +92,38 @@ export default async function JobPage({
     take: logsPerPage,
   });
 
+  // Rating status — the (one) rating token for this job drives the banner.
+  const ratingToken = await db.jobRatingToken.findFirst({
+    where: { jobId: id },
+    orderBy: { createdAt: "asc" },
+    select: {
+      ratingStars: true,
+      ratherNotAnswer: true,
+      usedAt: true,
+      emailSentAt: true,
+      popupShownAt: true,
+    },
+  });
+  const ratingStatus = ratingToken
+    ? {
+        state: (ratingToken.usedAt
+          ? ratingToken.ratherNotAnswer
+            ? "skipped"
+            : "rated"
+          : ratingToken.popupShownAt
+          ? "shown"
+          : ratingToken.emailSentAt
+          ? "sent"
+          : "none") as "none" | "sent" | "shown" | "rated" | "skipped",
+        stars: ratingToken.ratingStars,
+        emailSentAt: ratingToken.emailSentAt?.toISOString() ?? null,
+        ratedAt:
+          ratingToken.usedAt && !ratingToken.ratherNotAnswer
+            ? ratingToken.usedAt.toISOString()
+            : null,
+      }
+    : null;
+
   // Fetch all photos uploaded for this job
   const photos = await db.jobPhoto.findMany({
     where: { jobId: id },
@@ -129,6 +161,7 @@ export default async function JobPage({
     clientName: job.clientName,
     clientId: job.clientId,
     location: job.location,
+    apartmentNumber: job.apartmentNumber,
     description: job.description,
     jobType: job.jobType,
     jobDate: job.jobDate?.toISOString() || null,
@@ -149,6 +182,7 @@ export default async function JobPage({
     discountAmount: job.discountAmount,
     bedCount: job.bedCount,
     bathCount: job.bathCount,
+    halfBathCount: job.halfBathCount,
     payRateMultiplier: job.payRateMultiplier,
     depositPaid: job.depositPaid,
     depositPaymentIntentId: job.depositPaymentIntentId,
@@ -163,6 +197,9 @@ export default async function JobPage({
     cleaners: job.cleaners.map((c) => ({ id: c.id, name: c.name })),
     cancellationRequestedAt: job.cancellationRequestedAt?.toISOString() ?? null,
     rescheduleRequestedAt: job.rescheduleRequestedAt?.toISOString() ?? null,
+    afterPhotoConsent: job.afterPhotoConsent,
+    afterPhotoConsentAt: job.afterPhotoConsentAt?.toISOString() ?? null,
+    afterPhotoOverrideAt: job.afterPhotoOverrideAt?.toISOString() ?? null,
   };
 
   const productUsageData = job.productUsage.map((usage) => ({
@@ -210,6 +247,7 @@ export default async function JobPage({
       onDeleteJob={deleteJob}
       users={users}
       clients={clients}
+      ratingStatus={ratingStatus}
     />
   );
 }

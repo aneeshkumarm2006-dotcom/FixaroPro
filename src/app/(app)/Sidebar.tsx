@@ -223,35 +223,41 @@ export default function Sidebar({
                 <SectionLabel expanded={expanded}>Overview</SectionLabel>
                 <NavLink href="/dashboard" icon="dashboard" expanded={expanded}>Dashboard</NavLink>
                 <NavLink href="/analytics" icon="analytics" expanded={expanded}>Analytics</NavLink>
+                <NavLink href="/kpi" icon="analytics" expanded={expanded}>Retention KPI</NavLink>
+                <NavLink href="/calendar" icon="calendar" expanded={expanded}>Calendar</NavLink>
 
                 <SectionLabel expanded={expanded}>Operations</SectionLabel>
-                <NavLink href="/employees" icon="employees" expanded={expanded}>Employees</NavLink>
-                <NavLink href="/clients" icon="clients" expanded={expanded}>Clients</NavLink>
                 <NavLink href="/jobs" icon="jobs" expanded={expanded}>Jobs</NavLink>
-                <NavLink href="/web-bookings" icon="web-bookings" expanded={expanded}>Web Bookings</NavLink>
-                <NavLink href="/calendar" icon="calendar" expanded={expanded}>Calendar</NavLink>
                 <NavLink href="/requests" icon="requests" expanded={expanded} badge={pendingRequests}>Requests</NavLink>
-                <NavLink href="/inventory" icon="inventory" expanded={expanded} exclude={["/inventory/rag-wash"]}>Inventory</NavLink>
+                <NavLink href="/waitlist" icon="waitlist" expanded={expanded}>Wait Lists</NavLink>
+                <NavLink href="/documents" icon="documents" expanded={expanded}>Documents</NavLink>
+                <NavLink href="/clients" icon="clients" expanded={expanded}>Clients</NavLink>
+                <NavLink href="/web-bookings" icon="web-bookings" expanded={expanded}>Web Bookings</NavLink>
+                <NavLink href="/leads" icon="leads" expanded={expanded}>Leads</NavLink>
+                <NavLink href="/chat" icon="chat" expanded={expanded} badge={chatUnread}>Chat</NavLink>
+
+                <SectionLabel expanded={expanded}>Staff</SectionLabel>
+                <NavLink href="/employees" icon="employees" expanded={expanded}>Employees</NavLink>
+                <NavLink href="/job-applications" icon="employees" expanded={expanded}>Applications</NavLink>
+
+                <SectionLabel expanded={expanded}>Inventory &amp; Supplies</SectionLabel>
+                <NavLink href="/inventory" icon="inventory" expanded={expanded} exclude={["/inventory/rag-wash", "/inventory/kits"]}>Inventory</NavLink>
                 <NavLink href="/inventory/rag-wash" icon="rag-wash" expanded={expanded}>Rag Wash</NavLink>
-                <NavLink href="/inventory/kits" icon="my-inventory" expanded={expanded}>Cleaner Kits</NavLink>
-                <NavLink href="/wash-payouts" icon="rag-wash" expanded={expanded}>Wash Payouts</NavLink>
+
+                <SectionLabel expanded={expanded}>Sales &amp; Marketing</SectionLabel>
+                <NavLink href="/sales" icon="sales" expanded={expanded}>Sales</NavLink>
+                <NavLink href="/promo-codes" icon="sales" expanded={expanded}>Promo Codes</NavLink>
+                <NavLink href="/quotes" icon="leads" expanded={expanded}>Quotes</NavLink>
 
                 <SectionLabel expanded={expanded}>Finance</SectionLabel>
                 <NavLink href="/payouts" icon="payouts" expanded={expanded}>Payouts</NavLink>
                 <NavLink href="/finances" icon="finances" expanded={expanded}>Finances</NavLink>
                 <NavLink href="/invoices" icon="invoices" expanded={expanded}>Invoices</NavLink>
                 <NavLink href="/bulk-charge" icon="payouts" expanded={expanded}>Bulk Charge</NavLink>
-                <NavLink href="/quotes" icon="leads" expanded={expanded}>Quotes</NavLink>
-                <NavLink href="/gift-cards" icon="sales" expanded={expanded}>Gift Cards</NavLink>
-                <NavLink href="/sales" icon="sales" expanded={expanded}>Sales</NavLink>
-                <NavLink href="/promo-codes" icon="sales" expanded={expanded}>Promo Codes</NavLink>
-                <NavLink href="/leads" icon="leads" expanded={expanded}>Leads</NavLink>
-                <NavLink href="/waitlist" icon="waitlist" expanded={expanded}>Waitlist</NavLink>
 
-                <SectionLabel expanded={expanded}>More</SectionLabel>
+                <SectionLabel expanded={expanded}>Admin</SectionLabel>
+                <NavLink href="/settings" icon="settings" expanded={expanded}>Settings</NavLink>
                 <NavLink href="/training" icon="training" expanded={expanded}>Training</NavLink>
-                <NavLink href="/documents" icon="documents" expanded={expanded}>Documents</NavLink>
-                <NavLink href="/chat" icon="chat" expanded={expanded} badge={chatUnread}>Chat</NavLink>
               </>
             ) : (
               <>

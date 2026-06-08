@@ -50,6 +50,7 @@ model User {
   employeeComplaints           Complaint[]            @relation("EmployeeComplaints")
   resolvedComplaints           Complaint[]            @relation("ResolvedComplaints")
   receivedAlerts               Alert[]                @relation("RecipientAlerts")
+  strikes                      CleanerStrike[]        @relation("CleanerStrikes")
 }
 
 model Account {
@@ -221,6 +222,7 @@ model Client {
   waitlistEntries        Waitlist[]
   referredBy             Client?           @relation("ClientReferrals", fields: [referredByClientId], references: [id], onDelete: SetNull)
   referrals              Client[]          @relation("ClientReferrals")
+  recurringCancellations RecurringCancellation[]
 
   @@index([clientType])
   @@index([isActive])
@@ -247,6 +249,7 @@ model Job {
   clientName              String
   clientId                String?
   location                String?
+  apartmentNumber         String?
   description             String?
   jobType                 String?
   jobDate                 DateTime?
@@ -311,6 +314,14 @@ model Job {
   // Manager override for the Rag Wash review flag.
   washReviewOverrideAt    DateTime?
   washReviewOverrideBy    String?
+  // After-photo consent (captured at booking). Cleaners may not upload
+  // after-photos unless the customer consented OR an admin override is set.
+  // Enforced server-side in uploadJobPhoto.ts.
+  afterPhotoConsent        Boolean   @default(false)
+  afterPhotoConsentAt      DateTime?
+  afterPhotoConsentVersion String?
+  afterPhotoOverrideAt     DateTime?
+  afterPhotoOverrideBy     String?
   // Card hold lifecycle. `holdPaymentIntentId` is set when admin (or the
   // booking flow) places a manual-capture PI for the full job price.
   holdPaymentIntentId     String?
@@ -339,6 +350,7 @@ model Job {
   complaints              Complaint[]
   emailLogs               EmailLog[]
   ratingTokens            JobRatingToken[]
+  strikes                 CleanerStrike[]
   convertedFromLeads      Lead[]
   convertedFromWaitlist   Waitlist[]
 
@@ -828,6 +840,7 @@ enum AlertType {
   CLIENT_COMPLAINT
   RATING_DECREASE
   OVERDUE_COMMERCIAL
+  CLEANER_STRIKE
   GENERAL
 }
 
@@ -1432,6 +1445,36 @@ model QuoteRequest {
   @@index([createdAt])
 }
 
+enum JobApplicationStatus {
+  NEW
+  REVIEWING
+  INTERVIEW
+  HIRED
+  REJECTED
+  ARCHIVED
+}
+
+// Public careers intake. Modeled on QuoteRequest. Resume is uploaded to
+// Cloudinary as a raw resource and the secure URL stored here.
+model JobApplication {
+  id          String               @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  position    String?
+  experience  String?
+  coverLetter String?
+  resumeUrl   String?
+  status      JobApplicationStatus @default(NEW)
+  source      String?
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 model ServiceArea {
   id         String   @id @default(cuid())
   prefix     String   @unique
@@ -1523,17 +1566,30 @@ model EmailLog {
 }
 
 model JobRatingToken {
-  id          String    @id @default(cuid())
-  jobId       String
-  token       String    @unique
-  cleanerId   String?
-  usedAt      DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  jobId           String
+  token           String    @unique
+  cleanerId       String?
+  // Customer linkage — lets the portal popup find the right token without a
+  // job scan, and ties the rating record back to the client.
+  customerId      String?
+  // Captured star value (raw 1–5). Null until the customer actually rates.
+  ratingStars     Int?
+  // "Rather not answer" — the customer was prompted but declined. We stamp
+  // this (and usedAt) and write NO EmployeeRating row, so a skip never
+  // poisons the cleaner's average or pay multiplier.
+  ratherNotAnswer Boolean   @default(false)
+  // Idempotency stamps for the two prompt channels: email send + popup show.
+  emailSentAt     DateTime?
+  popupShownAt    DateTime?
+  usedAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
   @@index([token])
+  @@index([customerId])
 }
 
 model PromoCode {
@@ -1550,5 +1606,81 @@ model PromoCode {
   updatedAt    DateTime  @updatedAt
 
   @@index([code])
+}
+
+enum SaveOfferStatus {
+  PENDING
+  SENT
+  OPENED
+  CLICKED
+  REPLIED
+  REACTIVATED
+  EXPIRED
+}
+
+// One row per full-recurring cancellation. Drives the retention "save offer"
+// email + the retention KPI dashboard. Lifecycle stamps track the funnel:
+// sent → opened (pixel) → clicked (redirect) → replied (admin) → reactivated.
+model RecurringCancellation {
+  id            String           @id @default(cuid())
+  clientId      String
+  frequency     ServiceFrequency
+  reason        String?
+  cancelledAt   DateTime         @default(now())
+  emailSentAt   DateTime?
+  // Save offer snapshot (mirrors PromoCode discountType/value + the code minted).
+  offerType     String?          // FIXED | PERCENT
+  offerValue    Float?
+  offerCode     String?
+  offerStatus   SaveOfferStatus  @default(PENDING)
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  repliedAt     DateTime?
+  reactivatedAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  client        Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([offerStatus])
+  @@index([cancelledAt])
+}
+
+enum StrikeReason {
+  LATE_ARRIVAL
+  LATE_CANCEL
+  REFUND_ISSUED
+  LOW_RATING
+  MANUAL
+}
+
+enum StrikeStatus {
+  ACTIVE
+  EXCUSED
+  REMOVED
+}
+
+// Three-strike accountability. The rolling 30-day active count is computed on
+// read (no cron) — strikes outside the window simply don't count. EXCUSED /
+// REMOVED strikes are kept for the audit trail but never count toward the
+// threshold.
+model CleanerStrike {
+  id        String       @id @default(cuid())
+  cleanerId String
+  jobId     String?
+  reason    StrikeReason
+  status    StrikeStatus @default(ACTIVE)
+  note      String?
+  // Admin who issued / excused / removed the strike (null for auto-triggers).
+  actionBy  String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  cleaner   User         @relation("CleanerStrikes", fields: [cleanerId], references: [id], onDelete: Cascade)
+  job       Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([cleanerId])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
 }
 

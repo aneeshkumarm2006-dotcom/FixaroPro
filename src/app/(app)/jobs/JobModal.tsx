@@ -14,11 +14,13 @@ import {
   FileText,
   AlertTriangle,
   Calendar,
+  Clock,
   Users,
   ChevronRight,
   ChevronLeft,
   Check,
   ChevronDown,
+  Hash,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -38,6 +40,7 @@ interface Job {
   clientName: string;
   clientId?: string | null;
   location: string | null;
+  apartmentNumber?: string | null;
   description: string | null;
   jobType: string | null;
   jobDate: string | null;
@@ -52,6 +55,7 @@ interface Job {
   discountAmount?: number | null;
   bedCount?: number | null;
   bathCount?: number | null;
+  halfBathCount?: number | null;
   payRateMultiplier?: number | null;
   cleaners: Array<{ id: string; name: string }>;
   addOns?: Array<{ id: string; name: string; price: number }>;
@@ -80,12 +84,11 @@ interface JobModalProps {
 const formSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   location: z.string().optional(),
+  apartmentNumber: z.string().optional(),
   description: z.string().optional(),
   jobType: z.string().optional(),
   startDate: z.string().optional(),
   startTime: z.string().optional(),
-  endDate: z.string().optional(),
-  endTime: z.string().optional(),
   price: z.union([z.coerce.number().min(0), z.literal("")]).optional(),
   employeePay: z.union([z.coerce.number().min(0), z.literal("")]).optional(),
   totalTip: z.union([z.coerce.number().min(0), z.literal("")]).optional(),
@@ -93,6 +96,7 @@ const formSchema = z.object({
   notes: z.string().optional(),
   bedCount: z.union([z.coerce.number().int().min(0), z.literal("")]).optional(),
   bathCount: z.union([z.coerce.number().int().min(0), z.literal("")]).optional(),
+  halfBathCount: z.union([z.coerce.number().int().min(0), z.literal("")]).optional(),
   discountAmount: z.union([z.coerce.number().min(0), z.literal("")]).optional(),
 });
 
@@ -343,153 +347,45 @@ function CustomDatePicker({
   );
 }
 
-type CustomTimePickerProps = {
+type TimeInputProps = {
   label: string;
   value?: string;
   onChange: (value: string) => void;
-  placeholder?: string;
   disabled?: boolean;
 };
 
-function CustomTimePicker({
-  label,
-  value,
-  onChange,
-  placeholder = "Select time",
-  disabled,
-}: CustomTimePickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && pickerRef.current) {
-      const rect = pickerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
-      });
-    }
-  }, [isOpen]);
-
-  const generateTimeOptions = () => {
-    const options = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        const timeString = `${String(hour).padStart(2, "0")}:${String(
-          minute
-        ).padStart(2, "0")}`;
-        options.push(timeString);
-      }
-    }
-    return options;
-  };
-
-  const timeOptions = generateTimeOptions();
-
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return "";
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const handleTimeSelect = (time: string) => {
-    onChange(time);
-    setIsOpen(false);
-  };
-
-  const handleClear = () => {
-    onChange("");
-    setIsOpen(false);
+function TimeInput({ label, value, onChange, disabled }: TimeInputProps) {
+  const handleNow = () => {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, "0");
+    const m = String(now.getMinutes()).padStart(2, "0");
+    onChange(`${h}:${m}`);
   };
 
   return (
-    <div className="space-y-2 relative" ref={pickerRef}>
+    <div className="space-y-2">
       <label className="input-label tracking-tight">{label}</label>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        className={`w-full px-4 py-3 rounded-2xl border border-[#1c1917]/15 bg-[#e85d04]/5 flex items-center justify-between text-left transition-all tracking-tight ${
-          disabled
-            ? "opacity-60 cursor-not-allowed"
-            : "hover:border-[#1c1917]/40"
-        }`}>
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center border border-[#1c1917]/15">
-            <Calendar className="w-4 h-4 text-[#1c1917]" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-xs text-[#1c1917]/70">Selected time</span>
-            <span
-              className={`text-sm font-[450] ${
-                value ? "text-[#1c1917]" : "text-[#1c1917]/50"
-              }`}>
-              {value ? formatTimeDisplay(value) : placeholder}
-            </span>
-          </div>
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1c1917]/50 pointer-events-none z-10" />
+          <input
+            type="time"
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            className={`w-full pl-11 pr-4 py-3 rounded-2xl border border-[#1c1917]/15 bg-[#e85d04]/5 text-sm text-[#1c1917] tracking-tight focus:outline-none focus:border-[#e85d04]/60 focus:ring-2 focus:ring-[#e85d04]/10 transition-all ${
+              disabled ? "opacity-60 cursor-not-allowed" : "hover:border-[#1c1917]/40"
+            }`}
+          />
         </div>
-        <ChevronDown className="w-4 h-4 text-[#1c1917]/60 flex-shrink-0" />
-      </button>
-
-      {isOpen && (
-        <div
-          className="fixed z-[9999] w-full max-w-sm rounded-2xl bg-white shadow-xl border border-[#1c1917]/10 max-h-64 overflow-y-auto"
-          style={{ top: dropdownPosition.top, left: dropdownPosition.left }}>
-          <div className="p-2">
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                className="flex-1 px-3 py-2 rounded-xl bg-[#e85d04] text-white text-sm font-[500] tracking-tight hover:bg-[#e85d04]/90"
-                onClick={() =>
-                  handleTimeSelect(new Date().toTimeString().slice(0, 5))
-                }>
-                Now
-              </button>
-              <button
-                type="button"
-                className="flex-1 px-3 py-2 rounded-xl bg-white border border-[#1c1917]/20 text-[#1c1917]/80 text-sm font-[500] tracking-tight hover:border-[#1c1917]/40"
-                onClick={handleClear}>
-                Clear
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-1">
-              {timeOptions.map((time) => (
-                <button
-                  key={time}
-                  type="button"
-                  onClick={() => handleTimeSelect(time)}
-                  className={`px-3 py-2 rounded-lg text-sm font-[450] tracking-tight transition-all ${
-                    value === time
-                      ? "bg-[#e85d04] text-white"
-                      : "bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10"
-                  }`}>
-                  {formatTimeDisplay(time)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={handleNow}
+          className="px-3 py-2.5 rounded-xl text-xs font-[500] bg-[#e85d04]/10 text-[#1c1917] hover:bg-[#e85d04]/20 transition-colors whitespace-nowrap disabled:opacity-50">
+          Now
+        </button>
+      </div>
     </div>
   );
 }
@@ -731,6 +627,7 @@ export default function JobModal({
         reset({
           clientName: job.clientName || "",
           location: job.location || "",
+          apartmentNumber: job.apartmentNumber || "",
           description: job.description || "",
           jobType: job.jobType || "",
           startDate: job.startTime
@@ -739,12 +636,6 @@ export default function JobModal({
           startTime: job.startTime
             ? new Date(job.startTime).toISOString().split("T")[1].slice(0, 5)
             : "",
-          endDate: job.endTime
-            ? new Date(job.endTime).toISOString().split("T")[0]
-            : "",
-          endTime: job.endTime
-            ? new Date(job.endTime).toISOString().split("T")[1].slice(0, 5)
-            : "",
           price: job.price || "",
           employeePay: job.employeePay || "",
           totalTip: job.totalTip || "",
@@ -752,6 +643,7 @@ export default function JobModal({
           notes: job.notes || "",
           bedCount: job.bedCount ?? "",
           bathCount: job.bathCount ?? "",
+          halfBathCount: job.halfBathCount ?? "",
           discountAmount: job.discountAmount ?? "",
         });
         setSelectedCleaners(job.cleaners?.map((c) => c.id) || []);
@@ -774,12 +666,11 @@ export default function JobModal({
         reset({
           clientName: "",
           location: "",
+          apartmentNumber: "",
           description: "",
           jobType: "",
           startDate: "",
           startTime: "",
-          endDate: "",
-          endTime: "",
           price: "",
           employeePay: "",
           totalTip: "",
@@ -787,6 +678,7 @@ export default function JobModal({
           notes: "",
           bedCount: "",
           bathCount: "",
+          halfBathCount: "",
           discountAmount: "",
         });
         setSelectedCleaners([]);
@@ -884,12 +776,11 @@ export default function JobModal({
       formData.append("clientName", values.clientName);
       formData.append("clientId", selectedClientId);
       formData.append("location", values.location || "");
+      formData.append("apartmentNumber", values.apartmentNumber || "");
       formData.append("description", values.description || "");
       formData.append("jobType", selectedJobType);
       formData.append("startDate", values.startDate || "");
       formData.append("startTime", values.startTime || "");
-      formData.append("endDate", values.endDate || "");
-      formData.append("endTime", values.endTime || "");
       formData.append("price", String(values.price || ""));
       formData.append("employeePay", String(values.employeePay || ""));
       formData.append("totalTip", String(values.totalTip || ""));
@@ -897,6 +788,7 @@ export default function JobModal({
       formData.append("notes", values.notes || "");
       formData.append("bedCount", String(values.bedCount || ""));
       formData.append("bathCount", String(values.bathCount || ""));
+      formData.append("halfBathCount", String(values.halfBathCount || ""));
 
       // Resolve discount: convert percent to amount if needed.
       // If admin has touched the field, send an explicit value (including "0")
@@ -1157,22 +1049,42 @@ export default function JobModal({
                   />
 
                   {/* Location */}
-                  <div>
-                    <label className="input-label tracking-tight">
-                      Location
-                    </label>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
-                      <Input
-                        variant="form"
-                        type="text"
-                        size="md"
-                        {...register("location")}
-                        disabled={disableForm}
-                        className="w-full pl-11 px-4 py-3 tracking-tight placeholder:tracking-tight"
-                        placeholder="Address or area"
-                        border={false}
-                      />
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="input-label tracking-tight">
+                        Location
+                      </label>
+                      <div className="relative">
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                        <Input
+                          variant="form"
+                          type="text"
+                          size="md"
+                          {...register("location")}
+                          disabled={disableForm}
+                          className="w-full pl-11 px-4 py-3 tracking-tight placeholder:tracking-tight"
+                          placeholder="Street address"
+                          border={false}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="input-label tracking-tight">
+                        Apt / Unit
+                      </label>
+                      <div className="relative">
+                        <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                        <Input
+                          variant="form"
+                          type="text"
+                          size="md"
+                          {...register("apartmentNumber")}
+                          disabled={disableForm}
+                          className="w-full pl-11 px-4 py-3 tracking-tight placeholder:tracking-tight"
+                          placeholder="e.g. 4B"
+                          border={false}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1241,11 +1153,11 @@ export default function JobModal({
                         control={control}
                         render={({ field }) => (
                           <CustomDatePicker
-                            label="Start Date"
+                            label="Job Date"
                             value={field.value}
                             onChange={field.onChange}
                             disabled={disableForm}
-                            placeholder="Select start date"
+                            placeholder="Select date"
                           />
                         )}
                       />
@@ -1254,40 +1166,11 @@ export default function JobModal({
                         name="startTime"
                         control={control}
                         render={({ field }) => (
-                          <CustomTimePicker
+                          <TimeInput
                             label="Start Time"
                             value={field.value}
                             onChange={field.onChange}
                             disabled={disableForm}
-                            placeholder="Select start time"
-                          />
-                        )}
-                      />
-
-                      <Controller
-                        name="endDate"
-                        control={control}
-                        render={({ field }) => (
-                          <CustomDatePicker
-                            label="End Date"
-                            value={field.value}
-                            onChange={field.onChange}
-                            disabled={disableForm}
-                            placeholder="Select end date"
-                          />
-                        )}
-                      />
-
-                      <Controller
-                        name="endTime"
-                        control={control}
-                        render={({ field }) => (
-                          <CustomTimePicker
-                            label="End Time"
-                            value={field.value}
-                            onChange={field.onChange}
-                            disabled={disableForm}
-                            placeholder="Select end time"
                           />
                         )}
                       />
@@ -1525,7 +1408,7 @@ export default function JobModal({
 
                       <div>
                         <label className="input-label tracking-tight">
-                          Bed Count
+                          Bedrooms
                         </label>
                         <Input
                           variant="form"
@@ -1542,7 +1425,7 @@ export default function JobModal({
 
                       <div>
                         <label className="input-label tracking-tight">
-                          Bath Count
+                          Full Bathrooms
                         </label>
                         <Input
                           variant="form"
@@ -1550,6 +1433,23 @@ export default function JobModal({
                           size="md"
                           min="0"
                           {...register("bathCount")}
+                          disabled={disableForm}
+                          className="w-full px-4 py-3"
+                          placeholder="0"
+                          border={false}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="input-label tracking-tight">
+                          Half Bathrooms
+                        </label>
+                        <Input
+                          variant="form"
+                          type="number"
+                          size="md"
+                          min="0"
+                          {...register("halfBathCount")}
                           disabled={disableForm}
                           className="w-full px-4 py-3"
                           placeholder="0"

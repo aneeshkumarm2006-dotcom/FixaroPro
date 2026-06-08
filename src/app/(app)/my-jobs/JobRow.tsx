@@ -98,7 +98,7 @@ export function JobRow({ job, isMainEmployee, missingEquipment = [] }: JobRowPro
             {job.location && (
               <span className="row">
                 <MapPin size={13} className="icon" />
-                {job.location}
+                {job.location}{job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
               </span>
             )}
             {job.startTime && (

@@ -11,6 +11,7 @@ import PremiumSelect from "@/components/ui/PremiumSelect";
 import { EmployeeModal } from "../EmployeeModal";
 import { assignKit } from "../../actions/assignKit";
 import { setEmployeeRating } from "../../actions/setEmployeeRating";
+import StrikesPanel from "./StrikesPanel";
 import {
   ArrowLeft,
   Mail,
@@ -29,7 +30,7 @@ import {
   Star,
 } from "lucide-react";
 
-type TabView = "overview" | "jobs" | "products" | "availability";
+type TabView = "overview" | "jobs" | "products" | "availability" | "strikes";
 
 const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
   [
@@ -52,6 +53,11 @@ const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
       id: "availability",
       label: "Availability",
       icon: <Calendar className="w-4 h-4" />,
+    },
+    {
+      id: "strikes",
+      label: "Strikes",
+      icon: <AlertTriangle className="w-4 h-4" />,
     },
   ];
 
@@ -156,6 +162,19 @@ interface EmployeeDetailViewProps {
   upcomingJobCount: number;
   availability: AvailabilitySlot[];
   availabilityConflicts: AvailabilityConflict[];
+  strikeSummary: {
+    activeCount: number;
+    level: "none" | "warning" | "critical";
+    strikes: Array<{
+      id: string;
+      reason: string;
+      status: string;
+      note: string | null;
+      jobId: string | null;
+      createdAt: string;
+      countsTowardThreshold: boolean;
+    }>;
+  };
 }
 
 export default function EmployeeDetailView({
@@ -171,6 +190,7 @@ export default function EmployeeDetailView({
   upcomingJobCount,
   availability,
   availabilityConflicts,
+  strikeSummary,
 }: EmployeeDetailViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1008,6 +1028,9 @@ export default function EmployeeDetailView({
           {activeView === "jobs" && <JobsTab />}
           {activeView === "products" && <ProductsTab />}
           {activeView === "availability" && <AvailabilityTabContent />}
+          {activeView === "strikes" && (
+            <StrikesPanel cleanerId={employee.id} summary={strikeSummary} />
+          )}
         </div>
       </div>
 

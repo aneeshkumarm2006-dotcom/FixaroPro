@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { projectWashables, CREDIT_PER_RAG, CREDIT_PER_PAD } from "@/lib/wash";
 import { sendAdminClockedOut } from "@/lib/email";
+import { ensureRatingRequest } from "@/lib/rating";
 
 const ML_PER_SPRAY = 1.25;
 
@@ -21,6 +22,91 @@ export interface PostJobUsage {
 interface RestockItem {
   name: string;
   productId: string;
+}
+
+async function updatePayoutsForCompletedJob(
+  job: {
+    id: string;
+    employeeId: string | null;
+    employeePay: number | null;
+    totalTip: number | null;
+    payRateMultiplier: number | null;
+    jobDate: Date | null;
+    startTime: Date;
+    clockInTime: Date | null;
+    cleaners: Array<{ id: string }>;
+  },
+  cleanerIds: string[],
+  clockOutTime: Date
+) {
+  const jobDateForLookup = job.jobDate ?? job.startTime;
+  const rangeEnd = new Date(jobDateForLookup);
+  rangeEnd.setHours(23, 59, 59, 999);
+
+  const activePeriods = await db.payPeriod.findMany({
+    where: {
+      status: { in: ["DRAFT", "APPROVED"] },
+      startDate: { lte: rangeEnd },
+      endDate: { gte: jobDateForLookup },
+    },
+  });
+  if (activePeriods.length === 0) return;
+
+  const employeeMultipliers = await db.user.findMany({
+    where: { id: { in: cleanerIds } },
+    select: { id: true, payMultiplier: true },
+  });
+  const multiplierMap = new Map(
+    employeeMultipliers.map((e) => [e.id, e.payMultiplier ?? 1])
+  );
+
+  const basePay = (job.employeePay ?? 0) + (job.totalTip ?? 0);
+  const jobPayMultiplier = job.payRateMultiplier ?? 1;
+  const totalJobPay = basePay * jobPayMultiplier;
+  const perPerson = cleanerIds.length > 0 ? totalJobPay / cleanerIds.length : 0;
+
+  const clockIn = job.clockInTime;
+  const hours =
+    clockIn
+      ? Math.max(0, (clockOutTime.getTime() - clockIn.getTime()) / 3_600_000)
+      : 0;
+  const perPersonHours = cleanerIds.length > 0 ? hours / cleanerIds.length : 0;
+
+  for (const period of activePeriods) {
+    for (const cleanerId of cleanerIds) {
+      const empMultiplier = multiplierMap.get(cleanerId) ?? 1;
+      const contribution = Number((perPerson * empMultiplier).toFixed(2));
+      const hoursContrib = Number(perPersonHours.toFixed(4));
+
+      const existing = await db.payout.findUnique({
+        where: { payPeriodId_employeeId: { payPeriodId: period.id, employeeId: cleanerId } },
+      });
+
+      if (existing) {
+        const newBase = Number((existing.baseAmount + contribution).toFixed(2));
+        await db.payout.update({
+          where: { id: existing.id },
+          data: {
+            baseAmount: newBase,
+            finalAmount: Number((newBase + existing.adjustments - existing.deductions + existing.reimbursements).toFixed(2)),
+            jobCount: { increment: 1 },
+            totalHours: Number((existing.totalHours + hoursContrib).toFixed(2)),
+          },
+        });
+      } else {
+        await db.payout.create({
+          data: {
+            payPeriodId: period.id,
+            employeeId: cleanerId,
+            baseAmount: contribution,
+            finalAmount: contribution,
+            jobCount: 1,
+            totalHours: hoursContrib,
+          },
+        });
+      }
+    }
+  }
 }
 
 export async function clockOut(jobId: string, usage: PostJobUsage) {
@@ -297,6 +383,17 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
       durationMinutes,
     }).catch((e) => console.error("admin clocked-out email", e));
 
+    // Auto-update payout records in any active pay period covering this job.
+    updatePayoutsForCompletedJob(job, cleanerIdsForCredit, now).catch((e) =>
+      console.error("payout update after clock-out", e)
+    );
+
+    // Job is now COMPLETED — mint the rating token + send the "rate us" email
+    // once (idempotent; shares the token used by markJobComplete + the popup).
+    ensureRatingRequest(jobId).catch((e) =>
+      console.error("ensureRatingRequest (clockOut)", e)
+    );
+
     revalidatePath("/my-jobs");
     revalidatePath(`/my-jobs/${jobId}`);
     revalidatePath(`/jobs/${jobId}`);
@@ -304,6 +401,7 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
     revalidatePath("/finances");
     revalidatePath("/analytics");
     revalidatePath("/my-inventory");
+    revalidatePath("/my-pay");
 
     return { success: true, restockNeeded: restockNeeded.length > 0 };
   } catch (error) {

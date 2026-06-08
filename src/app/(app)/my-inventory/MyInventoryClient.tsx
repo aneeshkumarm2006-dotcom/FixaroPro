@@ -78,12 +78,7 @@ export default function MyInventoryClient({
           <h1 className="cl-page-title">My inventory</h1>
           <p className="cl-page-sub">Equipment and supplies assigned to you.</p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <a href="/my-inventory/rag-wash" className="cl-action-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c-1 2-6 7-6 11a6 6 0 0 0 12 0c0-4-5-9-6-11z" /></svg>
-            Log rag washes
-          </a>
-        </div>
+        <div style={{ display: "flex", gap: 10 }} />
       </div>
 
       {/* Hero */}

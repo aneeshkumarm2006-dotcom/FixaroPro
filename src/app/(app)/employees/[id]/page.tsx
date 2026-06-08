@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import EmployeeDetailView from "./EmployeeDetailView";
 import { getEmployeeAvgRating } from "../../actions/setEmployeeRating";
+import { getStrikeSummary } from "@/lib/strikes";
 
 export default async function EmployeePage({
   params,
@@ -263,9 +264,11 @@ export default async function EmployeePage({
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
   const starRating = await getEmployeeAvgRating(id);
+  const strikeSummary = await getStrikeSummary(id);
 
   return (
     <EmployeeDetailView
+      strikeSummary={strikeSummary}
       employee={{
         id: employee.id,
         name: employee.name,

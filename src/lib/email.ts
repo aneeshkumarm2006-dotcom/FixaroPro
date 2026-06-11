@@ -2390,7 +2390,7 @@ export async function sendCustomerQuoteReceived(opts: {
 }
 
 /** Confirmation to a job applicant that we received their application. */
-export async function sendCustomerApplicationReceived(opts: {
+export async function sendApplicantConfirmation(opts: {
   to: string;
   applicantName: string;
   position?: string | null;
@@ -2407,7 +2407,7 @@ export async function sendCustomerApplicationReceived(opts: {
 }
 
 /** Admin alert that a new job application landed in the inbox. */
-export async function sendAdminJobApplication(opts: {
+export async function sendAdminNewApplication(opts: {
   applicationId: string;
   name: string;
   email: string;

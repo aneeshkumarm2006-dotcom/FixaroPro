@@ -32,100 +32,119 @@ export async function sendInvoice(invoiceId: string) {
     });
 
     if (!invoice) return { success: false, error: "Invoice not found" };
-    if (!["DRAFT", "SENT"].includes(invoice.status)) {
-      return { success: false, error: "Only draft or sent invoices can be emailed" };
+
+    if (invoice.status === "CANCELLED") {
+      return {
+        success: false,
+        error: "Cancelled invoices cannot be emailed",
+      };
     }
 
-    const isFirstSend = invoice.status === "DRAFT";
+    const wasDraft = invoice.status === "DRAFT";
 
-    // Mark as SENT if it was a draft
-    if (isFirstSend) {
-      await db.invoice.update({
-        where: { id: invoiceId },
-        data: { status: "SENT", sentAt: new Date() },
-      });
+    // Mark as SENT (if it was a draft) and stamp the send time.
+    await db.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        ...(wasDraft ? { status: "SENT" } : {}),
+        sentAt: new Date(),
+      },
+    });
 
-      if (invoice.jobId) {
-        await db.$transaction([
-          db.job.update({
-            where: { id: invoice.jobId },
-            data: { invoiceSent: true },
-          }),
-          db.jobLog.create({
-            data: {
-              jobId: invoice.jobId,
-              userId: guard.session.user.id,
-              action: "INVOICE_SENT",
-              field: "invoiceSent",
-              oldValue: "false",
-              newValue: "true",
-              description: `Invoice ${invoice.invoiceNumber} sent by ${guard.session.user.name}`,
-            },
-          }),
-        ]);
-        revalidatePath(`/jobs/${invoice.jobId}`);
-        revalidatePath("/jobs");
-      }
+    // If linked to a job, flag it as invoiced and log the send.
+    if (invoice.jobId) {
+      await db.$transaction([
+        db.job.update({
+          where: { id: invoice.jobId },
+          data: { invoiceSent: true },
+        }),
+        db.jobLog.create({
+          data: {
+            jobId: invoice.jobId,
+            userId: guard.session.user.id,
+            action: "INVOICE_SENT",
+            field: "invoiceSent",
+            oldValue: "false",
+            newValue: "true",
+            description: `Invoice ${invoice.invoiceNumber} sent by ${guard.session.user.name}`,
+          },
+        }),
+      ]);
+      revalidatePath(`/jobs/${invoice.jobId}`);
+      revalidatePath("/jobs");
     }
 
     revalidatePath("/invoices");
     revalidatePath(`/invoices/${invoiceId}`);
 
-    // Send email with PDF attached if client has an email
-    if (invoice.client?.email) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-
-      // Generate PDF attachment
-      let pdfAttachment: Array<{ filename: string; content: Buffer }> | undefined;
-      try {
-        const pdfBuffer = await buildInvoicePdfBuffer({
-          invoiceNumber: invoice.invoiceNumber,
-          createdAt: invoice.createdAt.toISOString(),
-          dueDate: invoice.dueDate?.toISOString() ?? null,
-          status: isFirstSend ? "SENT" : invoice.status,
-          client: {
-            name: invoice.client.name,
-            email: invoice.client.email,
-            phone: invoice.client.phone ?? null,
-            address: invoice.client.address ?? null,
-          },
-          lineItems: invoice.lineItems.map((li) => ({
-            description: li.description,
-            quantity: li.quantity,
-            unitPrice: li.unitPrice,
-            amount: li.amount,
-          })),
-          subtotal: invoice.subtotal,
-          discountAmount: invoice.discountAmount,
-          gstAmount: invoice.gstAmount,
-          qstAmount: invoice.qstAmount,
-          totalAmount: invoice.totalAmount,
-          notes: invoice.notes,
-          taxConfig: {
-            gstRate: GST_RATE * 100,
-            qstRate: QST_RATE * 100,
-            gstNumber: "",
-            qstNumber: "",
-          },
-        });
-        pdfAttachment = [{ filename: `invoice-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }];
-      } catch (pdfErr) {
-        console.error("PDF generation failed, sending email without attachment", pdfErr);
-      }
-
-      await sendInvoiceEmail({
-        to: invoice.client.email,
-        recipient: "CUSTOMER",
-        event: isFirstSend ? "new" : "resend",
-        invoiceNumber: invoice.invoiceNumber,
-        amount: invoice.totalAmount,
-        clientName: invoice.client.name,
-        link: `${appUrl}/invoices/${invoice.id}`,
-        attachments: pdfAttachment,
-      }).catch((e) => console.error("invoice email", e));
+    // Email the customer with the invoice PDF attached.
+    if (!invoice.client?.email) {
+      // Invoice is marked sent; there's just no address to email it to.
+      return { success: true, emailed: false };
     }
 
-    return { success: true, emailed: !!invoice.client?.email };
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+    // Generate PDF attachment
+    let pdfAttachment: Array<{ filename: string; content: Buffer }> | undefined;
+    try {
+      const pdfBuffer = await buildInvoicePdfBuffer({
+        invoiceNumber: invoice.invoiceNumber,
+        createdAt: invoice.createdAt.toISOString(),
+        dueDate: invoice.dueDate?.toISOString() ?? null,
+        status: wasDraft ? "SENT" : invoice.status,
+        client: {
+          name: invoice.client.name,
+          email: invoice.client.email,
+          phone: invoice.client.phone ?? null,
+          address: invoice.client.address ?? null,
+        },
+        lineItems: invoice.lineItems.map((li) => ({
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          amount: li.amount,
+        })),
+        subtotal: invoice.subtotal,
+        discountAmount: invoice.discountAmount,
+        gstAmount: invoice.gstAmount,
+        qstAmount: invoice.qstAmount,
+        totalAmount: invoice.totalAmount,
+        notes: invoice.notes,
+        taxConfig: {
+          gstRate: GST_RATE * 100,
+          qstRate: QST_RATE * 100,
+          gstNumber: "",
+          qstNumber: "",
+        },
+      });
+      pdfAttachment = [{ filename: `invoice-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }];
+    } catch (pdfErr) {
+      console.error("PDF generation failed, sending email without attachment", pdfErr);
+    }
+
+    const result = await sendInvoiceEmail({
+      to: invoice.client.email,
+      recipient: "CUSTOMER",
+      event: wasDraft ? "new" : "resend",
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.totalAmount,
+      clientName: invoice.client.name,
+      link: `${appUrl}/portal/invoices/${invoice.id}`,
+      attachments: pdfAttachment,
+    });
+
+    if (!result.ok) {
+      return {
+        success: false,
+        error:
+          ("error" in result && typeof result.error === "string"
+            ? result.error
+            : null) ?? "Email delivery failed",
+      };
+    }
+
+    return { success: true, emailed: true };
   } catch (error) {
     console.error("Error sending invoice:", error);
     return { success: false, error: "Failed to send invoice" };

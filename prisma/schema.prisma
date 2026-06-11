@@ -192,8 +192,15 @@ model Client {
   id                     String            @id @default(cuid())
   name                   String
   email                  String?
+  secondaryEmail         String?
   phone                  String?
+  secondaryPhone         String?
+  company                String?
   address                String?
+  aptNumber              String?
+  city                   String?
+  state                  String?
+  zip                    String?
   notes                  String?
   discountPercent        Float             @default(0)
   clientType             ClientType        @default(RESIDENTIAL)
@@ -223,10 +230,28 @@ model Client {
   referredBy             Client?           @relation("ClientReferrals", fields: [referredByClientId], references: [id], onDelete: SetNull)
   referrals              Client[]          @relation("ClientReferrals")
   recurringCancellations RecurringCancellation[]
+  addresses              ClientAddress[]
 
   @@index([clientType])
   @@index([isActive])
   @@index([referredByClientId])
+}
+
+// Multiple saved addresses per client (e.g. repeat customers with several
+// properties). The single `Client.address` remains the primary/legacy field;
+// these are additional labeled addresses.
+model ClientAddress {
+  id        String   @id @default(cuid())
+  clientId  String
+  label     String   @default("Home")
+  address   String
+  aptNumber String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
 }
 
 enum ClientType {

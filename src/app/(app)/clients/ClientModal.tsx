@@ -12,6 +12,7 @@ import {
   Loader,
   Check,
   Percent,
+  Building2,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -23,8 +24,15 @@ interface ClientLite {
   id: string;
   name: string;
   email: string | null;
+  secondaryEmail?: string | null;
   phone: string | null;
+  secondaryPhone?: string | null;
+  company?: string | null;
   address: string | null;
+  aptNumber?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   notes: string | null;
   discountPercent?: number | null;
 }
@@ -49,8 +57,15 @@ export default function ClientModal({
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [secondaryEmail, setSecondaryEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [secondaryPhone, setSecondaryPhone] = useState("");
+  const [company, setCompany] = useState("");
   const [address, setAddress] = useState("");
+  const [aptNumber, setAptNumber] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zip, setZip] = useState("");
   const [notes, setNotes] = useState("");
   const [discountPercent, setDiscountPercent] = useState("");
 
@@ -60,8 +75,15 @@ export default function ClientModal({
       setSuccess(false);
       setName(client?.name || "");
       setEmail(client?.email || "");
+      setSecondaryEmail(client?.secondaryEmail || "");
       setPhone(client?.phone || "");
+      setSecondaryPhone(client?.secondaryPhone || "");
+      setCompany(client?.company || "");
       setAddress(client?.address || "");
+      setAptNumber(client?.aptNumber || "");
+      setCity(client?.city || "");
+      setState(client?.state || "");
+      setZip(client?.zip || "");
       setNotes(client?.notes || "");
       setDiscountPercent(
         client?.discountPercent != null && client.discountPercent > 0
@@ -85,8 +107,15 @@ export default function ClientModal({
     const fd = new FormData();
     fd.append("name", name);
     fd.append("email", email);
+    fd.append("secondaryEmail", secondaryEmail);
     fd.append("phone", phone);
+    fd.append("secondaryPhone", secondaryPhone);
+    fd.append("company", company);
     fd.append("address", address);
+    fd.append("aptNumber", aptNumber);
+    fd.append("city", city);
+    fd.append("state", state);
+    fd.append("zip", zip);
     fd.append("notes", notes);
     fd.append("discountPercent", discountPercent);
 
@@ -192,6 +221,24 @@ export default function ClientModal({
             </div>
 
             <div>
+              <label className="input-label tracking-tight">Secondary email</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                <Input
+                  variant="form"
+                  type="email"
+                  size="md"
+                  value={secondaryEmail}
+                  onChange={(e) => setSecondaryEmail(e.target.value)}
+                  disabled={submitting}
+                  className="w-full pl-11 px-4 py-3"
+                  placeholder="optional"
+                  border={false}
+                />
+              </div>
+            </div>
+
+            <div>
               <label className="input-label tracking-tight">Phone</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
@@ -209,6 +256,40 @@ export default function ClientModal({
             </div>
 
             <div>
+              <label className="input-label tracking-tight">Secondary phone</label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                <Input
+                  variant="form"
+                  size="md"
+                  value={secondaryPhone}
+                  onChange={(e) => setSecondaryPhone(e.target.value)}
+                  disabled={submitting}
+                  className="w-full pl-11 px-4 py-3"
+                  placeholder="optional"
+                  border={false}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="input-label tracking-tight">Company</label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                <Input
+                  variant="form"
+                  size="md"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  disabled={submitting}
+                  className="w-full pl-11 px-4 py-3"
+                  placeholder="optional"
+                  border={false}
+                />
+              </div>
+            </div>
+
+            <div>
               <label className="input-label tracking-tight">Address</label>
               <div className="relative">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
@@ -219,7 +300,62 @@ export default function ClientModal({
                   onChange={(e) => setAddress(e.target.value)}
                   disabled={submitting}
                   className="w-full pl-11 px-4 py-3"
-                  placeholder="Street, City"
+                  placeholder="Street address"
+                  border={false}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="input-label tracking-tight">Apt / Unit</label>
+                <Input
+                  variant="form"
+                  size="md"
+                  value={aptNumber}
+                  onChange={(e) => setAptNumber(e.target.value)}
+                  disabled={submitting}
+                  className="w-full px-4 py-3"
+                  placeholder="optional"
+                  border={false}
+                />
+              </div>
+              <div>
+                <label className="input-label tracking-tight">City</label>
+                <Input
+                  variant="form"
+                  size="md"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={submitting}
+                  className="w-full px-4 py-3"
+                  placeholder="City"
+                  border={false}
+                />
+              </div>
+              <div>
+                <label className="input-label tracking-tight">State / Province</label>
+                <Input
+                  variant="form"
+                  size="md"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  disabled={submitting}
+                  className="w-full px-4 py-3"
+                  placeholder="optional"
+                  border={false}
+                />
+              </div>
+              <div>
+                <label className="input-label tracking-tight">ZIP / Postal</label>
+                <Input
+                  variant="form"
+                  size="md"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  disabled={submitting}
+                  className="w-full px-4 py-3"
+                  placeholder="optional"
                   border={false}
                 />
               </div>

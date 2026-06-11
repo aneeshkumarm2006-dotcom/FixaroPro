@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import ImportCsvButton from "@/components/csv/ImportCsvButton";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
@@ -161,13 +162,17 @@ export default function InventoryView({
             </span>
           </h1>
         </div>
-        <Button
-          variant="primary"
-          border={false}
-          onClick={onAddProduct}
-          className="rounded-xl px-5 py-2.5">
-          <Plus className="w-4 h-4 mr-2" /> New product
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportCsvButton entity="products" label="Import Products" triggerClassName="btn btn-secondary btn-sm" />
+          <ImportCsvButton entity="inventory-requests" label="Import Requests" triggerClassName="btn btn-secondary btn-sm" />
+          <Button
+            variant="primary"
+            border={false}
+            onClick={onAddProduct}
+            className="rounded-xl px-5 py-2.5">
+            <Plus className="w-4 h-4 mr-2" /> New product
+          </Button>
+        </div>
       </header>
 
       {/* Stats — matches Jobs page */}

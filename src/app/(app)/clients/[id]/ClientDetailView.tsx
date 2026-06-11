@@ -6,18 +6,35 @@ import {
   AlertTriangle, Pencil, Mail, Phone, MapPin,
 } from "lucide-react";
 import ClientModal from "../ClientModal";
+import ClientAddressManager from "../ClientAddressManager";
 
 type TabKey = "history" | "payments" | "ratings";
+
+interface ClientAddressLite {
+  id: string;
+  label: string;
+  address: string;
+  aptNumber: string | null;
+  isDefault: boolean;
+}
 
 interface ClientData {
   id: string;
   name: string;
   email: string | null;
+  secondaryEmail?: string | null;
   phone: string | null;
+  secondaryPhone?: string | null;
+  company?: string | null;
   address: string | null;
+  aptNumber?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   notes: string | null;
   discountPercent: number;
   createdAt: string;
+  addresses?: ClientAddressLite[];
 }
 
 interface JobLite {
@@ -219,6 +236,14 @@ export default function ClientDetailView({
           </p>
         </div>
       )}
+
+      {/* Saved addresses */}
+      <div className="dcard">
+        <div className="dcard-head">
+          <h3>Saved addresses</h3>
+        </div>
+        <ClientAddressManager clientId={client.id} addresses={client.addresses ?? []} />
+      </div>
 
       {/* Tabs */}
       <div className="dtabs">

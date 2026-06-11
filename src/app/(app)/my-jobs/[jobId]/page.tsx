@@ -12,6 +12,7 @@ import CancelShiftButton from "../CancelShiftButton";
 import WhyThisPriceLink from "../WhyThisPriceLink";
 import PhotoGallery from "./PhotoGallery";
 import JobChecklistPanel from "./JobChecklistPanel";
+import MapLinks from "./MapLinksClient";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -117,10 +118,13 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
       {/* Hero */}
       <header className="cl-jd-hero">
         {job.location && (
-          <div className="loc">
-            <MapPin size={14} />
-            {job.location}{job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
-          </div>
+          <>
+            <div className="loc">
+              <MapPin size={14} />
+              {job.location}{job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}
+            </div>
+            <MapLinks address={`${job.location}${job.apartmentNumber ? `, Unit ${job.apartmentNumber}` : ''}`} />
+          </>
         )}
         <h1>{job.clientName}</h1>
         {jobTypeLabel(job.jobType) && (

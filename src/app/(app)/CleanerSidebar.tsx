@@ -112,6 +112,7 @@ const NAV = [
       { href: "/dashboard",      label: "Dashboard",      icon: ICONS.dashboard },
       { href: "/my-jobs",        label: "My jobs",        icon: ICONS.jobs },
       { href: "/available-jobs", label: "Available jobs", icon: ICONS.avail },
+      { href: "/availability",   label: "Availability",   icon: ICONS.calendar },
       { href: "/calendar",       label: "Calendar",       icon: ICONS.calendar },
     ],
   },

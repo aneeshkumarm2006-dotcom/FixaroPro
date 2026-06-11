@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2, Pencil, X, Package } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import ImportCsvButton from "@/components/csv/ImportCsvButton";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
@@ -143,15 +144,18 @@ export default function KitTemplatesTab({
       description="Define reusable starter kits combining multiple products."
       icon={Package}
       actions={
-        <Button
-          type="button"
-          variant="action"
-          border={false}
-          size="sm"
-          onClick={openCreate}
-          className="rounded-xl">
-          <Plus className="w-4 h-4 mr-1" /> New Kit
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportCsvButton entity="kit-templates" label="Import" triggerClassName="btn btn-secondary btn-sm" />
+          <Button
+            type="button"
+            variant="action"
+            border={false}
+            size="sm"
+            onClick={openCreate}
+            className="rounded-xl">
+            <Plus className="w-4 h-4 mr-1" /> New Kit
+          </Button>
+        </div>
       }>
       {kitTemplates.length === 0 ? (
         <p className="text-sm text-[#1c1917]/60">No kit templates yet.</p>

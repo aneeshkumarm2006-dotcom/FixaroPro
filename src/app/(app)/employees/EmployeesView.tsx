@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import ImportCsvButton from "@/components/csv/ImportCsvButton";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
@@ -182,15 +183,18 @@ export default function EmployeesView({
             Manage your team members and their assignments
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="md"
-          border={false}
-          onClick={onCreateEmployee}
-          className="rounded-2xl px-6 py-3">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Employee
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <ImportCsvButton entity="employees" />
+          <Button
+            variant="primary"
+            size="md"
+            border={false}
+            onClick={onCreateEmployee}
+            className="rounded-2xl px-6 py-3">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Employee
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

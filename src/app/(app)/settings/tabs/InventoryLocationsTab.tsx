@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2, Pencil, MapPin, X } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import ImportCsvButton from "@/components/csv/ImportCsvButton";
 import IconButton from "@/components/ui/IconButton";
 import Modal from "@/components/ui/Modal";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
@@ -145,15 +146,18 @@ export default function InventoryLocationsTab({
       description="Storage units and warehouses where employees pick up equipment."
       icon={MapPin}
       actions={
-        <Button
-          type="button"
-          variant="action"
-          border={false}
-          size="sm"
-          onClick={openCreate}
-          className="rounded-xl">
-          <Plus className="w-4 h-4 mr-1" /> New Location
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportCsvButton entity="inventory-locations" label="Import" triggerClassName="btn btn-secondary btn-sm" />
+          <Button
+            type="button"
+            variant="action"
+            border={false}
+            size="sm"
+            onClick={openCreate}
+            className="rounded-xl">
+            <Plus className="w-4 h-4 mr-1" /> New Location
+          </Button>
+        </div>
       }>
       {locations.length === 0 ? (
         <p className="text-sm text-[#1c1917]/60">No locations defined yet.</p>

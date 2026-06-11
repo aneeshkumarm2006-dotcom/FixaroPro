@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import ClientModal from "./ClientModal";
+import ImportCsvButton from "@/components/csv/ImportCsvButton";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { deleteClient } from "../actions/deleteClient";
 
@@ -175,9 +176,12 @@ export default function ClientsPageClient({
             <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>· {initialStats.totalClients}</span>
           </h1>
         </div>
-        <button type="button" className="btn btn-primary" onClick={handleCreate}>
-          <Plus size={16} /> New Client
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <ImportCsvButton entity="clients" />
+          <button type="button" className="btn btn-primary" onClick={handleCreate}>
+            <Plus size={16} /> New Client
+          </button>
+        </div>
       </header>
 
       <div className="astat-grid">

@@ -2,8 +2,8 @@
 
 import { db } from "@/db";
 import {
-  sendCustomerApplicationReceived,
-  sendAdminJobApplication,
+  sendApplicantConfirmation,
+  sendAdminNewApplication,
 } from "@/lib/email";
 
 export interface JobApplicationInput {
@@ -37,13 +37,13 @@ export async function submitJobApplication(input: JobApplicationInput) {
     },
   });
 
-  sendCustomerApplicationReceived({
+  sendApplicantConfirmation({
     to: email,
     applicantName: name,
     position: input.position?.trim() ?? null,
   }).catch((e) => console.error("applicant confirmation email", e));
 
-  sendAdminJobApplication({
+  sendAdminNewApplication({
     applicationId: application.id,
     name,
     email,

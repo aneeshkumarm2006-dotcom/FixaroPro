@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, Calendar, UserX, Users, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, Sparkles, Search } from "lucide-react";
 import { updateLeadStatus } from "../actions/updateLeadStatus";
 import { convertLeadToJob } from "../actions/convertLeadToJob";
 import PremiumSelect from "@/components/ui/PremiumSelect";
@@ -142,9 +142,9 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
   return (
     <div className="admin-font stack-24">
       <header className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
-        <div className="stack-8">
+        <div className="stack-8" style={{ minWidth: 0 }}>
           <p className="eyebrow">Sales</p>
-          <h1 className="display">
+          <h1 className="display" style={{ fontSize: "clamp(34px, 4.2vw, 48px)", whiteSpace: "nowrap" }}>
             Leads{" "}
             <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>· {stats.total}</span>
           </h1>
@@ -152,17 +152,17 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
       </header>
 
       <div className="astat-grid">
-        <AStatCard icon={Users}       label="Total leads"   value={stats.total}     hint="all time" />
-        <AStatCard icon={AlertCircle} label="New"           value={stats.new}       hint="not contacted" />
+        <AStatCard icon={Sparkles}     label="Total leads"  value={stats.total}     hint="all time" />
+        <AStatCard icon={AlertCircle}  label="New"          value={stats.new}       hint="awaiting first contact" />
         <AStatCard
-          icon={Calendar} label="Converted" value={stats.converted}
+          icon={CheckCircle2} label="Converted" value={stats.converted}
           delta={stats.total ? `${Math.round((stats.converted / stats.total) * 100)}%` : "0%"}
-          deltaDir="up" hint="conversion rate"
+          deltaDir="up" hint="rate"
         />
         <AStatCard
-          icon={UserX} label="Dead / Lost"
+          icon={XCircle} label="Dead / lost"
           value={stats.dead + stats.out_of_area}
-          hint="dead + out of area"
+          hint={`${stats.out_of_area} out of area`}
         />
       </div>
 
@@ -184,11 +184,11 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
             className="input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, email, phone, postal…"
+            placeholder="Search by name, email, phone, postal code…"
           />
         </div>
         <span style={{ fontSize: 13, color: "var(--primary-60)", marginLeft: "auto" }}>
-          {filtered.length} lead{filtered.length !== 1 ? "s" : ""}
+          {filtered.length} of {stats.total}
         </span>
       </div>
 
@@ -214,32 +214,39 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
                 <tbody>
                   {filtered.map(l => (
                     <tr key={l.id}>
-                      <td style={{ minWidth: 200 }}>
+                      <td style={{ minWidth: 240 }}>
                         <div className="col-client">
                           {l.name || <em style={{ color: "var(--primary-50)", fontStyle: "normal" }}>No name</em>}
                         </div>
-                        <div className="col-client-sub">{l.email}</div>
-                        {l.phone && <div className="col-client-sub">{l.phone}</div>}
-                        {l.postalCode && (
-                          <span className="pill" style={{ marginTop: 4, fontSize: 10, background: "var(--primary-10)", color: "var(--primary)" }}>
-                            {l.postalCode}
-                          </span>
-                        )}
+                        <div className="col-client-sub" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span>{l.email}</span>
+                          {l.phone && <span style={{ color: "var(--primary-40)" }}>·</span>}
+                          {l.phone && <span>{l.phone}</span>}
+                          {l.postalCode && (
+                            <span style={{ fontSize: 11, padding: "2px 6px", background: "var(--primary-5)", borderRadius: 4, color: "var(--primary)", fontWeight: 600, fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
+                              {l.postalCode}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td style={{ minWidth: 180 }}>
-                        {(l.bedCount !== null || l.bathCount !== null) && (
-                          <div style={{ fontSize: 13, color: "var(--ink)" }}>
-                            {l.bedCount ?? "?"}bd · {l.bathCount ?? "?"}ba
+                      <td style={{ minWidth: 200 }}>
+                        {l.serviceType ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            {(l.bedCount !== null || l.bathCount !== null) && (
+                              <span style={{ fontSize: 12, color: "var(--primary-70)" }}>
+                                {l.bedCount ?? "?"}bd · {l.bathCount ?? "?"}ba
+                              </span>
+                            )}
+                            <span className="pill" style={{ background: "var(--primary-10)", color: "var(--primary)" }}>
+                              {SERVICE_LABELS[l.serviceType] ?? l.serviceType}
+                            </span>
                           </div>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "var(--primary-40)", fontStyle: "italic" }}>—</span>
                         )}
-                        {l.serviceType && (
-                          <span className="pill" style={{ background: "var(--primary-10)", color: "var(--primary)", marginTop: 4 }}>
-                            {SERVICE_LABELS[l.serviceType] ?? l.serviceType}
-                          </span>
-                        )}
-                        {l.dropOffStep !== null && (
+                        {l.dropOffStep !== null && l.dropOffStep > 0 && l.dropOffStep < 4 && (
                           <div style={{ fontSize: 11, color: "var(--primary-50)", marginTop: 4 }}>
-                            Stopped step {l.dropOffStep}
+                            Stopped at step {l.dropOffStep}
                           </div>
                         )}
                       </td>
@@ -261,10 +268,10 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
                           style={{ width: 130 }}
                         />
                       </td>
-                      <td style={{ minWidth: 140 }}>
+                      <td style={{ minWidth: 150 }}>
                         {l.convertedJob ? (
-                          <a href={`/jobs/${l.convertedJob.id}`} className="link" style={{ fontSize: 13 }}>
-                            Job #{l.convertedJob.jobNumber}
+                          <a href={`/jobs/${l.convertedJob.id}`} className="link" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            Job #{l.convertedJob.jobNumber} →
                           </a>
                         ) : (l.status === "NEW" || l.status === "CONTACTED") ? (
                           <button
@@ -272,7 +279,7 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
                             className="btn btn-primary btn-sm"
                             disabled={converting === l.id}
                             onClick={() => handleConvert(l.id)}>
-                            {converting === l.id ? "Converting…" : "→ Job"}
+                            {converting === l.id ? "Converting…" : "→ Convert to job"}
                           </button>
                         ) : <span style={{ color: "var(--primary-40)" }}>—</span>}
                       </td>
@@ -350,7 +357,7 @@ export default function LeadsPageClient({ leads }: { leads: Lead[] }) {
           </div>
 
           <style>{`
-            @media (max-width: 900px) {
+            @media (max-width: 1100px) {
               #ld-desktop { display: none !important; }
               #ld-mobile  { display: flex !important; }
             }

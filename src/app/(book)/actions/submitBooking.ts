@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { checkServiceAreaInternal } from "@/lib/service-area";
+import { getBlockedDates, getBlockedSlots } from "@/lib/blocked-dates";
 import {
   computeBookingPrice,
   nextOccurrence,
@@ -83,6 +84,28 @@ export async function submitBooking(input: SubmitBookingInput) {
     }
     if (!input.date) {
       return { success: false, error: "Date is required" };
+    }
+
+    // Reject fully-closed days (admin-configured). Server-authoritative — the
+    // date picker greys these out but a crafted request could bypass it.
+    const blockedDates = await getBlockedDates();
+    if (blockedDates.includes(input.date)) {
+      return {
+        success: false,
+        error: "Sorry, we're closed on that date. Please choose another day.",
+      };
+    }
+    // Reject a specific time slot the admin has closed (skipped for flexible
+    // bookings, which don't pin a slot).
+    if (!input.isFlexible && input.timeSlot) {
+      const blockedSlots = await getBlockedSlots(input.date);
+      if (blockedSlots.includes(input.timeSlot)) {
+        return {
+          success: false,
+          error:
+            "Sorry, that time is no longer available. Please choose another slot.",
+        };
+      }
     }
 
     // 2. Re-check service area (server-authoritative — client can be tampered)

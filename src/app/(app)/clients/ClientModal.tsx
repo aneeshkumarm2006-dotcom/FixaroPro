@@ -13,6 +13,7 @@ import {
   Check,
   Percent,
   Building2,
+  Hash,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -223,7 +224,7 @@ export default function ClientModal({
             <div>
               <label className="input-label tracking-tight">Secondary email</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/30" />
                 <Input
                   variant="form"
                   type="email"
@@ -232,7 +233,7 @@ export default function ClientModal({
                   onChange={(e) => setSecondaryEmail(e.target.value)}
                   disabled={submitting}
                   className="w-full pl-11 px-4 py-3"
-                  placeholder="optional"
+                  placeholder="cc@example.com (optional)"
                   border={false}
                 />
               </div>
@@ -258,7 +259,7 @@ export default function ClientModal({
             <div>
               <label className="input-label tracking-tight">Secondary phone</label>
               <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/30" />
                 <Input
                   variant="form"
                   size="md"
@@ -266,7 +267,7 @@ export default function ClientModal({
                   onChange={(e) => setSecondaryPhone(e.target.value)}
                   disabled={submitting}
                   className="w-full pl-11 px-4 py-3"
-                  placeholder="optional"
+                  placeholder="(555) 987-6543 (optional)"
                   border={false}
                 />
               </div>
@@ -283,7 +284,7 @@ export default function ClientModal({
                   onChange={(e) => setCompany(e.target.value)}
                   disabled={submitting}
                   className="w-full pl-11 px-4 py-3"
-                  placeholder="optional"
+                  placeholder="Company name (optional)"
                   border={false}
                 />
               </div>
@@ -306,19 +307,22 @@ export default function ClientModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="input-label tracking-tight">Apt / Unit</label>
-                <Input
-                  variant="form"
-                  size="md"
-                  value={aptNumber}
-                  onChange={(e) => setAptNumber(e.target.value)}
-                  disabled={submitting}
-                  className="w-full px-4 py-3"
-                  placeholder="optional"
-                  border={false}
-                />
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 text-[#1c1917]/50" />
+                  <Input
+                    variant="form"
+                    size="md"
+                    value={aptNumber}
+                    onChange={(e) => setAptNumber(e.target.value)}
+                    disabled={submitting}
+                    className="w-full pl-11 px-4 py-3"
+                    placeholder="Apt no."
+                    border={false}
+                  />
+                </div>
               </div>
               <div>
                 <label className="input-label tracking-tight">City</label>
@@ -342,12 +346,12 @@ export default function ClientModal({
                   onChange={(e) => setState(e.target.value)}
                   disabled={submitting}
                   className="w-full px-4 py-3"
-                  placeholder="optional"
+                  placeholder="State / Province"
                   border={false}
                 />
               </div>
               <div>
-                <label className="input-label tracking-tight">ZIP / Postal</label>
+                <label className="input-label tracking-tight">Zip / Postal Code</label>
                 <Input
                   variant="form"
                   size="md"
@@ -355,7 +359,7 @@ export default function ClientModal({
                   onChange={(e) => setZip(e.target.value)}
                   disabled={submitting}
                   className="w-full px-4 py-3"
-                  placeholder="optional"
+                  placeholder="Zip / Postal"
                   border={false}
                 />
               </div>

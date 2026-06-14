@@ -60,6 +60,13 @@ export const POOR_RATING_FOLLOWUP_STARS = 1;
 /** Default low-stock threshold applied to a product if none is set. */
 export const DEFAULT_INVENTORY_LOW_STOCK = 10;
 
+/** Fee charged to the customer when they cancel inside the late-cancellation
+ *  window below. */
+export const CANCELLATION_FEE_USD = 20;
+/** Hours before the booking start time inside which a cancellation incurs the
+ *  late-cancellation fee. */
+export const CANCELLATION_FEE_WINDOW_HOURS = 48;
+
 /**
  * After-photo consent shown at booking. Cleaners may only photograph the
  * finished work when the customer consented (or an admin overrides). Bump

@@ -3,15 +3,14 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import SignatureCanvas from "react-signature-canvas";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  Download,
   ExternalLink,
-  Eraser,
+  PenLine,
+  Check,
 } from "lucide-react";
 import { signDocument } from "../../actions/signDocument";
 
@@ -43,48 +42,52 @@ interface DocumentSigningViewProps {
   signer: SignerData;
 }
 
-function formatDate(value: string | null) {
+const STATUS: Record<DocStatus, { label: string; dot: string; bg: string; fg: string }> = {
+  PENDING: { label: "Pending", dot: "#d97706", bg: "var(--amber-50)", fg: "var(--amber-800)" },
+  SIGNED: { label: "Signed", dot: "#059669", bg: "var(--emerald-100)", fg: "var(--emerald-800)" },
+  EXPIRED: { label: "Expired", dot: "#64748b", bg: "#f1f5f9", fg: "#334155" },
+  REVOKED: { label: "Revoked", dot: "#dc2626", bg: "#fef2f2", fg: "var(--error-text)" },
+};
+
+function fmtDate(value: string | null) {
   if (!value) return null;
   return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
 }
 
+function DocStatusPill({ status }: { status: DocStatus }) {
+  const m = STATUS[status];
+  return (
+    <span className="pill" style={{ background: m.bg, color: m.fg }}>
+      <span className="pill-dot" style={{ background: m.dot }} />
+      {m.label}
+    </span>
+  );
+}
+
 export default function DocumentSigningView({
-  document,
+  document: doc,
   signature,
   signer,
 }: DocumentSigningViewProps) {
   const router = useRouter();
   const sigRef = useRef<SignatureCanvas>(null);
   const [agreed, setAgreed] = useState(false);
-  const [hasDrawn, setHasDrawn] = useState(false);
+  const [hasInk, setHasInk] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const isSigned = signature.status === "SIGNED";
-  const isReadOnly =
-    signature.status === "SIGNED" ||
-    signature.status === "EXPIRED" ||
-    signature.status === "REVOKED";
+  const signable = signature.status === "PENDING";
 
-  const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  function clearSignature() {
+  function clear() {
     sigRef.current?.clear();
-    setHasDrawn(false);
+    setHasInk(false);
   }
 
-  async function handleSubmit() {
+  async function submit() {
     if (!sigRef.current || sigRef.current.isEmpty()) {
       setMessage({ type: "error", text: "Please draw your signature." });
       return;
@@ -93,217 +96,172 @@ export default function DocumentSigningView({
       setMessage({ type: "error", text: "You must agree before signing." });
       return;
     }
-
     setSaving(true);
     setMessage(null);
-
     const dataUrl = sigRef.current.toDataURL("image/png");
-    const res = await signDocument({
-      documentId: document.id,
-      signatureDataUrl: dataUrl,
-    });
-
+    const res = await signDocument({ documentId: doc.id, signatureDataUrl: dataUrl });
     if (res.success) {
       setMessage({ type: "success", text: "Document signed successfully." });
       router.refresh();
     } else {
-      setMessage({
-        type: "error",
-        text: res.error || "Failed to sign document.",
-      });
+      setMessage({ type: "error", text: res.error || "Failed to sign document." });
     }
     setSaving(false);
   }
 
   return (
-    <div className="max-w-[60rem] mx-auto space-y-6">
-      <Button
-        variant="default"
-        size="sm"
-        border={false}
-        onClick={() => router.push("/documents")}
-        className="mb-2 px-6 py-3">
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Documents
-      </Button>
+    <div className="admin-font">
+      <DocsDetailStyles />
 
-      <div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-3xl !font-light tracking-tight text-[#1c1917]">
-            {document.title}
-          </h1>
-          <Badge variant="default" size="md">
-            v{document.version}
-          </Badge>
-          {isSigned && (
-            <Badge variant="success" size="md">
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Signed
-            </Badge>
-          )}
-          {signature.status === "REVOKED" && (
-            <Badge variant="error" size="md">
-              <AlertCircle className="w-3 h-3 mr-1" />
-              Revoked
-            </Badge>
-          )}
-        </div>
-        {document.description && (
-          <p className="text-sm text-[#1c1917]/70 !font-light mt-2 max-w-3xl">
-            {document.description}
-          </p>
-        )}
-        {document.dueDate && !isSigned && (
-          <p className="text-xs text-[#1c1917]/60 mt-1">
-            Due {formatDate(document.dueDate)}
-          </p>
-        )}
-      </div>
+      <button className="jdetail-back" onClick={() => router.push("/documents")}>
+        <ArrowLeft size={14} /> Back to Documents
+      </button>
 
-      <Card variant="default" className="p-6">
-        <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
-          Document
-        </h2>
-        {document.fileUrl ? (
-          <div className="space-y-4">
-            <iframe
-              src={document.fileUrl}
-              className="w-full h-[60vh] rounded-xl border border-[#1c1917]/10 bg-white"
-              title={document.title}
-            />
-            <a
-              href={document.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-[#1c1917] hover:underline">
-              Open in new tab
-              <ExternalLink className="w-3 h-3" />
-            </a>
+      <div className="doc-detail">
+        {/* Document content */}
+        <div className="doc-paper-wrap">
+          <div className="doc-paper-head">
+            <div>
+              <p className="eyebrow">HR &amp; Compliance</p>
+              <h1 className="title" style={{ fontSize: 28, marginTop: 4 }}>{doc.title}</h1>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="doc-ver">v{doc.version}</span>
+              <DocStatusPill status={signature.status} />
+            </div>
           </div>
-        ) : document.content ? (
-          <div className="prose prose-sm max-w-none text-[#1c1917] whitespace-pre-wrap leading-relaxed bg-white p-4 rounded-xl border border-[#1c1917]/10">
-            {document.content}
-          </div>
-        ) : (
-          <p className="text-sm text-[#1c1917]/60">
-            This document has no content.
-          </p>
-        )}
-      </Card>
-
-      {isSigned ? (
-        <Card variant="default" className="p-6">
-          <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
-            Your Signature
-          </h2>
-          <div className="space-y-3">
-            {signature.signatureUrl && (
-              <div className="border border-[#1c1917]/10 rounded-xl bg-white p-4 inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={signature.signatureUrl}
-                  alt="Signature"
-                  className="max-h-32"
-                />
+          <div className="doc-paper">
+            {doc.fileUrl ? (
+              <div className="doc-pdf-frame">
+                <iframe src={doc.fileUrl} title={doc.title} />
+                <a className="link" href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, marginTop: 10 }}>
+                  Open in new tab <ExternalLink size={13} />
+                </a>
+              </div>
+            ) : doc.content ? (
+              <div className="doc-text" style={{ whiteSpace: "pre-wrap" }}>{doc.content}</div>
+            ) : (
+              <div className="doc-pdf-placeholder">
+                <Download size={40} />
+                <div style={{ fontWeight: 600 }}>{doc.title} · v{doc.version}</div>
+                <div style={{ fontSize: 13, color: "var(--primary-50)" }}>No content attached.</div>
               </div>
             )}
-            <p className="text-xs text-[#1c1917]/70">
-              Signed by {signer.name} on {formatDate(signature.signedAt)}
+          </div>
+        </div>
+
+        {/* Sign or signed view */}
+        {signable ? (
+          <div className="dcard doc-sign">
+            <div className="dcard-head"><h3>Your signature</h3></div>
+            <p style={{ fontSize: 13.5, color: "var(--primary-60)", margin: 0 }}>
+              Draw your signature in the box below.
+            </p>
+            <div className="doc-canvas-wrap">
+              <SignatureCanvas
+                ref={sigRef}
+                penColor="#1c1917"
+                canvasProps={{ className: "doc-canvas" }}
+                onEnd={() => setHasInk(true)}
+              />
+              {!hasInk && <span className="doc-canvas-hint">Sign here</span>}
+              <span className="doc-canvas-x">✕</span>
+            </div>
+            <div className="doc-canvas-actions">
+              <button
+                className="link-muted"
+                style={{ background: "none", border: 0, cursor: "pointer", fontSize: 13 }}
+                onClick={clear}
+                disabled={!hasInk}>
+                Clear
+              </button>
+            </div>
+            <label className="doc-agree">
+              <span className={`doc-check ${agreed ? "on" : ""}`} onClick={() => setAgreed((a) => !a)}>
+                {agreed ? <Check size={13} /> : null}
+              </span>
+              <span onClick={() => setAgreed((a) => !a)}>
+                I have read and agree to the terms set out in <strong>{doc.title}</strong>, and I am
+                signing this document electronically.
+              </span>
+            </label>
+            {message && (
+              <div
+                style={{
+                  fontSize: 13,
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  background: message.type === "success" ? "var(--emerald-100)" : "#fef2f2",
+                  color: message.type === "success" ? "var(--emerald-800)" : "var(--error-text)",
+                }}>
+                {message.text}
+              </div>
+            )}
+            <button className="btn btn-primary btn-block" disabled={!agreed || !hasInk || saving} onClick={submit}>
+              <PenLine size={16} /> {saving ? "Signing…" : "Sign document"}
+            </button>
+            <p style={{ fontSize: 11.5, color: "var(--primary-40)", textAlign: "center", margin: 0 }}>
+              Your signature and a timestamp will be recorded.
             </p>
           </div>
-        </Card>
-      ) : isReadOnly ? (
-        <Card variant="alert" className="p-6">
-          <p className="text-sm">
-            This document can no longer be signed.
-          </p>
-        </Card>
-      ) : (
-        <Card variant="default" className="p-6">
-          <h2 className="text-sm font-[400] text-[#1c1917] mb-4 uppercase tracking-wide">
-            Sign
-          </h2>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-1">
-                Name
-              </label>
-              <div className="px-4 py-2.5 rounded-xl bg-[#e85d04]/5 text-sm text-[#1c1917]">
-                {signer.name}
+        ) : (
+          <div className="dcard doc-sign">
+            <div className="dcard-head"><h3>Signature on file</h3></div>
+            {signature.status === "SIGNED" ? (
+              <>
+                <div className="doc-signed-box">
+                  {signature.signatureUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={signature.signatureUrl} alt="signature" style={{ maxWidth: "100%", maxHeight: 90 }} />
+                  ) : (
+                    <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 30, color: "var(--ink)" }}>
+                      {signer.name}
+                    </span>
+                  )}
+                </div>
+                <div className="banner" style={{ marginTop: 4, background: "var(--emerald-100)", color: "var(--emerald-800)" }}>
+                  <CheckCircle2 size={16} /> Signed by {signer.name} on {fmtDate(signature.signedAt)} · v{doc.version}
+                </div>
+              </>
+            ) : (
+              <div className="banner banner-amber">
+                <AlertCircle size={16} /> This document is {signature.status.toLowerCase()} and can no
+                longer be signed.
               </div>
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-1">
-                Date
-              </label>
-              <div className="px-4 py-2.5 rounded-xl bg-[#e85d04]/5 text-sm text-[#1c1917]">
-                {today}
-              </div>
-            </div>
+            )}
           </div>
-
-          <label className="text-xs uppercase tracking-wide text-[#1c1917]/70 block mb-2">
-            Signature
-          </label>
-          <div className="border border-[#1c1917]/15 rounded-xl bg-white relative">
-            <SignatureCanvas
-              ref={sigRef}
-              canvasProps={{
-                className: "w-full h-48 rounded-xl",
-              }}
-              onEnd={() => setHasDrawn(true)}
-              penColor="#e85d04"
-            />
-            <button
-              type="button"
-              onClick={clearSignature}
-              disabled={!hasDrawn}
-              className="absolute top-2 right-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10 disabled:opacity-30">
-              <Eraser className="w-3 h-3" />
-              Clear
-            </button>
-          </div>
-          <p className="text-xs text-[#1c1917]/60 mt-2">
-            Sign with your finger, mouse, or stylus above.
-          </p>
-
-          <label className="flex items-start gap-2 mt-4 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 accent-[#e85d04]"
-            />
-            <span className="text-sm text-[#1c1917]">
-              I have read and agree to the contents of this document. I
-              understand my electronic signature is legally binding.
-            </span>
-          </label>
-
-          {message && (
-            <div
-              className={`p-3 rounded-xl text-sm mt-4 ${
-                message.type === "success"
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}>
-              {message.text}
-            </div>
-          )}
-
-          <div className="flex justify-end mt-4">
-            <Button
-              variant="action"
-              size="md"
-              border={false}
-              onClick={handleSubmit}
-              disabled={saving || !agreed || !hasDrawn}
-              className="px-6 py-3">
-              {saving ? "Signing..." : "Sign Document"}
-            </Button>
-          </div>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
+  );
+}
+
+function DocsDetailStyles() {
+  return (
+    <style>{`
+    .doc-detail { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; margin-top: 16px; }
+    @media (max-width: 1000px) { .doc-detail { grid-template-columns: 1fr; } }
+    .doc-paper-wrap { background: #fff; border-radius: 18px; box-shadow: var(--shadow-soft); overflow: hidden; }
+    .doc-paper-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 28px; border-bottom: 1px solid var(--primary-10); flex-wrap: wrap; }
+    .doc-paper { padding: 8px; }
+    .doc-ver { font-family: var(--font-mono); font-size: 11px; color: var(--primary-60); background: var(--primary-5); padding: 2px 7px; border-radius: 6px; flex: 0 0 auto; }
+    .doc-pdf-frame { margin: 12px; }
+    .doc-pdf-frame iframe { width: 100%; height: 62vh; border: 1px solid var(--primary-10); border-radius: 12px; background: #fff; }
+    .doc-pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; padding: 70px 24px; color: var(--primary-40); background: var(--primary-5); border-radius: 12px; margin: 16px; }
+    .doc-text { padding: 24px 28px; font-size: 14.5px; line-height: 1.7; color: var(--ink-soft); }
+
+    .doc-sign { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .doc-canvas-wrap { position: relative; border: 1.5px dashed var(--primary-20); border-radius: 12px; background: var(--primary-5); height: 150px; overflow: hidden; }
+    .doc-canvas { width: 100%; height: 150px; display: block; cursor: crosshair; touch-action: none; }
+    .doc-canvas-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--primary-30); font-family: var(--font-serif); font-style: italic; font-size: 24px; pointer-events: none; }
+    .doc-canvas-x { position: absolute; left: 16px; bottom: 14px; color: var(--primary-30); font-size: 13px; pointer-events: none; }
+    .doc-canvas-actions { display: flex; justify-content: flex-end; margin-top: -4px; }
+    .doc-agree { display: flex; gap: 11px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--ink-soft); cursor: pointer; }
+    .doc-agree strong { color: var(--ink); }
+    .doc-check { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--primary-20); flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; color: #fff; transition: background .12s, border-color .12s; margin-top: 1px; }
+    .doc-check.on { background: var(--primary); border-color: var(--primary); }
+    .doc-signed-box { border: 1px solid var(--primary-10); border-radius: 12px; background: var(--primary-5); height: 110px; display: flex; align-items: center; justify-content: center; padding: 10px; }
+    `}</style>
   );
 }

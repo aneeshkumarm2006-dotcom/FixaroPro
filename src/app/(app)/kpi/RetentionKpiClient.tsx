@@ -1,45 +1,66 @@
 "use client";
 
+// Recurring client retention — Cleano "Retention" design, re-skinned to the
+// Fixaro charcoal/orange palette (A). Keeps the existing data fetch + actions.
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getRetentionKpi, type RetentionKpi, type RetentionKpiRow } from "../actions/getRetentionKpi";
 import { updateRecurringCancellation } from "../actions/updateRecurringCancellation";
 
 type Preset = "month" | "quarter" | "year" | "custom";
-type Tab = "all" | "pending" | "reactivated" | "replied";
+type Bucket = "all" | "pending" | "reactivated" | "replied";
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
-
 function presetRange(preset: Preset): { from: string; to: string } {
   const now = new Date();
   const y = now.getFullYear();
-  if (preset === "year") {
-    return { from: isoDate(new Date(y, 0, 1)), to: isoDate(new Date(y, 11, 31)) };
-  }
+  if (preset === "year") return { from: isoDate(new Date(y, 0, 1)), to: isoDate(new Date(y, 11, 31)) };
   if (preset === "quarter") {
     const q = Math.floor(now.getMonth() / 3);
-    return {
-      from: isoDate(new Date(y, q * 3, 1)),
-      to: isoDate(new Date(y, q * 3 + 3, 0)),
-    };
+    return { from: isoDate(new Date(y, q * 3, 1)), to: isoDate(new Date(y, q * 3 + 3, 0)) };
   }
-  // month
-  return {
-    from: isoDate(new Date(y, now.getMonth(), 1)),
-    to: isoDate(new Date(y, now.getMonth() + 1, 0)),
-  };
+  return { from: isoDate(new Date(y, now.getMonth(), 1)), to: isoDate(new Date(y, now.getMonth() + 1, 0)) };
 }
+const initials = (name: string) => name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
+// ── progress ring (ported from the Cleano chart kit, palette A) ──
+function Ring({ value, max = 100, label, sublabel, color = "#059669", size = 140 }: {
+  value: number; max?: number; label?: string; sublabel?: string; color?: string; size?: number;
+}) {
+  const stroke = 12, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, value / max)), cx = size / 2;
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="text-2xl font-bold" style={{ color: accent ?? "#111827" }}>
-        {value}
-      </div>
-      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--primary-10)" strokeWidth={stroke} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} transform={`rotate(-90 ${cx} ${cx})`} />
+        <text x={cx} y={cx - 2} textAnchor="middle" fontSize={size * 0.2} fontFamily="var(--font-serif)" fill="var(--ink)">{Math.round(pct * 100)}%</text>
+        {sublabel && <text x={cx} y={cx + size * 0.16} textAnchor="middle" fontSize="11" fill="var(--primary-60)">{sublabel}</text>}
+      </svg>
+      {label && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{label}</div>}
     </div>
   );
+}
+
+function Tile({ label, value, hint, accent }: { label: string; value: string | number; hint?: string; accent?: string }) {
+  return (
+    <div className="an-tile">
+      <div className="an-tile-label">{label}</div>
+      <div className="an-tile-value" style={accent ? { color: accent } : undefined}>{value}</div>
+      {hint && <div className="an-tile-hint">{hint}</div>}
+    </div>
+  );
+}
+
+function statusOf(r: RetentionKpiRow) {
+  if (r.reactivatedAt) return { label: "Reactivated", bg: "#d1fae5", color: "#065f46", dot: "#059669" };
+  if (r.repliedAt) return { label: "Replied", bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" };
+  if (r.clickedAt) return { label: "Clicked", bg: "var(--primary-5)", color: "var(--primary)", dot: "var(--primary)" };
+  if (r.openedAt) return { label: "Opened", bg: "var(--primary-5)", color: "var(--primary-70)", dot: "var(--primary-40)" };
+  if (r.emailSentAt) return { label: "Sent", bg: "#fef3c7", color: "var(--amber-800)", dot: "#d97706" };
+  return { label: r.offerStatus || "Cancelled", bg: "#fef2f2", color: "#991b1b", dot: "#dc2626" };
 }
 
 export default function RetentionKpiClient() {
@@ -47,27 +68,22 @@ export default function RetentionKpiClient() {
   const [range, setRange] = useState(() => presetRange("month"));
   const [data, setData] = useState<RetentionKpi | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("all");
+  const [bucket, setBucket] = useState<Bucket>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async (r: { from: string; to: string }) => {
     setLoading(true);
     const res = await getRetentionKpi(r);
     setLoading(false);
-    if (res.success) {
-      setData(res);
-    }
+    if (res.success) setData(res);
   }, []);
 
-  useEffect(() => {
-    load(range);
-  }, [range, load]);
+  useEffect(() => { load(range); }, [range, load]);
 
   function choosePreset(p: Preset) {
     setPreset(p);
     if (p !== "custom") setRange(presetRange(p));
   }
-
   async function markReplied(id: string) {
     setBusyId(id);
     await updateRecurringCancellation({ id, action: "replied" });
@@ -77,162 +93,113 @@ export default function RetentionKpiClient() {
 
   const rows = useMemo<RetentionKpiRow[]>(() => {
     if (!data) return [];
-    if (tab === "pending") return data.rows.filter((r) => !r.reactivatedAt);
-    if (tab === "reactivated") return data.rows.filter((r) => r.reactivatedAt);
-    if (tab === "replied") return data.rows.filter((r) => r.repliedAt);
+    if (bucket === "pending") return data.rows.filter((r) => !r.reactivatedAt);
+    if (bucket === "reactivated") return data.rows.filter((r) => r.reactivatedAt);
+    if (bucket === "replied") return data.rows.filter((r) => r.repliedAt);
     return data.rows;
-  }, [data, tab]);
+  }, [data, bucket]);
 
-  const presetBtn = (p: Preset, label: string) => (
-    <button
-      type="button"
-      onClick={() => choosePreset(p)}
-      className={`px-3 py-1.5 text-sm rounded-lg border ${
-        preset === p
-          ? "border-[#c44c03] text-[#c44c03] bg-[#c44c03]/5"
-          : "border-gray-300 text-gray-600"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const total = data?.totalCancellations ?? 0;
+  const reactivated = data?.reactivated ?? 0;
+  const reactRate = data?.reactivationRate ?? 0;
+  const pending = data?.pending ?? 0;
+  const replied = data?.replied ?? 0;
+
+  const PERIODS: Array<{ id: Preset; label: string }> = [
+    { id: "month", label: "This month" }, { id: "quarter", label: "This quarter" },
+    { id: "year", label: "This year" }, { id: "custom", label: "Custom" },
+  ];
+  const BUCKETS: Array<{ id: Bucket; label: string; count: number }> = [
+    { id: "all", label: "All", count: data?.rows.length ?? 0 },
+    { id: "pending", label: "Pending", count: data?.rows.filter((r) => !r.reactivatedAt).length ?? 0 },
+    { id: "reactivated", label: "Reactivated", count: reactivated },
+    { id: "replied", label: "Replied", count: replied },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Recurring retention</h1>
-      <p className="text-sm text-gray-500 mb-5">
-        Save-offer performance for clients who cancelled their recurring service.
-      </p>
+    <div className="admin-font">
+      <header style={{ marginBottom: 24 }}>
+        <p className="eyebrow">Insights · Retention</p>
+        <h1 className="display" style={{ fontSize: "clamp(32px, 4.2vw, 46px)", marginTop: 6 }}>Recurring client <em>retention.</em></h1>
+        <p className="subtitle" style={{ marginTop: 10, fontSize: 15.5 }}>Save-offer performance for clients who cancelled their recurring service.</p>
+      </header>
 
-      <div className="flex items-center gap-2 flex-wrap mb-5">
-        {presetBtn("month", "This month")}
-        {presetBtn("quarter", "This quarter")}
-        {presetBtn("year", "This year")}
-        {presetBtn("custom", "Custom")}
+      {/* Period selector */}
+      <div className="k-period">
+        <div className="row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {PERIODS.map((p) => (
+            <button key={p.id} className={`an-chip ${preset === p.id ? "active" : ""}`} onClick={() => choosePreset(p.id)}>{p.label}</button>
+          ))}
+        </div>
         {preset === "custom" && (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={range.from}
-              onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm"
-            />
-            <span className="text-gray-400 text-sm">→</span>
-            <input
-              type="date"
-              value={range.to}
-              onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm"
-            />
+          <div className="row" style={{ display: "flex", gap: 10 }}>
+            <label className="k-date">From<input type="date" className="input" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} /></label>
+            <label className="k-date">To<input type="date" className="input" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} /></label>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <Stat label="Cancellations" value={loading ? "…" : String(data?.totalCancellations ?? 0)} />
-        <Stat
-          label="Reactivated"
-          value={loading ? "…" : String(data?.reactivated ?? 0)}
-          accent="#059669"
-        />
-        <Stat
-          label="Reactivation rate"
-          value={loading ? "…" : data?.reactivationRate == null ? "—" : `${data.reactivationRate}%`}
-          accent="#059669"
-        />
-        <Stat label="Pending" value={loading ? "…" : String(data?.pending ?? 0)} accent="#d97706" />
-        <Stat label="Replied" value={loading ? "…" : String(data?.replied ?? 0)} />
-        <Stat
-          label="Active recurring"
-          value={loading ? "…" : String(data?.activeRecurringClients ?? 0)}
-        />
+      {/* KPI tiles + ring */}
+      <div className="k-top">
+        <div className="k-cards">
+          <Tile label="Reactivation rate" value={loading ? "…" : `${reactRate}%`} accent="var(--emerald-600)" hint={`${reactivated} of ${total} won back`} />
+          <Tile label="Cancellations" value={loading ? "…" : total} hint="recurring services cancelled" />
+          <Tile label="Reactivations" value={loading ? "…" : reactivated} accent="var(--primary)" hint="won back this period" />
+          <Tile label="Pending" value={loading ? "…" : pending} accent="var(--amber-700)" hint="awaiting outcome" />
+        </div>
+        <div className="dcard k-ring">
+          <Ring value={reactRate} color="#059669" label="Reactivated" sublabel={`${reactivated}/${total} clients`} size={140} />
+        </div>
       </div>
 
-      <div className="text-xs text-gray-500 mb-4">
-        Offer funnel — sent {data?.emailSent ?? 0} · opened {data?.opened ?? 0} · clicked{" "}
-        {data?.clicked ?? 0}
-      </div>
+      {/* Offer funnel */}
+      <p className="k-funnel">
+        Offer funnel — sent <strong>{data?.emailSent ?? 0}</strong> · opened <strong>{data?.opened ?? 0}</strong> · clicked <strong>{data?.clicked ?? 0}</strong> · replied <strong>{replied}</strong> · active recurring <strong>{data?.activeRecurringClients ?? 0}</strong>
+      </p>
 
-      {/* Drill-down */}
-      <div className="flex items-center gap-2 mb-3">
-        {(["all", "pending", "reactivated", "replied"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`px-3 py-1.5 text-sm rounded-lg capitalize ${
-              tab === t ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            {t}
+      {/* Bucket filter */}
+      <div className="row" style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "24px 0 16px" }}>
+        {BUCKETS.map((b) => (
+          <button key={b.id} className={`k-bucket ${bucket === b.id ? "active" : ""}`} onClick={() => setBucket(b.id)}>
+            {b.label}<span className="k-bucket-count">{b.count}</span>
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-xs">
-            <tr>
-              <th className="text-left px-4 py-2 font-medium">Client</th>
-              <th className="text-left px-4 py-2 font-medium">Frequency</th>
-              <th className="text-left px-4 py-2 font-medium">Cancelled</th>
-              <th className="text-left px-4 py-2 font-medium">Status</th>
-              <th className="text-right px-4 py-2 font-medium">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  {loading ? "Loading…" : "No cancellations in this period."}
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-gray-100">
-                <td className="px-4 py-2.5 text-gray-900">
-                  {r.clientName}
-                  {r.reason && (
-                    <span className="block text-xs text-gray-400">{r.reason}</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-gray-600 capitalize">
-                  {r.frequency.toLowerCase()}
-                </td>
-                <td className="px-4 py-2.5 text-gray-600">
-                  {new Date(r.cancelledAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-2.5">
-                  <span className="text-xs text-gray-700">
-                    {r.reactivatedAt
-                      ? "Reactivated"
-                      : r.repliedAt
-                      ? "Replied"
-                      : r.clickedAt
-                      ? "Clicked"
-                      : r.openedAt
-                      ? "Opened"
-                      : r.emailSentAt
-                      ? "Sent"
-                      : r.offerStatus}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  {!r.repliedAt && !r.reactivatedAt && (
-                    <button
-                      type="button"
-                      onClick={() => markReplied(r.id)}
-                      disabled={busyId === r.id}
-                      className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Mark replied
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Client table */}
+      <div className="atable-wrap">
+        <div className="atable-scroll">
+          <table className="atable">
+            <thead>
+              <tr><th>Client</th><th>Frequency</th><th>Cancelled</th><th>Status</th><th style={{ textAlign: "right" }}>Action</th></tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 48, color: "var(--primary-50)" }}>{loading ? "Loading…" : "No cancellations in this period."}</td></tr>
+              ) : rows.map((r) => {
+                const s = statusOf(r);
+                return (
+                  <tr key={r.id} style={{ cursor: "default" }}>
+                    <td>
+                      <div className="row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flex: "0 0 auto" }}>{initials(r.clientName)}</span>
+                        <div><div className="col-client">{r.clientName}</div>{r.reason && <div className="col-client-sub">{r.reason}</div>}</div>
+                      </div>
+                    </td>
+                    <td><span className="pill" style={{ background: "var(--primary-5)", color: "var(--primary)", textTransform: "capitalize" }}>{r.frequency.toLowerCase()}</span></td>
+                    <td style={{ fontSize: 13, color: "var(--ink-soft)" }}>{new Date(r.cancelledAt).toLocaleDateString()}</td>
+                    <td><span className="pill" style={{ background: s.bg, color: s.color }}><span className="pill-dot" style={{ background: s.dot }} />{s.label}</span></td>
+                    <td style={{ textAlign: "right" }}>
+                      {!r.repliedAt && !r.reactivatedAt && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => markReplied(r.id)} disabled={busyId === r.id}>Mark replied</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

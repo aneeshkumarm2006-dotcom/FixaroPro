@@ -1,16 +1,11 @@
 "use client";
 
+// Web bookings — Cleano "Web bookings" card design, re-skinned to the Fixaro
+// charcoal/orange palette (A). Jobs that came through the public /book funnel.
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Globe,
-  ExternalLink,
-  UserPlus,
-  Users,
-  AlertTriangle,
-  RotateCw,
-  Clock,
-} from "lucide-react";
+import { CalendarClock, MapPin, Sparkles, Globe, UserPlus, Clock, AlertCircle } from "lucide-react";
 
 interface WebJob {
   id: string;
@@ -25,301 +20,151 @@ interface WebJob {
   parentJobId: string | null;
   cancellationRequestedAt: string | null;
   rescheduleRequestedAt: string | null;
-  client: {
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-  } | null;
+  client: { id: string; name: string; email: string | null; phone: string | null } | null;
   cleaners: { id: string; name: string }[];
   addOns: { name: string; price: number }[];
   createdAt: string;
 }
 
-type Filter = "all" | "unassigned" | "flexible" | "needs_attention";
+type Filter = "all" | "cleaner" | "flexible" | "attention";
 
-export default function WebBookingsPageClient({ jobs }: { jobs: WebJob[] }) {
-  const [filter, setFilter] = useState<Filter>("unassigned");
+const money = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-CA");
+const initials = (name: string) => name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
-  const filtered = useMemo(() => {
-    switch (filter) {
-      case "unassigned":
-        return jobs.filter(
-          (j) =>
-            j.cleaners.length < j.requiredCleaners &&
-            j.status !== "CANCELLED" &&
-            j.status !== "COMPLETED" &&
-            j.status !== "PAID"
-        );
-      case "flexible":
-        return jobs.filter((j) => j.isFlexible && j.status !== "CANCELLED");
-      case "needs_attention":
-        return jobs.filter(
-          (j) => j.cancellationRequestedAt || j.rescheduleRequestedAt
-        );
-      default:
-        return jobs;
-    }
-  }, [jobs, filter]);
+function needsCleaner(j: WebJob) {
+  return j.cleaners.length < j.requiredCleaners && j.status !== "CANCELLED" && j.status !== "COMPLETED" && j.status !== "PAID";
+}
+function hasRequest(j: WebJob) {
+  return !!j.cancellationRequestedAt || !!j.rescheduleRequestedAt;
+}
 
-  const counts = {
-    all: jobs.length,
-    unassigned: jobs.filter(
-      (j) =>
-        j.cleaners.length < j.requiredCleaners &&
-        j.status !== "CANCELLED" &&
-        j.status !== "COMPLETED" &&
-        j.status !== "PAID"
-    ).length,
-    flexible: jobs.filter((j) => j.isFlexible && j.status !== "CANCELLED")
-      .length,
-    needs_attention: jobs.filter(
-      (j) => j.cancellationRequestedAt || j.rescheduleRequestedAt
-    ).length,
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, { label: string; bg: string; color: string; dot: string }> = {
+    CREATED: { label: "Created", bg: "#f3f4f6", color: "#374151", dot: "#9ca3af" },
+    SCHEDULED: { label: "Scheduled", bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
+    IN_PROGRESS: { label: "In Progress", bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
+    COMPLETED: { label: "Completed", bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+    PAID: { label: "Paid", bg: "#d1fae5", color: "#065f46", dot: "#059669" },
+    CANCELLED: { label: "Cancelled", bg: "#fee2e2", color: "#991b1b", dot: "#ef4444" },
   };
+  const c = map[status] || { label: status, bg: "#f3f4f6", color: "#374151", dot: "#9ca3af" };
+  return <span className="pill" style={{ background: c.bg, color: c.color }}><span className="pill-dot" style={{ background: c.dot }} />{c.label}</span>;
+}
 
+function AvatarStack({ names }: { names: string[] }) {
+  const shown = names.slice(0, 3);
+  const more = names.length - shown.length;
+  if (names.length === 0) return <span style={{ fontSize: 12, color: "var(--primary-50)" }}>Unassigned</span>;
   return (
-    <div className="admin-font">
-      {/* Header — matches /jobs */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          marginBottom: 32,
-          gap: 16,
-          flexWrap: "wrap",
-        }}>
-        <div>
-          <p className="admin-eyebrow">Operations</p>
-          <h1 className="admin-page-title">
-            Web bookings{" "}
-            <span style={{ color: "var(--primary-40)", fontWeight: 300 }}>
-              · {counts.all}
-            </span>
-          </h1>
-        </div>
-      </header>
-
-      {/* Stats — match Jobs page; clickable to filter */}
-      <div className="astat-grid" style={{ marginBottom: 28 }}>
-        <FilterStat
-          icon={<Globe size={15} />}
-          label="Total"
-          value={counts.all}
-          active={filter === "all"}
-          onClick={() => setFilter("all")}
-        />
-        <FilterStat
-          icon={<UserPlus size={15} />}
-          label="Needs cleaner"
-          value={counts.unassigned}
-          warn={counts.unassigned > 0}
-          active={filter === "unassigned"}
-          onClick={() => setFilter("unassigned")}
-        />
-        <FilterStat
-          icon={<Clock size={15} />}
-          label="Flexible time"
-          value={counts.flexible}
-          active={filter === "flexible"}
-          onClick={() => setFilter("flexible")}
-        />
-        <FilterStat
-          icon={<AlertTriangle size={15} />}
-          label="Needs attention"
-          value={counts.needs_attention}
-          warn={counts.needs_attention > 0}
-          active={filter === "needs_attention"}
-          onClick={() => setFilter("needs_attention")}
-        />
-      </div>
-
-      {/* List */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid var(--primary-10)",
-          borderRadius: 16,
-          padding: 18,
-        }}>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", color: "var(--primary-50)", fontSize: 13, padding: "48px 0" }}>
-            {filter === "unassigned"
-              ? "🎉 Every web booking has a cleaner assigned."
-              : "No web bookings match this filter."}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {filtered.map((j) => (
-              <BookingRow key={j.id} job={j} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <span className="wb-avstack">
+      {shown.map((n, i) => <span key={i} className="wb-av">{initials(n)}</span>)}
+      {more > 0 && <span className="wb-av more">+{more}</span>}
+    </span>
   );
 }
 
-function FilterStat({
-  icon,
-  label,
-  value,
-  warn,
-  active,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  warn?: boolean;
-  active?: boolean;
-  onClick: () => void;
+function FilterStat({ icon: Icon, label, value, hint, amber, active, onClick }: {
+  icon: React.ElementType; label: string; value: number; hint: string; amber?: boolean; active: boolean; onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="astat"
-      style={{
-        textAlign: "left",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        border: active
-          ? "1.5px solid var(--primary)"
-          : warn && value > 0
-          ? "1px solid #fde68a"
-          : undefined,
-        background: active
-          ? "var(--primary-5)"
-          : warn && value > 0
-          ? "#fffbeb"
-          : undefined,
-      }}>
+    <button type="button" onClick={onClick} className={`wb-stat ${active ? "active" : ""} ${amber ? "amber" : ""}`}>
       <div className="astat-head">
-        <span className="astat-label">{label}</span>
-        <div className="astat-icon">{icon}</div>
+        <span>{label}</span>
+        <span className="astat-icon" style={amber ? { background: "#fef3c7", color: "var(--amber-700)" } : undefined}><Icon size={16} /></span>
       </div>
-      <div className="astat-value">{value}</div>
-      {active && <div className="astat-delta">Showing</div>}
+      <div className="astat-value" style={amber ? { color: "var(--amber-800)" } : undefined}>{value}</div>
+      <div className="astat-delta">{active ? "Showing" : hint}</div>
     </button>
   );
 }
 
-function BookingRow({ job }: { job: WebJob }) {
-  const needsCleaner =
-    job.cleaners.length < job.requiredCleaners &&
-    job.status !== "CANCELLED" &&
-    job.status !== "COMPLETED" &&
-    job.status !== "PAID";
-  const hasRequest =
-    !!job.cancellationRequestedAt || !!job.rescheduleRequestedAt;
+export default function WebBookingsPageClient({ jobs }: { jobs: WebJob[] }) {
+  const [filter, setFilter] = useState<Filter>("all");
 
-  const startStr = new Date(job.startTime).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year:
-      new Date(job.startTime).getFullYear() === new Date().getFullYear()
-        ? undefined
-        : "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const counts = {
+    all: jobs.length,
+    cleaner: jobs.filter(needsCleaner).length,
+    flexible: jobs.filter((j) => j.isFlexible && j.status !== "CANCELLED").length,
+    attention: jobs.filter((j) => needsCleaner(j) || hasRequest(j)).length,
+  };
+
+  const visible = useMemo(() => {
+    if (filter === "cleaner") return jobs.filter(needsCleaner);
+    if (filter === "flexible") return jobs.filter((j) => j.isFlexible && j.status !== "CANCELLED");
+    if (filter === "attention") return jobs.filter((j) => needsCleaner(j) || hasRequest(j));
+    return jobs;
+  }, [jobs, filter]);
 
   return (
-    <article className="rounded-xl border border-[#1c1917]/10 bg-white p-5 space-y-3">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-[#1c1917]/60 font-medium">
-            <span>Job #{job.jobNumber}</span>
-            {job.parentJobId ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#e85d04]/5 text-[#1c1917] normal-case">
-                <RotateCw className="w-3 h-3" /> recurring
-              </span>
-            ) : null}
-            {job.isFlexible ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 normal-case">
-                Flexible
-              </span>
-            ) : null}
-          </div>
-          <div className="text-lg font-medium text-[#1c1917] mt-0.5">
-            {startStr}
-          </div>
-          {job.location ? (
-            <div className="text-xs text-[#1c1917]/60 mt-1">{job.location}</div>
-          ) : null}
-          {job.jobType ? (
-            <div className="text-xs text-[#1c1917]/70 mt-1">{job.jobType}</div>
-          ) : null}
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          {job.price !== null ? (
-            <div className="text-lg font-medium text-[#1c1917]">
-              ${job.price.toFixed(2)}
-            </div>
-          ) : null}
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide ${
-              job.status === "COMPLETED" || job.status === "PAID"
-                ? "bg-emerald-100 text-emerald-800"
-                : job.status === "CANCELLED"
-                ? "bg-gray-100 text-gray-500"
-                : "bg-slate-100 text-slate-700"
-            }`}>
-            {job.status}
-          </span>
-        </div>
+    <div className="admin-font">
+      <header style={{ marginBottom: 24 }}>
+        <p className="eyebrow">Operations</p>
+        <h1 className="display" style={{ fontSize: "clamp(32px, 4.2vw, 46px)", marginTop: 6 }}>
+          Web <em>bookings.</em> <span style={{ color: "var(--primary-40)", fontWeight: 300, fontFamily: "var(--font-serif)" }}>· {counts.all}</span>
+        </h1>
+        <p className="subtitle" style={{ marginTop: 10, fontSize: 15.5 }}>Jobs booked through the public booking funnel. Assign cleaners and handle change requests.</p>
+      </header>
+
+      <div className="astat-grid" style={{ marginBottom: 26 }}>
+        <FilterStat icon={Globe} label="Total" value={counts.all} hint="from /book" active={filter === "all"} onClick={() => setFilter("all")} />
+        <FilterStat icon={UserPlus} label="Needs cleaner" value={counts.cleaner} hint="understaffed" amber={counts.cleaner > 0} active={filter === "cleaner"} onClick={() => setFilter("cleaner")} />
+        <FilterStat icon={Clock} label="Flexible time" value={counts.flexible} hint="time TBD" active={filter === "flexible"} onClick={() => setFilter("flexible")} />
+        <FilterStat icon={AlertCircle} label="Needs attention" value={counts.attention} hint="action required" amber={counts.attention > 0} active={filter === "attention"} onClick={() => setFilter("attention")} />
       </div>
 
-      <div className="text-xs text-[#1c1917]/70">
-        {job.client ? (
-          <span>
-            {job.client.name}
-            {job.client.email ? ` · ${job.client.email}` : ""}
-            {job.client.phone ? ` · ${job.client.phone}` : ""}
-          </span>
-        ) : (
-          <span className="text-[#1c1917]/40">No client linked</span>
-        )}
-      </div>
+      {visible.length === 0 ? (
+        <div className="dcard" style={{ padding: 56, textAlign: "center", color: "var(--primary-60)" }}>No web bookings in this view.</div>
+      ) : (
+        <div className="wb-grid">
+          {visible.map((j) => {
+            const short = needsCleaner(j);
+            const startStr = new Date(j.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            const reqKind = j.cancellationRequestedAt ? "cancellation" : j.rescheduleRequestedAt ? "reschedule" : null;
+            return (
+              <article key={j.id} className="wb-card">
+                <div className="wb-top">
+                  <div className="wb-jobno">
+                    Job #{j.jobNumber}
+                    {j.parentJobId && <span className="wb-tag recurring">Recurring</span>}
+                    {j.isFlexible && <span className="wb-tag flexible">Flexible</span>}
+                  </div>
+                  <StatusPill status={j.status} />
+                </div>
 
-      <div className="flex flex-wrap gap-2 items-center pt-3 border-t border-[#1c1917]/10">
-        <div className="flex items-center gap-2 text-xs">
-          <Users className="w-3.5 h-3.5 text-[#1c1917]/60" />
-          <span className="text-[#1c1917]/70">
-            Cleaners: {job.cleaners.length} / {job.requiredCleaners}
-          </span>
-          {job.cleaners.length > 0 ? (
-            <span className="text-[#1c1917] font-medium">
-              {job.cleaners.map((c) => c.name).join(", ")}
-            </span>
-          ) : null}
+                <div className="wb-rows">
+                  <div className="wb-row"><span className="wb-ic"><CalendarClock size={15} /></span><span>{j.isFlexible ? `${new Date(j.startTime).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · time TBD` : startStr}</span></div>
+                  {j.location && <div className="wb-row"><span className="wb-ic"><MapPin size={15} /></span><span>{j.location}</span></div>}
+                  {j.client && <div className="wb-row"><span className="wb-ic"><Sparkles size={15} /></span><span className="wb-client">{j.client.name}</span></div>}
+                </div>
+
+                <div className="wb-meta">
+                  {j.jobType ? <span className="pill" style={{ background: "var(--primary-5)", color: "var(--primary)" }}>{j.jobType}</span> : <span />}
+                  <div className={`wb-staff ${short ? "short" : ""}`}>
+                    <AvatarStack names={j.cleaners.map((c) => c.name)} />
+                    <span className="wb-staff-count">{j.cleaners.length}/{j.requiredCleaners}</span>
+                  </div>
+                </div>
+
+                {(short || reqKind) && (
+                  <div className="wb-pills">
+                    {short && <span className="wb-pill needs">Needs assignment</span>}
+                    {reqKind && (
+                      <Link href="/requests" className={`wb-pill req ${reqKind}`}>
+                        {reqKind === "cancellation" ? "Cancel requested" : "Reschedule requested"} →
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                <div className="wb-foot">
+                  <div className="wb-price">{money(j.price || 0)}</div>
+                  <Link href={`/jobs/${j.id}`} className="btn btn-primary btn-sm">Open &amp; assign →</Link>
+                </div>
+              </article>
+            );
+          })}
         </div>
-
-        {needsCleaner ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase tracking-wide ml-2">
-            <UserPlus className="w-3 h-3" />
-            Needs assignment
-          </span>
-        ) : null}
-
-        {hasRequest ? (
-          <Link
-            href="/requests"
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-semibold uppercase tracking-wide ml-2 hover:bg-red-100">
-            {job.cancellationRequestedAt ? "Cancel requested" : "Reschedule requested"}
-          </Link>
-        ) : null}
-
-        <div className="flex-1" />
-        <Link
-          href={`/jobs/${job.id}`}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-[#e85d04] text-white hover:bg-[#c44c03]">
-          <ExternalLink className="w-3.5 h-3.5" /> Open & assign
-        </Link>
-      </div>
-    </article>
+      )}
+    </div>
   );
 }

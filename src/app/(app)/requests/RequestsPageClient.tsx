@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Inbox, Check, X, ExternalLink } from "lucide-react";
-import Card from "@/components/ui/Card";
+// Pending requests — Cleano "Pending requests" card design, re-skinned to the
+// Fixaro charcoal/orange palette (A). Keeps the existing resolveJobRequest flow.
+
+import { Fragment, useMemo, useState } from "react";
+import Link from "next/link";
+import { CalendarClock, MapPin, Briefcase, X, CheckCircle2 } from "lucide-react";
 import { resolveJobRequest } from "../actions/resolveJobRequest";
 
 interface JobRow {
@@ -16,27 +19,38 @@ interface JobRow {
   price: number | null;
   cancellationRequestedAt: string | null;
   rescheduleRequestedAt: string | null;
-  client: {
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-  } | null;
+  client: { id: string; name: string; email: string | null; phone: string | null } | null;
   cleaners: { id: string; name: string }[];
 }
 
 type Filter = "all" | "cancellation" | "reschedule";
+type Kind = "cancellation" | "reschedule";
+
+const money = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-CA");
+const initials = (name: string) => name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+function relTime(iso: string) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "yesterday";
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ jobId: string; kind: Kind; decision: "approve" | "deny" } | null>(null);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const filtered = useMemo(() => {
-    if (filter === "cancellation")
-      return jobs.filter((j) => j.cancellationRequestedAt);
-    if (filter === "reschedule")
-      return jobs.filter((j) => j.rescheduleRequestedAt);
+    if (filter === "cancellation") return jobs.filter((j) => j.cancellationRequestedAt);
+    if (filter === "reschedule") return jobs.filter((j) => j.rescheduleRequestedAt);
     return jobs;
   }, [jobs, filter]);
 
@@ -45,353 +59,154 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
     cancellation: jobs.filter((j) => j.cancellationRequestedAt).length,
     reschedule: jobs.filter((j) => j.rescheduleRequestedAt).length,
   };
+  const TABS: Array<{ id: Filter; label: string; count: number }> = [
+    { id: "all", label: "All", count: counts.all },
+    { id: "cancellation", label: "Cancellation", count: counts.cancellation },
+    { id: "reschedule", label: "Reschedule", count: counts.reschedule },
+  ];
 
-  const [pending, setPending] = useState<{
-    jobId: string;
-    kind: "cancellation" | "reschedule";
-    decision: "approve" | "deny";
-    msg: string;
-  } | null>(null);
-  const [note, setNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  function handle(
-    jobId: string,
-    kind: "cancellation" | "reschedule",
-    decision: "approve" | "deny"
-  ) {
-    const msg =
-      kind === "cancellation" && decision === "approve"
-        ? "Approve this cancellation? The job will be marked as CANCELLED."
-        : `Mark this ${kind} request as ${decision === "approve" ? "approved" : "denied"}?`;
+  function handle(jobId: string, kind: Kind, decision: "approve" | "deny") {
     setNote("");
-    setPending({ jobId, kind, decision, msg });
+    setError(null);
+    setPending({ jobId, kind, decision });
   }
-
   async function confirmHandle() {
     if (!pending) return;
     const { jobId, kind, decision } = pending;
     setSubmitting(true);
     setError(null);
-    const res = await resolveJobRequest({
-      jobId,
-      kind,
-      decision,
-      note: note.trim() || undefined,
-    });
+    const res = await resolveJobRequest({ jobId, kind, decision, note: note.trim() || undefined });
     setSubmitting(false);
-    if (!res.success) {
-      setError(res.error || "Failed to resolve");
-      return;
-    }
+    if (!res.success) { setError(res.error || "Failed to resolve"); return; }
     setPending(null);
     setBusyId(jobId);
     setBusyId(null);
   }
 
+  const modalCopy = (() => {
+    if (!pending) return { title: "", body: "" };
+    const { kind, decision, jobId } = pending;
+    const num = jobs.find((j) => j.id === jobId)?.jobNumber ?? "";
+    if (decision === "deny") return { title: "Deny request", body: `Keep Job #${num} as scheduled and let the customer know their request was declined.` };
+    if (kind === "cancellation") return { title: "Approve cancellation", body: `Cancel Job #${num}. The slot will be freed and the customer notified.` };
+    return { title: "Approve reschedule", body: `Approve the reschedule for Job #${num}. The cleaners and customer will be notified.` };
+  })();
+  const confirmCls = pending?.decision === "deny" ? "btn-secondary req-deny" : pending?.kind === "cancellation" ? "req-approve-cancel" : "req-approve-resched";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl !font-light tracking-tight text-[#1c1917] flex items-center gap-3">
-          <Inbox className="w-7 h-7" /> Pending Requests
+    <div className="admin-font">
+      <header style={{ marginBottom: 24 }}>
+        <p className="eyebrow">Operations</p>
+        <h1 className="display" style={{ fontSize: "clamp(32px, 4.2vw, 46px)", marginTop: 6 }}>
+          Pending <em>requests.</em> <span style={{ color: "var(--primary-40)", fontWeight: 300, fontFamily: "var(--font-serif)" }}>· {jobs.length}</span>
         </h1>
-        <p className="text-sm text-[#1c1917]/70 mt-1">
-          Customer-initiated cancellation and reschedule requests that need a
-          decision from you.
-        </p>
+        <p className="subtitle" style={{ marginTop: 10, fontSize: 15.5 }}>Customer-initiated cancellation and reschedule requests awaiting your approval.</p>
+      </header>
+
+      {error && (
+        <div style={{ marginBottom: 18, borderRadius: 12, background: "#fef2f2", border: "1px solid #fecaca", padding: "12px 14px", fontSize: 13.5, color: "#991b1b" }}>{error}</div>
+      )}
+
+      <div className="an-tabs" style={{ marginBottom: 22 }}>
+        {TABS.map((t) => (
+          <button key={t.id} className={`an-tab ${filter === t.id ? "active" : ""}`} onClick={() => setFilter(t.id)}>
+            {t.label}<span style={{ marginLeft: 7, fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: filter === t.id ? "var(--accent-soft, rgba(232,93,4,0.12))" : "var(--primary-10)", color: filter === t.id ? "var(--accent)" : "var(--primary-60)" }}>{t.count}</span>
+          </button>
+        ))}
       </div>
 
-      {error ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          {error}
+      {filtered.length === 0 ? (
+        <div className="dcard" style={{ padding: 64, textAlign: "center" }}>
+          <div style={{ width: 56, height: 56, margin: "0 auto 16px", borderRadius: 16, background: "var(--primary-5)", color: "var(--primary-40)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <CheckCircle2 size={28} />
+          </div>
+          <h3 className="title-sm" style={{ marginBottom: 6 }}>All caught up</h3>
+          <p className="subtitle" style={{ fontSize: 14, margin: 0 }}>No {filter === "all" ? "" : filter + " "}requests need your attention right now.</p>
         </div>
-      ) : null}
-
-      <Card variant="default" className="p-5">
-        <div className="flex flex-wrap gap-1 mb-5">
-          {([
-            ["all", `All (${counts.all})`],
-            ["cancellation", `Cancellation (${counts.cancellation})`],
-            ["reschedule", `Reschedule (${counts.reschedule})`],
-          ] as [Filter, string][]).map(([k, label]) => {
-            const active = filter === k;
+      ) : (
+        <div className="req-grid">
+          {filtered.map((j) => {
+            const kinds: Kind[] = [];
+            if (j.cancellationRequestedAt) kinds.push("cancellation");
+            if (j.rescheduleRequestedAt) kinds.push("reschedule");
+            const requestedAt = j.cancellationRequestedAt ?? j.rescheduleRequestedAt;
+            const startStr = new Date(j.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            const price = (j.price || 0);
             return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setFilter(k)}
-                className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                  active
-                    ? "bg-[#e85d04] text-white"
-                    : "bg-[#e85d04]/5 text-[#1c1917] hover:bg-[#e85d04]/10"
-                }`}>
-                {label}
-              </button>
+              <article key={j.id} className="req-card">
+                <div className="req-card-top">
+                  <div>
+                    <div className="req-jobno">Job #{j.jobNumber}</div>
+                    {requestedAt && <div className="req-when">Requested {relTime(requestedAt)}</div>}
+                  </div>
+                  <div className="req-badges">
+                    {kinds.map((k) => <span key={k} className={`req-badge ${k === "cancellation" ? "cancel" : "resched"}`}>{k}</span>)}
+                  </div>
+                </div>
+
+                <div className="req-rows">
+                  <div className="req-row">
+                    <span className="req-row-ic"><CalendarClock size={15} /></span>
+                    <div className="req-row-main">{startStr}{j.isFlexible && <span style={{ color: "var(--primary-60)", fontWeight: 400 }}> · flexible</span>}</div>
+                  </div>
+                  {j.location && (
+                    <div className="req-row"><span className="req-row-ic"><MapPin size={15} /></span><div className="req-row-main">{j.location}</div></div>
+                  )}
+                  {j.client && (
+                    <div className="req-row">
+                      <span className="req-row-ic"><span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600 }}>{initials(j.client.name)}</span></span>
+                      <div>
+                        <div className="req-row-main">{j.client.name}</div>
+                        <div className="req-row-sub">{[j.client.email, j.client.phone].filter(Boolean).join(" · ") || "—"}</div>
+                      </div>
+                    </div>
+                  )}
+                  {j.cleaners.length > 0 && (
+                    <div className="req-row"><span className="req-row-ic"><Briefcase size={15} /></span><div className="req-row-main">{j.cleaners.map((c) => c.name).join(", ")}</div></div>
+                  )}
+                </div>
+
+                <div className="req-foot">
+                  <div className="req-price">{money(price)}</div>
+                  <div className="req-actions">
+                    <Link href={`/jobs/${j.id}`} className="btn btn-secondary btn-sm">Open job</Link>
+                    {kinds.map((k) => (
+                      <Fragment key={k}>
+                        <button className="btn btn-secondary btn-sm req-deny" disabled={busyId === j.id} onClick={() => handle(j.id, k, "deny")}>Deny</button>
+                        <button className={`btn btn-sm ${k === "cancellation" ? "req-approve-cancel" : "req-approve-resched"}`} disabled={busyId === j.id} onClick={() => handle(j.id, k, "approve")}>
+                          {k === "cancellation" ? "Approve cancellation" : "Approve reschedule"}
+                        </button>
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+              </article>
             );
           })}
         </div>
-
-        {filtered.length === 0 ? (
-          <div className="text-center text-sm text-[#1c1917]/60 py-12">
-            No pending requests. 🎉
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((j) => {
-              const kinds: ("cancellation" | "reschedule")[] = [];
-              if (j.cancellationRequestedAt) kinds.push("cancellation");
-              if (j.rescheduleRequestedAt) kinds.push("reschedule");
-              const requestedAt =
-                j.cancellationRequestedAt ?? j.rescheduleRequestedAt;
-              const startStr = new Date(j.startTime).toLocaleString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              });
-
-              return (
-                <article
-                  key={j.id}
-                  className="rounded-xl border border-[#1c1917]/10 bg-white p-5 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wide text-[#1c1917]/60 font-medium">
-                        Job #{j.jobNumber}
-                      </div>
-                      <div className="text-lg font-medium text-[#1c1917] mt-0.5">
-                        {startStr}
-                        {j.isFlexible ? (
-                          <span className="ml-2 text-xs text-[#1c1917]/60 font-normal">
-                            (flexible)
-                          </span>
-                        ) : null}
-                      </div>
-                      {j.location ? (
-                        <div className="text-xs text-[#1c1917]/60 mt-1">
-                          {j.location}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="flex gap-1.5">
-                      {kinds.map((k) => (
-                        <span
-                          key={k}
-                          className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
-                            k === "cancellation"
-                              ? "bg-red-50 text-red-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}>
-                          {k}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3 text-xs text-[#1c1917]/70">
-                    {j.client ? (
-                      <span>
-                        {j.client.name}
-                        {j.client.email ? ` · ${j.client.email}` : ""}
-                        {j.client.phone ? ` · ${j.client.phone}` : ""}
-                      </span>
-                    ) : null}
-                    {j.cleaners.length ? (
-                      <span>
-                        with {j.cleaners.map((c) => c.name).join(", ")}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[#1c1917]/10">
-                    <a
-                      href={`/jobs/${j.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#1c1917]/70 hover:bg-[#e85d04]/5">
-                      <ExternalLink className="w-3.5 h-3.5" /> Open job
-                    </a>
-                    <div className="flex-1" />
-                    {kinds.map((k) => (
-                      <div key={k} className="inline-flex gap-1.5">
-                        <button
-                          type="button"
-                          disabled={busyId === j.id}
-                          onClick={() => handle(j.id, k, "approve")}
-                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-white disabled:opacity-50 ${
-                            k === "cancellation"
-                              ? "bg-red-600 hover:bg-red-700"
-                              : "bg-emerald-600 hover:bg-emerald-700"
-                          }`}>
-                          <Check className="w-3.5 h-3.5" />
-                          Approve {k}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyId === j.id}
-                          onClick={() => handle(j.id, k, "deny")}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[#1c1917] bg-[#e85d04]/5 hover:bg-[#e85d04]/10 disabled:opacity-50">
-                          <X className="w-3.5 h-3.5" /> Deny
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {requestedAt ? (
-                    <div className="text-[10px] text-[#1c1917]/40">
-                      Requested {new Date(requestedAt).toLocaleString()}
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+      )}
 
       {pending && (
-        <div
-          onClick={() => !submitting && setPending(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 60, 70, 0.55)",
-            backdropFilter: "blur(2px)",
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              maxWidth: 480,
-              width: "100%",
-              padding: 28,
-              boxShadow: "0 20px 60px rgba(0, 60, 70, 0.25)",
-            }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-              <div>
-                <h2
-                  style={{
-                    fontFamily: "var(--font-serif, serif)",
-                    fontSize: 24,
-                    color: "var(--primary-deep, #003C46)",
-                    margin: "0 0 6px",
-                    fontWeight: 400,
-                  }}>
-                  {pending.decision === "approve"
-                    ? `Approve ${pending.kind}?`
-                    : `Deny ${pending.kind}?`}
-                </h2>
-                <p style={{ fontSize: 13.5, color: "var(--primary-60, #5b7a80)", margin: 0, lineHeight: 1.5 }}>
-                  {pending.msg}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => !submitting && setPending(null)}
-                style={{
-                  background: "transparent",
-                  border: 0,
-                  cursor: "pointer",
-                  color: "var(--primary-50, #6b8085)",
-                  padding: 4,
-                  fontFamily: "inherit",
-                }}
-                aria-label="Close">
-                <X className="w-4 h-4" />
-              </button>
+        <div className="req-modal-overlay" onClick={() => !submitting && setPending(null)}>
+          <div className="req-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="req-modal-head">
+              <h3>{modalCopy.title}</h3>
+              <button className="icon-btn" style={{ width: 30, height: 30 }} onClick={() => !submitting && setPending(null)} aria-label="Close"><X size={16} /></button>
             </div>
-
-            <div style={{ marginTop: 22 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "var(--primary-60, #5b7a80)",
-                  marginBottom: 8,
-                }}>
-                {pending.decision === "deny"
-                  ? "Reason (optional, shown to the customer)"
-                  : "Note (optional, shown to the customer)"}
-              </label>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={
-                  pending.decision === "deny"
-                    ? "e.g. We're outside our cancellation window — please contact us if you'd like to discuss."
-                    : "Any extra context to share with the customer."
-                }
-                rows={4}
-                disabled={submitting}
-                style={{
-                  width: "100%",
-                  borderRadius: 12,
-                  border: "1px solid var(--primary-10, rgba(232,93,4,0.15))",
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                  color: "var(--ink, #003C46)",
-                  resize: "vertical",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 22,
-              }}>
-              <button
-                type="button"
-                onClick={() => !submitting && setPending(null)}
-                disabled={submitting}
-                style={{
-                  background: "transparent",
-                  border: 0,
-                  padding: "10px 14px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "var(--primary-60, #5b7a80)",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  fontFamily: "inherit",
-                }}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmHandle}
-                disabled={submitting}
-                style={{
-                  padding: "10px 22px",
-                  borderRadius: 999,
-                  border: 0,
-                  background:
-                    pending.decision === "approve"
-                      ? "var(--primary-deep, #003C46)"
-                      : "#b91c1c",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: "inherit",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.6 : 1,
-                }}>
-                {submitting
-                  ? "Working…"
-                  : pending.decision === "approve"
-                  ? "Approve"
-                  : "Deny"}
+            <p className="req-modal-body">{modalCopy.body}</p>
+            <label className="req-modal-label">Customer-facing note <span>(optional)</span></label>
+            <textarea
+              rows={3}
+              value={note}
+              disabled={submitting}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={pending.decision === "deny" ? "Let them know why, and offer alternatives…" : "Add a friendly note to include in the confirmation…"}
+            />
+            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#991b1b" }}>{error}</p>}
+            <div className="req-modal-foot">
+              <button className="btn btn-ghost btn-sm" disabled={submitting} onClick={() => setPending(null)}>Cancel</button>
+              <button className={`btn btn-sm ${confirmCls}`} disabled={submitting} onClick={confirmHandle}>
+                {submitting ? "Working…" : modalCopy.title}
               </button>
             </div>
           </div>

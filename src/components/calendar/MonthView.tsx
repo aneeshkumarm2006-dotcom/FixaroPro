@@ -119,11 +119,8 @@ export const MonthView = () => {
                   isWeekend ? "bg-[#e85d04]/[0.02]" : ""
                 } ${isCurrentMonth ? "hover:bg-[#e85d04]/[0.04]" : "bg-[#e85d04]/[0.1] opacity-10"} `}
                 onClick={(e) => handleDayClick(day, e)}>
-                {/* Day Number */}
-                <div
-                  className={`flex items-baseline gap-1 mb-2 ${
-                    isToday ? "justify-start" : ""
-                  }`}>
+                {/* Day Number + jobs count */}
+                <div className="flex items-center gap-1 mb-2">
                   <span
                     className={`app-title ${
                       isToday
@@ -134,6 +131,18 @@ export const MonthView = () => {
                     }`}>
                     {format(day, "d")}
                   </span>
+                  {(() => {
+                    const jobs = dayEvents.filter(
+                      (e) => !!e.metadata?.jobId
+                    ).length;
+                    return jobs > 0 && isCurrentMonth ? (
+                      <span
+                        title={`${jobs} job${jobs === 1 ? "" : "s"}`}
+                        className="app-subtitle ml-auto !text-[10px] font-[600] text-[#e85d04] bg-[#e85d04]/10 px-1.5 py-0.5 rounded-full">
+                        {jobs}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
 
                 {/* Events */}
@@ -172,16 +181,18 @@ export const MonthView = () => {
                               <div className="app-title-small truncate flex-1">
                                 {event.title}
                               </div>
-                              {isJob && event.metadata?.status && (
-                                <div
-                                  className="app-subtitle !text-[10px] px-1.5 py-0.5 rounded"
-                                  style={{
-                                    backgroundColor: styleInfo.color + "30",
-                                    color: styleInfo.color,
-                                  }}>
-                                  {event.metadata.status.replace("_", " ")}
-                                </div>
-                              )}
+                              {isJob &&
+                                event.metadata?.status &&
+                                event.metadata.status !== "CREATED" && (
+                                  <div
+                                    className="app-subtitle !text-[10px] px-1.5 py-0.5 rounded"
+                                    style={{
+                                      backgroundColor: styleInfo.color + "30",
+                                      color: styleInfo.color,
+                                    }}>
+                                    {event.metadata.status.replace(/_/g, " ")}
+                                  </div>
+                                )}
                             </div>
                             {isJob && event.metadata?.location && (
                               <div className="app-subtitle truncate opacity-70 flex items-center gap-0.5">

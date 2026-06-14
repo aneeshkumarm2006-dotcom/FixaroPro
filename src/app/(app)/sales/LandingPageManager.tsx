@@ -3,22 +3,13 @@
 import React, { useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import { createLandingPage, updateLandingPage, deleteLandingPage } from "@/app/(app)/actions/createLandingPage";
-import {
-  Globe,
-  Plus,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { Globe, Plus, X } from "lucide-react";
 
 interface LandingPage {
   id: string;
@@ -90,24 +81,21 @@ export default function LandingPageManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-[400] text-[#1c1917]">Landing Pages</h3>
-          <p className="text-xs text-[#1c1917]/50 mt-0.5">
-            Create and manage public landing pages for marketing campaigns
-          </p>
-        </div>
-        <Button
-          variant="action"
-          size="sm"
+      <div className="sl-tab-bar">
+        <span className="sl-tab-hint">
+          {landingPages.length} landing page{landingPages.length !== 1 ? "s" : ""}
+        </span>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
           onClick={() => {
             setEditingPage(null);
             setCampaignId("");
             setShowModal(true);
           }}>
-          <Plus className="w-4 h-4 mr-1" />
-          New Page
-        </Button>
+          <Plus size={14} />
+          New page
+        </button>
       </div>
 
       {landingPages.length === 0 ? (
@@ -119,77 +107,67 @@ export default function LandingPageManager({
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="sl-card-list">
           {landingPages.map((page) => (
-            <Card key={page.id} variant="default" className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-[400] text-[#1c1917] truncate">
-                      {page.title}
-                    </h4>
-                    <Badge
-                      variant={page.isPublished ? "default" : "secondary"}
-                      size="sm">
-                      {page.isPublished ? (
-                        <span className="flex items-center gap-1">
-                          <Eye className="w-3 h-3" /> Published
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <EyeOff className="w-3 h-3" /> Draft
-                        </span>
-                      )}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-[#1c1917]/50 mt-1">
-                    /{page.slug}
-                    {page.campaignName && (
-                      <span className="ml-2 text-[#1c1917]/40">
-                        Campaign: {page.campaignName}
-                      </span>
-                    )}
-                  </p>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="text-xs text-[#1c1917]/60">
-                      {page.totalVisits} total visits
-                    </span>
-                    <span className="text-xs text-[#1c1917]/60">
-                      {page.recentVisits} last 30d
-                    </span>
-                  </div>
+            <div key={page.id} className="dcard sl-lp">
+              <div className="sl-lp-main">
+                <div className="sl-lp-toprow">
+                  <h3 className="sl-lp-title">{page.title}</h3>
+                  <span
+                    className="pill"
+                    style={
+                      page.isPublished
+                        ? { background: "var(--emerald-100)", color: "var(--emerald-800)" }
+                        : { background: "#f1f5f9", color: "#334155" }
+                    }>
+                    <span
+                      className="pill-dot"
+                      style={{ background: page.isPublished ? "#059669" : "#94a3b8" }}
+                    />
+                    {page.isPublished ? "Published" : "Draft"}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  {page.isPublished && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(`/p/${page.slug}`, "_blank")
-                      }>
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingPage(page);
-                      setCampaignId(page.campaignId || "");
-                      setShowModal(true);
-                    }}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(page.id)}
-                    className="text-red-400 hover:text-red-600">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                <div className="sl-lp-meta">
+                  <span className="sl-lp-slug">/{page.slug}</span>
+                  <span className="sl-lp-visits">
+                    <strong>{page.recentVisits.toLocaleString()}</strong> visits · 30d
+                  </span>
                 </div>
               </div>
-            </Card>
+              <div className="sl-lp-actions">
+                <a
+                  className="btn btn-ghost btn-sm"
+                  href={page.isPublished ? `/p/${page.slug}` : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={!page.isPublished}
+                  style={
+                    page.isPublished
+                      ? undefined
+                      : { pointerEvents: "none", opacity: 0.5 }
+                  }>
+                  Open ↗
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setEditingPage(page);
+                    setCampaignId(page.campaignId || "");
+                    setShowModal(true);
+                  }}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  style={{ width: 36, height: 36 }}
+                  aria-label={`Delete ${page.title}`}
+                  onClick={() => handleDelete(page.id)}>
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}

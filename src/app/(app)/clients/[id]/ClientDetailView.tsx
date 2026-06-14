@@ -138,6 +138,17 @@ function dateStr(iso: string) {
   return new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stack-4">
+      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--primary-50)" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 14, color: "var(--primary-70)" }}>{value}</span>
+    </div>
+  );
+}
+
 export default function ClientDetailView({
   client,
   jobs,
@@ -186,14 +197,24 @@ export default function ClientDetailView({
             </div>
             <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
               {client.email && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
+                <a href={`mailto:${client.email}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)", textDecoration: "none" }}>
                   <Mail size={13} /> {client.email}
-                </span>
+                </a>
+              )}
+              {client.secondaryEmail && (
+                <a href={`mailto:${client.secondaryEmail}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-50)", textDecoration: "none" }}>
+                  <Mail size={12} /> {client.secondaryEmail}
+                </a>
               )}
               {client.phone && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
+                <a href={`tel:${client.phone}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)", textDecoration: "none" }}>
                   <Phone size={13} /> {client.phone}
-                </span>
+                </a>
+              )}
+              {client.secondaryPhone && (
+                <a href={`tel:${client.secondaryPhone}`} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-50)", textDecoration: "none" }}>
+                  <Phone size={12} /> {client.secondaryPhone}
+                </a>
               )}
               {client.address && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--primary-70)" }}>
@@ -224,6 +245,23 @@ export default function ClientDetailView({
           hint={totals.unpaidAmount > 0 ? "outstanding" : "all clear"}
         />
       </div>
+
+      {/* Contact & address details */}
+      {(client.company || client.address || client.aptNumber || client.city || client.state || client.zip) && (
+        <div className="dcard">
+          <div className="dcard-head">
+            <h3>Contact &amp; address</h3>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16 }}>
+            {client.company && <DetailRow label="Company" value={client.company} />}
+            {client.address && <DetailRow label="Address" value={client.address} />}
+            {client.aptNumber && <DetailRow label="Apt / Unit" value={client.aptNumber} />}
+            {client.city && <DetailRow label="City" value={client.city} />}
+            {client.state && <DetailRow label="State / Province" value={client.state} />}
+            {client.zip && <DetailRow label="Zip / Postal" value={client.zip} />}
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       {client.notes && (

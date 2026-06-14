@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import AnalyticsView from "./AnalyticsView";
-import LabourCostCard from "./LabourCostCard";
 
 export default async function AnalyticsPage() {
   const session = await auth.api.getSession({
@@ -586,7 +585,7 @@ export default async function AnalyticsPage() {
   const targetsWithActuals = targets.map((target) => {
     let actual = 0;
     const periodStart = new Date(target.periodStart);
-    let periodEnd = new Date(periodStart);
+    const periodEnd = new Date(periodStart);
 
     switch (target.period) {
       case "WEEKLY":
@@ -777,7 +776,6 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">
-      <LabourCostCard />
       <AnalyticsView
         jobStats={jobStats}
         revenueStats={revenueStats}

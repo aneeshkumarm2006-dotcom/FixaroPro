@@ -1,5 +1,5 @@
 import RouteSkeleton from "@/components/loaders/RouteSkeleton";
 
 export default function Loading() {
-  return <RouteSkeleton variant="dashboard" />;
+  return <RouteSkeleton variant="table" />;
 }

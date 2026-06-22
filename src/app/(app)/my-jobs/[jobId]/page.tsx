@@ -13,6 +13,8 @@ import WhyThisPriceLink from "../WhyThisPriceLink";
 import PhotoGallery from "./PhotoGallery";
 import JobChecklistPanel from "./JobChecklistPanel";
 import MapLinks from "./MapLinksClient";
+import EquipmentPanel from "./EquipmentPanel";
+import { getRequiredEquipment } from "@/lib/equipment";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -450,6 +452,8 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
           </div>
         </>
       )}
+
+      <EquipmentPanel jobId={job.id} equipment={getRequiredEquipment(job.jobType)} />
 
       {/* Photos */}
       {["IN_PROGRESS", "COMPLETED", "PAID"].includes(job.status) && (

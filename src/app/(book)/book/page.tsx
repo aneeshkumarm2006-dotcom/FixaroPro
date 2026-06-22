@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
-import { BookingDraft, EMPTY_DRAFT } from "./types";
+import { BookingDraft, EMPTY_DRAFT, getMaterialsPricing } from "./types";
 import Step1PostalCode from "./steps/Step1PostalCode";
 import Step2Property from "./steps/Step2Property";
 import Step3Schedule from "./steps/Step3Schedule";
@@ -212,6 +212,8 @@ export default function BookPage() {
       addOns: draft.addOns
         .filter((a) => a.selected)
         .map((a) => ({ name: a.name, price: a.price })),
+      customerRequestsMaterials: draft.customerRequestsMaterials,
+      paintingScope: draft.paintingScope,
       date: draft.date,
       isFlexible: draft.isFlexible,
       timeSlot: draft.timeSlot,
@@ -241,7 +243,10 @@ export default function BookPage() {
   const addOnTotal = draft.addOns
     .filter((a) => a.selected)
     .reduce((s, a) => s + a.price, 0);
-  const subtotal = basePrice + addOnTotal + draft.travelFee;
+  const materialsAmount = draft.customerRequestsMaterials
+    ? getMaterialsPricing(draft.serviceType)?.amount ?? 0
+    : 0;
+  const subtotal = basePrice + addOnTotal + materialsAmount + draft.travelFee;
   const tax = calculateTax(subtotal);
   const showSummary = step >= 1 && basePrice > 0;
 

@@ -61,11 +61,15 @@ export const POOR_RATING_FOLLOWUP_STARS = 1;
 export const DEFAULT_INVENTORY_LOW_STOCK = 10;
 
 /** Fee charged to the customer when they cancel inside the late-cancellation
- *  window below. */
-export const CANCELLATION_FEE_USD = 20;
+ *  window below (SOP §4/§10: $25 within 24h). */
+export const CANCELLATION_FEE_USD = 25;
 /** Hours before the booking start time inside which a cancellation incurs the
- *  late-cancellation fee. */
-export const CANCELLATION_FEE_WINDOW_HOURS = 48;
+ *  late-cancellation fee (SOP §4/§10). */
+export const CANCELLATION_FEE_WINDOW_HOURS = 24;
+
+/** Default hourly labour rate (SOP §10). Admin-configurable via AppSetting
+ *  `pricing.labourRate` — see getLabourRate() in src/lib/billing.ts. */
+export const DEFAULT_LABOUR_RATE = 79;
 
 /**
  * After-photo consent shown at booking. Cleaners may only photograph the

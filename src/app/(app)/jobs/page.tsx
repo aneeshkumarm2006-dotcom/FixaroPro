@@ -134,6 +134,15 @@ export default async function JobsPage({
         name: a.name,
         price: a.price,
       })),
+      // "D" indicator (SOP §9): a paid materials deposit that hasn't been
+      // reconciled (applied/refunded) yet on a still-active booking.
+      needsDepositReview:
+        job.depositPaid &&
+        job.materialsType === "deposit" &&
+        job.materialsAppliedAmount == null &&
+        job.materialsRefundedAt == null &&
+        job.status !== "CANCELLED" &&
+        !job.paymentReceived,
     };
   });
 

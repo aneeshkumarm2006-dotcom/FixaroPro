@@ -7,6 +7,7 @@ import { ArrowLeft, Download, MapPin, Users, CreditCard } from "lucide-react";
 import { StatusBadge, DateBadge } from "@/components/customer/atoms";
 import { Banner } from "@/components/customer/Field";
 import RequestActions from "./RequestActions";
+import PaintingOfferActions from "./PaintingOfferActions";
 
 function formatPrice(n: number | null | undefined) {
   return `$${(n ?? 0).toFixed(2)}`;
@@ -63,6 +64,10 @@ export default async function BookingDetailPage({
 
   const isUpcoming = new Date(job.startTime) >= new Date();
   const isCompletedOrPaid = job.status === "COMPLETED" || job.status === "PAID";
+  // Deposit actually collected at booking (materials deposit, e.g. painting
+  // $799, or the $20 base booking deposit).
+  const depositCollected =
+    job.materialsType === "deposit" && job.materialsAmount ? job.materialsAmount : 20;
   const hasCancelRequest = !!job.cancellationRequestedAt;
   const hasRescheduleRequest = !!job.rescheduleRequestedAt;
   const hasRequest = hasCancelRequest || hasRescheduleRequest;
@@ -247,6 +252,28 @@ export default async function BookingDetailPage({
 
         {/* Right column */}
         <div className="cl-stack-16">
+          {/* Painting bid workflow (SOP §6) */}
+          {job.paintingStatus === "OFFER_SENT" && job.paintingFinalAmount ? (
+            <PaintingOfferActions jobId={job.id} finalAmount={job.paintingFinalAmount} />
+          ) : null}
+          {job.paintingStatus === "BIDDING" ? (
+            <section className="cl-tile cl-tile-pad-lg">
+              <h2 className="cl-title-md" style={{ marginBottom: 8 }}>Painting quote in progress</h2>
+              <p style={{ fontSize: 14, color: "var(--primary-70)", margin: 0, lineHeight: 1.55 }}>
+                Your estimated range is ${formatPrice(job.quoteRangeMin)}–{formatPrice(job.quoteRangeMax)}.
+                We're collecting bids from our painters and will send you a final price to accept shortly.
+              </p>
+            </section>
+          ) : null}
+          {job.paintingStatus === "ACCEPTED" ? (
+            <section className="cl-tile cl-tile-pad-lg">
+              <h2 className="cl-title-md" style={{ marginBottom: 8 }}>Painting quote accepted</h2>
+              <p style={{ fontSize: 14, color: "var(--primary-70)", margin: 0, lineHeight: 1.55 }}>
+                You accepted the final price of {formatPrice(job.paintingFinalAmount)}. Your booking is confirmed.
+              </p>
+            </section>
+          ) : null}
+
           <section className="cl-tile cl-tile-pad-lg">
             <h2 className="cl-title-md" style={{ marginBottom: 18 }}>
               Price
@@ -274,7 +301,7 @@ export default async function BookingDetailPage({
               {job.depositPaid ? (
                 <DetailRow
                   dt="Deposit paid"
-                  dd={`−${formatPrice(20)}`}
+                  dd={`−${formatPrice(depositCollected)}`}
                 />
               ) : null}
               {job.refundedAmount > 0 ? (
@@ -304,7 +331,7 @@ export default async function BookingDetailPage({
                 />
                 <span>
                   {job.depositPaid
-                    ? "$20 deposit collected at booking. The remaining balance will be charged after your visit is complete."
+                    ? `${formatPrice(depositCollected)} deposit collected at booking. The remaining balance will be charged after your visit is complete.`
                     : "You won't be charged until after your visit is complete."}
                 </span>
               </div>

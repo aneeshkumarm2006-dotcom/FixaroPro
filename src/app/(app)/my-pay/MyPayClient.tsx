@@ -245,7 +245,8 @@ export default function MyPayClient({
               </div>
             )}
 
-            {/* Rag Wash & Credits */}
+            {/* Rag Wash Credits removed from Fixaro (SOP §9) — ragData is no
+                longer supplied, so this never renders. */}
             {ragData && (
               <div className="cl-block">
                 <div className="cl-block-head">

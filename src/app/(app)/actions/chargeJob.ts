@@ -23,19 +23,62 @@ export async function chargeJob(jobId: string) {
 
   const job = await db.job.findUnique({
     where: { id: jobId },
-    include: { client: true },
+    include: { client: true, cleaners: { select: { id: true } } },
   });
 
   if (!job) return { success: false, error: "Job not found" };
   if (job.paymentReceived) return { success: false, error: "Already paid" };
   if (job.isCashJob) return { success: false, error: "This is a cash job — mark payment manually" };
 
+  // SOP §10: never charge an unassigned booking — prevents charging a card
+  // before a provider is validated for the job.
+  if (!job.employeeId && job.cleaners.length === 0) {
+    return { success: false, error: "Cannot charge an unassigned booking — assign a provider first." };
+  }
+
   const client = job.client;
   if (!client) return { success: false, error: "No client on this job" };
 
-  const totalAmount = (job.price ?? 0) - (job.discountAmount ?? 0);
-  if (totalAmount <= 0) {
+  const grossAmount = (job.price ?? 0) - (job.discountAmount ?? 0);
+  if (grossAmount <= 0) {
     return { success: false, error: "Invalid charge amount" };
+  }
+
+  // Credit the deposit already collected at booking (SOP §10 — deposits are
+  // applied to the final bill). For a materials deposit (e.g. painting $799)
+  // the admin-applied portion credits here; the unused balance is refunded via
+  // the deposit-adjust action. Otherwise the $20 base booking deposit credits.
+  let depositCredit = 0;
+  if (job.depositPaid) {
+    if (job.materialsType === "deposit") {
+      const collected = job.materialsAmount ?? 0;
+      depositCredit = job.materialsAppliedAmount ?? Math.min(collected, grossAmount);
+    } else {
+      depositCredit = 20;
+    }
+  }
+  const totalAmount = Math.max(0, grossAmount - depositCredit);
+  if (totalAmount <= 0) {
+    // Fully covered by the deposit already paid — settle without a new charge.
+    await db.$transaction([
+      db.job.update({
+        where: { id: jobId },
+        data: { paymentReceived: true, paidAt: new Date() },
+      }),
+      db.jobLog.create({
+        data: {
+          jobId,
+          userId: session.user.id,
+          action: "PAYMENT_RECEIVED",
+          description: `Booking settled — covered by $${depositCredit.toFixed(2)} deposit already paid.`,
+        },
+      }),
+    ]);
+    queueAndSendReceipt(jobId).catch(() => {});
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath("/jobs");
+    revalidatePath("/finances");
+    return { success: true, amount: grossAmount, giftCardApplied: 0, stripeCharged: 0 };
   }
 
   // Auto-apply gift card balance before hitting Stripe. We draw the

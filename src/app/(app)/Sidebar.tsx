@@ -22,7 +22,6 @@ import {
   Users,
   UserPlus,
   Package,
-  Droplets,
   MapPin,
   FileText,
   Tag,
@@ -34,6 +33,7 @@ import {
   ScrollText,
   ClipboardList,
   Boxes,
+  Paintbrush,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -102,7 +102,7 @@ const ADMIN_NAV: NavSection[] = [
     label: "Inventory & Supplies",
     items: [
       { href: "/inventory", label: "Inventory", Icon: Package, exclude: ["/inventory/rag-wash", "/inventory/kits"] },
-      { href: "/inventory/rag-wash", label: "Rag Wash", Icon: Droplets },
+      // Rag Wash removed from Fixaro dashboards (SOP §9).
     ],
   },
   {
@@ -126,6 +126,7 @@ const ADMIN_NAV: NavSection[] = [
     label: "Admin",
     items: [
       { href: "/activity", label: "Activity Log", Icon: ScrollText },
+      { href: "/audit", label: "Audit Log", Icon: ScrollText },
       { href: "/settings", label: "Settings", Icon: Settings },
       { href: "/training", label: "Training", Icon: GraduationCap },
     ],
@@ -137,6 +138,7 @@ const CLEANER_NAV: NavSection[] = [
     items: [
       { href: "/my-jobs", label: "My Jobs", Icon: ClipboardList },
       { href: "/available-jobs", label: "Available Jobs", Icon: Briefcase },
+      { href: "/painting-bids", label: "Painting Bids", Icon: Paintbrush },
       { href: "/my-pay", label: "My Pay", Icon: Wallet },
       { href: "/my-inventory", label: "My Inventory", Icon: Boxes },
       { href: "/calendar", label: "Calendar", Icon: CalendarDays },

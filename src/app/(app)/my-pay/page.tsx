@@ -77,26 +77,7 @@ export default async function MyPayPage() {
     ? new Date(currentPayout.payPeriod.endDate)
     : null;
 
-  const periodRagWashes = ragWashes.filter((w) => {
-    if (!currentPeriodStart || !currentPeriodEnd) return false;
-    return w.washDate >= currentPeriodStart && w.washDate <= currentPeriodEnd;
-  });
-  const periodRags = periodRagWashes.reduce((s, w) => s + w.ragCount, 0);
-  const periodCredit = Math.round(periodRags * ragCreditRate * 100) / 100;
-
-  const ragData = {
-    allTimeRags,
-    allTimeCredit,
-    periodRags,
-    periodCredit,
-    creditRate: ragCreditRate,
-    recentWashes: ragWashes.slice(0, 5).map((w) => ({
-      id: w.id,
-      washDate: w.washDate.toISOString(),
-      ragCount: w.ragCount,
-      notes: w.notes,
-    })),
-  };
+  // Rag Wash credits removed from Fixaro (SOP §9) — no ragData passed to the client.
 
   // Serialize Dates to strings for client component
   const serializePayout = (p: (typeof payouts)[number]) => ({
@@ -136,7 +117,6 @@ export default async function MyPayPage() {
       currentPayout={currentPayout ? serializePayout(currentPayout) : null}
       year={now.getFullYear()}
       starRating={starRating}
-      ragData={ragData}
     />
   );
 }

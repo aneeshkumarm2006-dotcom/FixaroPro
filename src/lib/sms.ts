@@ -173,3 +173,17 @@ export function smsCancellation(opts: {
     notification: { recipient: "CUSTOMER", key: "cust.cancel.booking_cancellation" },
   });
 }
+
+// Painting final-amount offer (SOP §6/§11). Per Appendix-A Q4, final amounts go
+// out on all available channels — email + in-app portal + this SMS.
+export function smsPaintingOffer(opts: {
+  to: string;
+  jobNumber: number;
+  finalAmount: number;
+}) {
+  return sendSms({
+    to: opts.to,
+    body: `Fixaro: your painting quote for booking #${opts.jobNumber} is $${opts.finalAmount.toFixed(2)}. Accept or reject it in your portal. Reply STOP to opt out.`,
+    notification: { recipient: "CUSTOMER", key: "cust.painting.final_offer" },
+  });
+}

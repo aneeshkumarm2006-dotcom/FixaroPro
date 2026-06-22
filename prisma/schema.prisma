@@ -51,6 +51,8 @@ model User {
   resolvedComplaints           Complaint[]            @relation("ResolvedComplaints")
   receivedAlerts               Alert[]                @relation("RecipientAlerts")
   strikes                      CleanerStrike[]        @relation("CleanerStrikes")
+  paintingBids                 PaintingBid[]          @relation("ProviderPaintingBids")
+  serviceEligibilities         EmployeeServiceEligibility[] @relation("EmployeeEligibilities")
 }
 
 model Account {
@@ -307,6 +309,38 @@ model Job {
   depositPaymentIntentId  String?
   depositPaid             Boolean           @default(false)
   depositPaidAt           DateTime?
+  // Materials/equipment decision (SOP §4/§5). All-or-nothing: when true the
+  // customer asked Fixaro to provide everything and a per-service amount applies.
+  // `materialsType` is "deposit" (refundable / applied to final bill, tracked
+  // separately) or "cost" (flat line item). Applied/refunded amounts are filled
+  // in during admin charge review (see SOP §10).
+  customerRequestsMaterials Boolean         @default(false)
+  materialsAmount           Float?
+  materialsType             String?
+  materialsAppliedAmount    Float?
+  materialsRefundedAt       DateTime?
+  // Painting bid workflow (SOP §6/§7). Only set on PAINTING jobs.
+  //   QUOTED → BIDDING → OFFER_SENT → ACCEPTED / REJECTED / CANCELLED
+  // Immediate customer range = internal baseline × 1.35 surplus (§7).
+  // Final amount = accepted (lowest valid) bid × surplus. Provider override is
+  // independent of price: swapping the provider keeps the client's agreed price
+  // unless an admin explicitly re-prices (see SOP §6 / tracker D3).
+  paintingStatus            PaintingStatus?
+  paintingScope             String?
+  quoteRangeMin             Float?
+  quoteRangeMax             Float?
+  acceptedBidId             String?
+  acceptedBidAmount         Float?
+  paintingSurplusRate       Float?            @default(1.35)
+  paintingFinalAmount       Float?
+  offerSentAt               DateTime?
+  offerRespondedAt          DateTime?
+  offerResponse             String?
+  offerLastReminderAt       DateTime?
+  followUpFlaggedAt         DateTime?
+  providerOverrideReason    String?
+  providerOverrideAt        DateTime?
+  providerOverrideBy        String?
   paymentFailedAt         DateTime?
   paymentFailureReason    String?
   paidAt                  DateTime?
@@ -383,6 +417,7 @@ model Job {
   strikes                 CleanerStrike[]
   convertedFromLeads      Lead[]
   convertedFromWaitlist   Waitlist[]
+  paintingBids            PaintingBid[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -402,6 +437,78 @@ model JobAddOn {
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+}
+
+// Painting bid workflow status on a Job (SOP §6).
+enum PaintingStatus {
+  QUOTED      // booking created with an immediate range, bidding not yet open
+  BIDDING     // painting-eligible providers notified; accepting bids
+  OFFER_SENT  // lowest valid bid auto-accepted, 35% surplus applied, client notified
+  ACCEPTED    // client accepted the final amount
+  REJECTED    // client rejected → booking cancelled, $799 deposit refunded
+  CANCELLED   // ops cancelled (e.g. no phone answer < 24h before job)
+}
+
+// A provider's bid on a painting job (SOP §6). One active bid per provider per
+// job; the lowest valid bid is auto-accepted by the software.
+model PaintingBid {
+  id             String    @id @default(cuid())
+  jobId          String
+  bidderId       String
+  amount         Float
+  note           String?
+  isValid        Boolean   @default(true)
+  isWinning      Boolean   @default(false)
+  autoAcceptedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  bidder         User      @relation("ProviderPaintingBids", fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, bidderId])
+  @@index([jobId])
+  @@index([bidderId])
+}
+
+// Admin-controlled provider service eligibility (SOP §8). A handyman may only
+// claim/bid on services they are approved for; the matrix is read-only to the
+// provider and edited by admins. Ineligible jobs are filtered out server-side.
+model EmployeeServiceEligibility {
+  id          String   @id @default(cuid())
+  employeeId  String
+  serviceType String   // matches Job.jobType / SERVICE_CATALOG value
+  isActive    Boolean  @default(true)
+  approvedBy  String?  // admin user id who last changed it
+  approvedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    User     @relation("EmployeeEligibilities", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, serviceType])
+  @@index([employeeId])
+  @@index([serviceType])
+}
+
+// Generic high-impact audit trail (SOP §9). Records who changed what, when, and
+// why for eligibility, deposits, refunds, charges, overrides, etc. JobLog stays
+// the job-scoped activity feed; this is the cross-entity admin audit log.
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String   // "EmployeeEligibility" | "Job" | "Deposit" | ...
+  entityId    String
+  action      String   // "ELIGIBILITY_GRANTED" | "ELIGIBILITY_REVOKED" | ...
+  field       String?
+  oldValue    String?
+  newValue    String?
+  reason      String?
+  actorId     String?
+  actorEmail  String?
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
 }
 
 model PricingRule {

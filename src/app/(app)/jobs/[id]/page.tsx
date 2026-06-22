@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import JobDetailView from "./JobDetailView";
+import AdminJobOpsPanel from "./AdminJobOpsPanel";
+import { computeJobBilling, getLabourRate } from "@/lib/billing";
+import { getEligibleProviderIdsFor } from "@/lib/eligibility";
 
 export default async function JobPage({
   params,
@@ -233,21 +236,77 @@ export default async function JobPage({
     employee: { id: photo.employee.id, name: photo.employee.name },
   }));
 
+  // Admin ops panel (SOP §9/§10): charge-review breakdown, painting bid
+  // controls, and deposit reconciliation. Self-contained — rendered alongside
+  // the existing detail view.
+  let opsPanel: React.ReactNode = null;
+  if (isAdmin) {
+    const labourRate = await getLabourRate();
+    const billing = computeJobBilling(job, labourRate);
+
+    let painting = null as null | {
+      status: string | null;
+      finalAmount: number | null;
+      acceptedBidAmount: number | null;
+      quoteRangeMin: number | null;
+      quoteRangeMax: number | null;
+      surplusRate: number;
+      bids: { id: string; bidderName: string; amount: number; isWinning: boolean }[];
+    };
+    let providerOptions: { id: string; name: string }[] = [];
+    if (job.jobType === "PAINTING") {
+      const bids = await db.paintingBid.findMany({
+        where: { jobId: job.id },
+        include: { bidder: { select: { name: true } } },
+        orderBy: { amount: "asc" },
+      });
+      painting = {
+        status: job.paintingStatus,
+        finalAmount: job.paintingFinalAmount,
+        acceptedBidAmount: job.acceptedBidAmount,
+        quoteRangeMin: job.quoteRangeMin,
+        quoteRangeMax: job.quoteRangeMax,
+        surplusRate: job.paintingSurplusRate ?? 1.35,
+        bids: bids.map((b) => ({ id: b.id, bidderName: b.bidder.name, amount: b.amount, isWinning: b.isWinning })),
+      };
+      const eligibleIds = await getEligibleProviderIdsFor("PAINTING");
+      if (eligibleIds.length > 0) {
+        const provs = await db.user.findMany({
+          where: { id: { in: eligibleIds } },
+          select: { id: true, name: true },
+        });
+        providerOptions = provs;
+      }
+    }
+
+    opsPanel = (
+      <AdminJobOpsPanel
+        jobId={job.id}
+        billing={billing}
+        painting={painting}
+        providerOptions={providerOptions}
+      />
+    );
+  }
+
   return (
-    <JobDetailView
-      job={jobData}
-      productUsage={productUsageData}
-      logs={logsData}
-      photos={photosData}
-      totalLogs={totalLogs}
-      logsPage={logsPage}
-      logsPerPage={logsPerPage}
-      totalProductCost={totalProductCost}
-      isAdmin={isAdmin}
-      onDeleteJob={deleteJob}
-      users={users}
-      clients={clients}
-      ratingStatus={ratingStatus}
-    />
+    <>
+      <JobDetailView
+        job={jobData}
+        productUsage={productUsageData}
+        logs={logsData}
+        photos={photosData}
+        totalLogs={totalLogs}
+        logsPage={logsPage}
+        logsPerPage={logsPerPage}
+        totalProductCost={totalProductCost}
+        isAdmin={isAdmin}
+        onDeleteJob={deleteJob}
+        users={users}
+        clients={clients}
+        ratingStatus={ratingStatus}
+      />
+      {opsPanel}
+    </>
   );
 }

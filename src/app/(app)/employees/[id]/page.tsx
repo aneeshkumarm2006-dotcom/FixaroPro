@@ -49,6 +49,10 @@ export default async function EmployeePage({
       availabilities: {
         orderBy: { day: "asc" },
       },
+      serviceEligibilities: {
+        where: { isActive: true },
+        select: { serviceType: true },
+      },
     },
   });
 
@@ -279,6 +283,7 @@ export default async function EmployeePage({
       starRating={starRating}
       availability={availabilitySlots}
       availabilityConflicts={conflicts}
+      serviceEligibilities={employee.serviceEligibilities.map((e) => e.serviceType)}
       stats={{
         completedJobsCount: completedJobs.length,
         totalRevenue,

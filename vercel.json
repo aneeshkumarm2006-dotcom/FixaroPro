@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/monthly",
       "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/cron/painting",
+      "schedule": "0 13 * * *"
     }
   ]
 }

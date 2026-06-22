@@ -42,7 +42,7 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [upcomingJobs, recentJobs, employeeProducts, ragWashes, ratings] = await Promise.all([
+  const [upcomingJobs, recentJobs, employeeProducts, ratings] = await Promise.all([
     // Next 6 upcoming jobs
     db.job.findMany({
       where: {
@@ -66,12 +66,6 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
     db.employeeProduct.findMany({
       where: { employeeId: userId },
       include: { product: { include: { inventoryRule: true } } },
-    }),
-    // Rag washes
-    db.ragWash.findMany({
-      where: { employeeId: userId },
-      orderBy: { washDate: "desc" },
-      take: 1,
     }),
     // Employee ratings
     db.employeeRating.findMany({
@@ -127,12 +121,6 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
   // Rating
   const avgRating = ratings.length > 0
     ? ratings.reduce((s, r) => s + (r as any).rating, 0) / ratings.length
-    : null;
-
-  // Last rag wash
-  const lastWash = ragWashes[0] ?? null;
-  const daysSinceWash = lastWash
-    ? Math.floor((now.getTime() - new Date((lastWash as any).washDate).getTime()) / 86400000)
     : null;
 
   const { g, firstName } = greeting(userName);
@@ -347,15 +335,7 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
             </div>
           )}
 
-          {/* Rag wash reminder */}
-          <div className="cl-dash-reminder">
-            <div className="icon"><Package size={20} /></div>
-            <div className="meta">
-              <h4>Rag wash</h4>
-              <p>{lastWash ? `Last washed ${daysSinceWash === 0 ? "today" : `${daysSinceWash}d ago`}` : "No wash logged yet."}</p>
-            </div>
-            <Link href="/my-inventory/rag-wash" className="cl-dash-reminder-btn">Log wash</Link>
-          </div>
+          {/* Rag wash reminder removed from Fixaro (SOP §9). */}
         </div>
       </div>
 

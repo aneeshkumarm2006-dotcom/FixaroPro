@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { isEligibleFor } from "@/lib/eligibility";
 
 export async function claimJob(jobId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -17,6 +18,18 @@ export async function claimJob(jobId: string) {
     include: { cleaners: { select: { id: true } } },
   });
   if (!job) return { success: false, error: "Job not found" };
+
+  // Painting is won by bidding, not claimed (SOP §6).
+  if (job.jobType === "PAINTING") {
+    return { success: false, error: "Painting jobs are won by bidding, not claiming." };
+  }
+
+  // SOP §8: provider must be admin-approved for this service type. Enforced
+  // server-side so a crafted request can't bypass the UI filter.
+  const eligible = await isEligibleFor(session.user.id, job.jobType);
+  if (!eligible) {
+    return { success: false, error: "You're not approved for this service type." };
+  }
 
   const alreadyCleaner = job.cleaners.some((c) => c.id === session.user.id);
   if (alreadyCleaner) return { success: false, error: "You already claimed this job" };

@@ -5,7 +5,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2, Banknote } from "lucide-react";
 import { applyPromoCode } from "../../actions/applyPromoCode";
-import { BookingDraft, SERVICE_TYPES, FREQUENCIES } from "../types";
+import { BookingDraft, SERVICE_TYPES, FREQUENCIES, getMaterialsPricing } from "../types";
 import { calculateTax } from "@/lib/tax";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -17,11 +17,17 @@ interface Props {
 }
 
 export default function Step5Review({ draft, basePrice, onChange }: Props) {
+  // Materials/equipment line (SOP §4/§5) — only when the customer opted in.
+  const materials = draft.customerRequestsMaterials
+    ? getMaterialsPricing(draft.serviceType)
+    : null;
+  const materialsAmount = materials?.amount ?? 0;
+
   const breakdown = useMemo(() => {
     const addOnTotal = draft.addOns
       .filter((a) => a.selected)
       .reduce((s, a) => s + a.price, 0);
-    const subtotal = basePrice + addOnTotal + draft.travelFee;
+    const subtotal = basePrice + addOnTotal + materialsAmount + draft.travelFee;
     const tax = calculateTax(subtotal);
     return {
       addOnTotal,
@@ -30,11 +36,14 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
       qstAmount: tax.qstAmount,
       total: tax.total,
     };
-  }, [draft, basePrice]);
+  }, [draft, basePrice, materialsAmount]);
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
+  // Deposit charged today — server-authoritative (painting $799, etc.). Defaults
+  // to the $20 base booking deposit until the charge-deposit route responds.
+  const [depositAmount, setDepositAmount] = useState(20);
 
   // Promo code
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -54,7 +63,9 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
     });
   }
 
-  // Create a $20 deposit PaymentIntent when contact info is known
+  // Create a deposit PaymentIntent when contact info is known. The amount is
+  // server-authoritative and depends on the service + materials choice, so we
+  // re-create it if those change (e.g. selecting painting → $799 deposit).
   useEffect(() => {
     if (!draft.email || !draft.name) return;
     setStripeLoading(true);
@@ -62,12 +73,18 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
     fetch("/api/stripe/charge-deposit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: draft.email, name: draft.name }),
+      body: JSON.stringify({
+        email: draft.email,
+        name: draft.name,
+        serviceType: draft.serviceType,
+        customerRequestsMaterials: draft.customerRequestsMaterials,
+      }),
     })
       .then((r) => r.json())
       .then((data) => {
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
+          if (typeof data.amount === "number") setDepositAmount(data.amount);
           onChange({ stripeCustomerId: data.customerId });
         } else {
           setStripeError("Could not initialise payment. Please refresh.");
@@ -76,7 +93,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
       .catch(() => setStripeError("Could not initialise payment. Please refresh."))
       .finally(() => setStripeLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.email, draft.name]);
+  }, [draft.email, draft.name, draft.serviceType, draft.customerRequestsMaterials]);
 
   const service = SERVICE_TYPES.find((s) => s.value === draft.serviceType);
   const freq = FREQUENCIES.find((f) => f.value === draft.frequency);
@@ -102,7 +119,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           <em>booking.</em>
         </h1>
         <p className="cl-subtitle">
-          A <strong>$20 deposit</strong> is charged today to secure your booking. The remaining balance is charged after the visit is complete.
+          A <strong>${depositAmount.toFixed(2)} deposit</strong> is charged today to secure your booking. The remaining balance is charged after the visit is complete.
         </p>
       </header>
 
@@ -130,6 +147,12 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
             .map((a) => (
               <Row key={a.name} dt={a.name} dd={`+$${a.price.toFixed(2)}`} />
             ))}
+          {materials ? (
+            <Row
+              dt={materials.type === "deposit" ? "Materials deposit" : "Materials & equipment"}
+              dd={`+$${materialsAmount.toFixed(2)}`}
+            />
+          ) : null}
           {draft.travelFee > 0 ? (
             <Row dt="Travel fee" dd={`+$${draft.travelFee.toFixed(2)}`} />
           ) : null}
@@ -157,7 +180,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
                 Due today (deposit)
               </span>
             </dt>
-            <dd style={{ color: "var(--primary)", fontWeight: 700 }}>$20.00</dd>
+            <dd style={{ color: "var(--primary)", fontWeight: 700 }}>${depositAmount.toFixed(2)}</dd>
           </div>
           <div className="cl-dlist-row">
             <dt style={{ color: "var(--primary-50)", fontSize: 12 }}>Remaining balance</dt>
@@ -197,11 +220,11 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <CreditCard size={20} style={{ color: "var(--primary)" }} />
           <span style={{ fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
-            Pay $20 deposit &amp; save card
+            Pay ${depositAmount.toFixed(2)} deposit &amp; save card
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--primary-70)", margin: "0 0 16px", lineHeight: 1.55 }}>
-          A $20 deposit is charged now to secure your booking. Your card is saved for the remaining balance after the visit. Apple Pay and Google Pay accepted.
+          A ${depositAmount.toFixed(2)} deposit is charged now to secure your booking. Your card is saved for the remaining balance after the visit. Apple Pay and Google Pay accepted.
         </p>
 
         {stripeLoading && (

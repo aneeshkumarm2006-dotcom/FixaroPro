@@ -864,6 +864,56 @@ export async function sendCustomerBookingsPrepaid(opts: {
   });
 }
 
+/** Customer painting final-offer email — accept/reject the bid-based price (SOP §6). */
+export async function sendCustomerPaintingOffer(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  finalAmount: number;
+  reminder?: boolean;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const heading = opts.reminder ? "Reminder: your painting quote" : "Your painting quote is ready";
+  const html = layout(
+    h1(heading) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your final painting price for booking #${opts.jobNumber} is <strong>${fmt(opts.finalAmount)}</strong>.`) +
+      p("Please accept to confirm your booking, or reject to cancel. If you reject, your $799 materials deposit is refunded in full.") +
+      p("Primer, if required, may increase the final amount — we'll confirm before any extra work.") +
+      btn("Review &amp; respond", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `${opts.reminder ? "Reminder — " : ""}Painting quote ${fmt(opts.finalAmount)} — #${opts.jobNumber}`,
+    html,
+    notification: {
+      recipient: "CUSTOMER",
+      key: opts.reminder ? "cust.painting.offer_reminder" : "cust.painting.final_offer",
+    },
+  });
+}
+
+/** Customer confirmation when they reject the painting offer — deposit refunded (SOP §6). */
+export async function sendCustomerPaintingRejected(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  refundAmount: number;
+}) {
+  const html = layout(
+    h1("Booking cancelled — deposit refunded") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, your painting booking #${opts.jobNumber} has been cancelled as requested.`) +
+      p(`Your ${fmt(opts.refundAmount)} materials deposit has been refunded to your original payment method.`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Painting booking cancelled — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.painting.offer_rejected" },
+  });
+}
+
 /** Customer email when their card is declined. */
 export async function sendCustomerCardDeclined(opts: {
   to: string;

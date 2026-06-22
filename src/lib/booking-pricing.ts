@@ -1,5 +1,9 @@
 import { calculateTax, TaxBreakdown } from "./tax";
-import { computeHourlyPrice } from "@/app/(book)/book/types";
+import {
+  computeHourlyPrice,
+  getMaterialsPricing,
+  type MaterialsType,
+} from "@/app/(book)/book/types";
 
 export interface PricingInput {
   hours: number;
@@ -7,6 +11,8 @@ export interface PricingInput {
   addOns: { name: string; price: number }[];
   travelFee?: number;
   discountAmount?: number;
+  // SOP §4/§5: customer chose "Fixaro provides all materials and equipment".
+  customerRequestsMaterials?: boolean;
 }
 
 export interface PricingResult extends TaxBreakdown {
@@ -14,6 +20,9 @@ export interface PricingResult extends TaxBreakdown {
   addOnTotal: number;
   travelFee: number;
   discountAmount: number;
+  // Materials/equipment line (0 when the customer provides their own).
+  materialsAmount: number;
+  materialsType: MaterialsType | null;
 }
 
 export async function computeBookingPrice(
@@ -24,10 +33,29 @@ export async function computeBookingPrice(
   const travelFee = input.travelFee ?? 0;
   const discountAmount = input.discountAmount ?? 0;
 
-  const preTax = Math.max(0, basePrice + addOnTotal + travelFee - discountAmount);
+  // Materials/equipment charge or deposit applies only when the customer
+  // opts in (all-or-nothing). Deposits are still part of the amount due now.
+  const materials = input.customerRequestsMaterials
+    ? getMaterialsPricing(input.serviceType)
+    : null;
+  const materialsAmount = materials?.amount ?? 0;
+  const materialsType = materials?.type ?? null;
+
+  const preTax = Math.max(
+    0,
+    basePrice + addOnTotal + materialsAmount + travelFee - discountAmount
+  );
   const tax = calculateTax(preTax);
 
-  return { basePrice, addOnTotal, travelFee, discountAmount, ...tax };
+  return {
+    basePrice,
+    addOnTotal,
+    travelFee,
+    discountAmount,
+    materialsAmount,
+    materialsType,
+    ...tax,
+  };
 }
 
 function resolveBasePrice(hours: number, serviceType?: string): number {

@@ -1,5 +1,6 @@
 import { requireCleaner } from "@/lib/page-guards";
 import { db } from "@/db";
+import { getEligibleServiceTypes } from "@/lib/eligibility";
 import AvailableJobsClient from "./AvailableJobsClient";
 
 export default async function AvailableJobsPage() {
@@ -7,12 +8,21 @@ export default async function AvailableJobsPage() {
 
   const now = new Date();
 
-  // Jobs that: are upcoming, not cancelled, not fully staffed, and the cleaner hasn't already claimed
+  // Provider eligibility (SOP §8): only show jobs for services this provider is
+  // admin-approved for. Painting is excluded (won by bidding, not claimed).
+  // Filtering happens server-side — ineligible jobs are never sent to the client.
+  const eligibleTypes = (await getEligibleServiceTypes(session.user.id)).filter(
+    (t) => t !== "PAINTING"
+  );
+
+  // Jobs that: are upcoming, not cancelled, not fully staffed, the cleaner
+  // hasn't already claimed, and match an eligible service type.
   const jobs = await db.job.findMany({
     where: {
       startTime: { gte: now },
       status: { notIn: ["CANCELLED", "COMPLETED"] },
       cleaners: { none: { id: session.user.id } },
+      jobType: { in: eligibleTypes },
     },
     include: {
       cleaners: { select: { id: true } },

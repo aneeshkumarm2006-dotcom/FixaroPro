@@ -44,6 +44,12 @@ export interface BookingDraft {
   hours: number;
   frequency: Frequency;
   addOns: AddOnSelection[];
+  // All-or-nothing materials/equipment decision (SOP §4). Default false:
+  // customer must actively confirm they want Fixaro to provide everything.
+  customerRequestsMaterials: boolean;
+  // Painting scope (SOP §7) — drives the immediate quote range. Empty unless
+  // the selected service is PAINTING.
+  paintingScope: string;
   // Step 3
   date: string;
   isFlexible: boolean;
@@ -74,6 +80,8 @@ export const EMPTY_DRAFT: BookingDraft = {
   hours: 2,
   frequency: "ONE_TIME",
   addOns: [],
+  customerRequestsMaterials: false,
+  paintingScope: "",
   date: "",
   isFlexible: true,
   timeSlot: "",
@@ -144,6 +152,75 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "DRYER_VENT", label: "Dryer vent cleaning", category: "Outdoor & Seasonal", pricing: "hourly" },
   { value: "MINOR_EXTERIOR", label: "Minor exterior fixes", category: "Outdoor & Seasonal", pricing: "hourly" },
 ];
+
+// ── Materials / equipment pricing (SOP §5) ─────────────────────────────────
+// Amounts apply ONLY when the customer checks the all-or-nothing
+// "Fixaro provides all materials and equipment" checkbox. CAD.
+//   type "deposit" → refundable before job / applied to final bill, tracked separately
+//   type "cost"    → flat materials/equipment line item
+export type MaterialsType = "deposit" | "cost";
+
+export interface MaterialsPricing {
+  amount: number;
+  type: MaterialsType;
+}
+
+export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
+  // Repairs
+  DRYWALL_REPAIR: { amount: 199, type: "deposit" },
+  DOOR_REPAIR: { amount: 99, type: "cost" },
+  CABINET_REPAIR: { amount: 99, type: "cost" },
+  TOILET_REPAIR: { amount: 99, type: "cost" },
+  FAUCET_REPAIR: { amount: 99, type: "cost" },
+  WEATHERSTRIPPING: { amount: 249, type: "deposit" },
+  CAULKING_TOUCHUPS: { amount: 75, type: "cost" },
+  LOCK_REPLACEMENT: { amount: 49, type: "cost" },
+
+  // Installation & Assembly
+  TV_MOUNTING: { amount: 49, type: "cost" },
+  CURTAIN_ROD: { amount: 49, type: "cost" },
+  SHELF_INSTALLATION: { amount: 49, type: "cost" },
+  FURNITURE_ASSEMBLY: { amount: 49, type: "cost" },
+  LIGHT_FIXTURE: { amount: 49, type: "cost" },
+  FAUCET_INSTALLATION: { amount: 49, type: "cost" },
+  VANITY_INSTALLATION: { amount: 49, type: "cost" },
+  MIRROR_HANGING: { amount: 49, type: "cost" },
+  BLINDS_INSTALLATION: { amount: 49, type: "cost" },
+  PICTURE_HANGING: { amount: 49, type: "cost" },
+  LOCK_INSTALLATION: { amount: 49, type: "cost" },
+  APPLIANCE_HOOKUP: { amount: 49, type: "cost" },
+
+  // Home Improvement
+  PAINTING: { amount: 799, type: "deposit" },
+  MOULDINGS: { amount: 49, type: "cost" },
+  DOOR_HARDWARE: { amount: 99, type: "deposit" },
+  CABINET_HARDWARE: { amount: 99, type: "cost" },
+  WALL_PANELING: { amount: 49, type: "cost" },
+  SMALL_CARPENTRY: { amount: 149, type: "cost" },
+  SILICONE_SEALING: { amount: 69, type: "cost" },
+  ACCENT_WALL: { amount: 200, type: "cost" },
+  GROUT_CLEANING: { amount: 19, type: "cost" },
+  CARPET_UPHOLSTERY: { amount: 79, type: "cost" },
+  SMALL_RENOVATION: { amount: 99, type: "deposit" },
+
+  // Outdoor & Seasonal
+  FENCE_REPAIR: { amount: 59, type: "cost" },
+  GATE_REPAIR: { amount: 59, type: "cost" },
+  DECK_REPAIRS: { amount: 149, type: "deposit" },
+  EXTERIOR_CAULKING: { amount: 75, type: "cost" },
+  SEASONAL_SETUP: { amount: 59, type: "cost" },
+  WEATHERPROOFING: { amount: 89, type: "cost" },
+  OUTDOOR_FURNITURE: { amount: 49, type: "cost" },
+  GUTTER_CLEANING: { amount: 59, type: "cost" },
+  DRYER_VENT: { amount: 19, type: "cost" },
+  MINOR_EXTERIOR: { amount: 59, type: "cost" },
+};
+
+// Returns the materials/equipment pricing for a service, or null if none configured.
+export function getMaterialsPricing(serviceType?: string): MaterialsPricing | null {
+  if (!serviceType) return null;
+  return MATERIALS_PRICING[serviceType] ?? null;
+}
 
 // Hourly rate & package pricing
 export const HOURLY_RATE = 79;

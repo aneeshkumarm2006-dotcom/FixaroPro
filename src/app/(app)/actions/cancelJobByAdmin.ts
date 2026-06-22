@@ -4,18 +4,25 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { stripe } from "@/lib/stripe";
 import { issueRefund } from "./issueRefund";
 import {
   sendAdminBookingCanceled,
   sendCustomerBookingCancellation,
   sendProviderBookingCanceled,
+  sendCustomerFeesCharged,
 } from "@/lib/email";
 import { isNotificationEnabled } from "@/lib/notifications";
+import { logAudit } from "@/lib/audit";
+import { CANCELLATION_FEE_USD, CANCELLATION_FEE_WINDOW_HOURS } from "@/lib/policy";
+import { depositCollected } from "@/lib/billing";
 
 interface CancelJobInput {
   jobId: string;
   refundDeposit: boolean;
   reason?: string;
+  // Late cancellations (< 24h) incur a $25 fee by default; admins can waive it.
+  waiveCancellationFee?: boolean;
 }
 
 export async function cancelJobByAdmin(input: CancelJobInput) {
@@ -39,7 +46,19 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
         startTime: true,
         location: true,
         jobType: true,
-        client: { select: { email: true } },
+        isCashJob: true,
+        materialsType: true,
+        materialsAmount: true,
+        cancellationFeeChargedAt: true,
+        client: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            stripeCustomerId: true,
+            defaultPaymentMethodId: true,
+          },
+        },
         cleaners: { select: { id: true, name: true, email: true } },
       },
     });
@@ -68,16 +87,99 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
       }),
     ]);
 
-    // Optionally refund the $20 deposit (capped at remaining deposit balance).
+    // Optionally refund the deposit (materials deposit, e.g. painting $799, or
+    // the $20 base deposit), capped at the remaining deposit balance.
     let refund: { success: boolean; error?: string } | null = null;
     if (input.refundDeposit && job.depositPaid) {
-      const remaining = 20 - (job.refundedAmount ?? 0);
+      const remaining = depositCollected(job) - (job.refundedAmount ?? 0);
       if (remaining > 0.001) {
         refund = await issueRefund({
           jobId: input.jobId,
           amount: remaining,
           reason: input.reason ?? "Booking cancelled",
         });
+      }
+    }
+
+    // Late-cancellation fee (SOP §4/§10): $25 if cancelled within 24h of start.
+    // Charged separately from (and alongside) any deposit refund. Off-session
+    // to the saved card; idempotent via cancellationFeeChargedAt.
+    let cancellationFee: { charged: boolean; amount?: number; error?: string } | null = null;
+    const hoursUntilStart = (job.startTime.getTime() - Date.now()) / 3600_000;
+    const isLateCancel = hoursUntilStart < CANCELLATION_FEE_WINDOW_HOURS;
+    if (
+      isLateCancel &&
+      !input.waiveCancellationFee &&
+      !job.isCashJob &&
+      !job.cancellationFeeChargedAt &&
+      job.client?.stripeCustomerId &&
+      job.client?.defaultPaymentMethodId
+    ) {
+      try {
+        const pi = await stripe.paymentIntents.create({
+          amount: Math.round(CANCELLATION_FEE_USD * 100),
+          currency: "cad",
+          customer: job.client.stripeCustomerId,
+          payment_method: job.client.defaultPaymentMethodId,
+          off_session: true,
+          confirm: true,
+          description: `Fixaro late-cancellation fee — job #${job.jobNumber}`,
+          metadata: { jobId: job.id, jobNumber: String(job.jobNumber), type: "cancellation_fee" },
+        });
+        await db.$transaction([
+          db.job.update({
+            where: { id: job.id },
+            data: {
+              cancellationFeeChargedAt: new Date(),
+              cancellationFeePaymentIntentId: pi.id,
+            },
+          }),
+          db.transaction.create({
+            data: {
+              date: new Date(),
+              category: "REVENUE",
+              amount: CANCELLATION_FEE_USD,
+              description: `Late-cancellation fee — job #${job.jobNumber} (PI: ${pi.id})`,
+              jobId: job.id,
+              source: "CREDIT_CARD",
+              isAuto: true,
+            },
+          }),
+          db.jobLog.create({
+            data: {
+              jobId: job.id,
+              userId: session.user.id,
+              action: "PAYMENT_RECEIVED",
+              field: "cancellationFee",
+              newValue: String(CANCELLATION_FEE_USD),
+              description: `Charged $${CANCELLATION_FEE_USD.toFixed(2)} late-cancellation fee (PI: ${pi.id}).`,
+            },
+          }),
+        ]);
+        cancellationFee = { charged: true, amount: CANCELLATION_FEE_USD };
+        logAudit({
+          entityType: "Job",
+          entityId: job.id,
+          action: "CANCELLATION_FEE_CHARGED",
+          newValue: String(CANCELLATION_FEE_USD),
+          reason: input.reason ?? null,
+          actorId: session.user.id,
+          actorEmail: session.user.email ?? null,
+          description: `Late-cancellation fee $${CANCELLATION_FEE_USD} charged on job #${job.jobNumber}.`,
+        });
+        if (job.client.email) {
+          sendCustomerFeesCharged({
+            to: job.client.email,
+            clientName: job.client.name ?? job.clientName,
+            jobId: job.id,
+            jobNumber: job.jobNumber,
+            feeType: "cancellation",
+            amount: CANCELLATION_FEE_USD,
+          }).catch((e) => console.error("cancellation fee email", e));
+        }
+      } catch (err: any) {
+        cancellationFee = { charged: false, error: err?.raw?.message ?? err?.message ?? "Fee charge failed" };
+        console.error("cancellation fee charge failed", err);
       }
     }
 
@@ -135,7 +237,7 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
 
     revalidatePath(`/jobs/${input.jobId}`);
     revalidatePath("/jobs");
-    return { success: true, refund };
+    return { success: true, refund, cancellationFee };
   } catch (err) {
     console.error("cancelJobByAdmin error:", err);
     return { success: false, error: "Failed to cancel job" };

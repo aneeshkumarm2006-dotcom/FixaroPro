@@ -8,8 +8,11 @@ import {
   FREQUENCIES,
   HOUR_OPTIONS,
   computeHourlyPrice,
+  getMaterialsPricing,
   ServiceItem,
 } from "../types";
+import { PAINTING_SCOPES, paintingQuoteRange } from "@/lib/painting";
+import { getRequiredEquipment } from "@/lib/equipment";
 import { Field, Input } from "@/components/customer/Field";
 import { ChoiceButton } from "@/components/customer/atoms";
 
@@ -36,7 +39,11 @@ export default function Step2Property({ draft, onChange }: Props) {
     onChange({ serviceType: item.value, hours: resetHours });
   }
 
+  const materials = getMaterialsPricing(draft.serviceType);
+
   const isSiliconeSealing = draft.serviceType === "SILICONE_SEALING";
+  const isPainting = draft.serviceType === "PAINTING";
+  const paintingRange = isPainting ? paintingQuoteRange(draft.paintingScope) : null;
   const isQuoteOnly =
     draft.serviceType === "PAINTING" ||
     draft.serviceType === "MOULDINGS" ||
@@ -161,8 +168,48 @@ export default function Step2Property({ draft, onChange }: Props) {
         </div>
       )}
 
-      {/* Quote-only notice */}
-      {isQuoteOnly && draft.serviceType && (
+      {/* Painting scope + immediate quote range (SOP §6/§7).
+          Range is baseline × 1.35 and is an ESTIMATE — the final price is
+          confirmed after provider bids. */}
+      {isPainting && (
+        <div className="cl-stack-12">
+          <span className="cl-label">What are we painting?</span>
+          <div className="cl-grid-2">
+            {PAINTING_SCOPES.map((s) => (
+              <ChoiceButton
+                key={s.key}
+                active={draft.paintingScope === s.key}
+                title={s.label}
+                hint={(() => {
+                  const r = paintingQuoteRange(s.key);
+                  return r ? `~$${r.min.toFixed(0)}–$${r.max.toFixed(0)}` : undefined;
+                })()}
+                onClick={() => onChange({ paintingScope: s.key })}
+              />
+            ))}
+          </div>
+          {paintingRange && (
+            <div
+              style={{
+                padding: "16px 20px",
+                background: "rgba(28,25,23,0.04)",
+                borderRadius: 14,
+                border: "1px solid rgba(28,25,23,0.10)",
+              }}>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>
+                Estimated range: ${paintingRange.min.toFixed(0)}–${paintingRange.max.toFixed(0)}
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.5 }}>
+                This is an estimate. We notify our painters, take bids, and send you a final
+                price to accept before any work begins. Primer, if required, may increase the price.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quote-only notice (non-painting custom-quote services, e.g. mouldings) */}
+      {isQuoteOnly && !isPainting && draft.serviceType && (
         <div
           style={{
             padding: "16px 20px",
@@ -222,6 +269,75 @@ export default function Step2Property({ draft, onChange }: Props) {
               <span className="cl-addon-price">+${a.price.toFixed(2)}</span>
             </label>
           ))}
+        </div>
+      )}
+
+      {/* Service equipment checklist (SOP §4) — what this job type generally
+          needs. Shown after service selection, before the materials choice. */}
+      {draft.serviceType && (
+        <div className="cl-stack-12">
+          <span className="cl-label">Equipment typically required</span>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+            }}>
+            {getRequiredEquipment(draft.serviceType).map((item) => (
+              <span
+                key={item}
+                style={{
+                  fontSize: 13,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: "rgba(28,25,23,0.04)",
+                  border: "1px solid rgba(28,25,23,0.10)",
+                  color: "var(--ink)",
+                }}>
+                {item}
+              </span>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+            Choose below whether Fixaro provides everything, or you'll have these ready before the visit.
+          </p>
+        </div>
+      )}
+
+      {/* Materials / equipment — all-or-nothing decision (SOP §4/§5).
+          Appears at the bottom of the step. Default unchecked: the customer
+          must actively confirm they want Fixaro to provide everything. */}
+      {draft.serviceType && materials && (
+        <div className="cl-stack-12">
+          <span className="cl-label">Materials &amp; equipment</span>
+          <label
+            className={`cl-addon-row ${draft.customerRequestsMaterials ? "active" : ""}`}>
+            <div className="cl-row" style={{ gap: 12 }}>
+              <input
+                type="checkbox"
+                className="cl-check"
+                checked={draft.customerRequestsMaterials}
+                onChange={(e) =>
+                  onChange({ customerRequestsMaterials: e.target.checked })
+                }
+              />
+              <span className="cl-addon-name">
+                Would you like us to provide all materials and equipment?
+              </span>
+            </div>
+            <span className="cl-addon-price">
+              {materials.type === "deposit"
+                ? `$${materials.amount.toFixed(0)} deposit`
+                : `+$${materials.amount.toFixed(2)}`}
+            </span>
+          </label>
+          <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+            {draft.customerRequestsMaterials
+              ? materials.type === "deposit"
+                ? `A $${materials.amount.toFixed(0)} materials deposit is collected now. Any unused balance is applied to your final bill or refunded.`
+                : `A $${materials.amount.toFixed(2)} materials & equipment charge is added to your booking.`
+              : "Leave unchecked and you'll need to provide everything required before the handyman arrives."}
+          </p>
         </div>
       )}
     </div>

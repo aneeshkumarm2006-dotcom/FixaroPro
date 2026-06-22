@@ -37,6 +37,8 @@ interface Job {
   timeSpentMs?: number;
   cleaners: Array<{ id: string; name: string }>;
   addOns?: Array<{ id: string; name: string; price: number }>;
+  // SOP §9 — "D" indicator: booking has a materials deposit awaiting review.
+  needsDepositReview?: boolean;
 }
 
 interface ClientLite { id: string; name: string; }
@@ -611,7 +613,29 @@ export default function JobsView({
                         <div className="time-line">{formatTime(job.startTime)}</div>
                       </td>
                       <td>
-                        <div className="col-client">{job.clientName}</div>
+                        <div className="col-client">
+                          {job.clientName}
+                          {job.needsDepositReview && (
+                            <span
+                              title="Deposit / materials review needed"
+                              style={{
+                                marginLeft: 6,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 18,
+                                height: 18,
+                                borderRadius: 5,
+                                background: 'var(--accent, #e85d04)',
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                verticalAlign: 'middle',
+                              }}>
+                              D
+                            </span>
+                          )}
+                        </div>
                         {job.location && <div className="col-client-sub">{job.location.split(',')[0]}</div>}
                       </td>
                       <td><TypePill type={job.jobType} /></td>

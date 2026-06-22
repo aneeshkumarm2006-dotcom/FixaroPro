@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
+import { getMaterialsPricing } from "@/app/(book)/book/types";
 import { db } from "@/db";
+
+// Base booking deposit collected on every web booking (CAD).
+const BASE_BOOKING_DEPOSIT = 20;
+
+// Server-authoritative deposit amount (in dollars). When the customer opts into
+// Fixaro-provided materials AND the service uses a refundable deposit (SOP §5,
+// e.g. painting $799), that deposit is collected upfront. "cost"-type materials
+// are billed on the final invoice, so the base booking deposit still applies.
+function resolveDepositAmount(
+  serviceType: string | undefined,
+  customerRequestsMaterials: boolean
+): number {
+  if (customerRequestsMaterials) {
+    const materials = getMaterialsPricing(serviceType);
+    if (materials && materials.type === "deposit") {
+      return materials.amount;
+    }
+  }
+  return BASE_BOOKING_DEPOSIT;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, name } = await req.json();
+    const { email, name, serviceType, customerRequestsMaterials } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json({ error: "email and name are required" }, { status: 400 });
@@ -20,20 +41,27 @@ export async function POST(req: NextRequest) {
       customerId = customer.id;
     }
 
+    const amount = resolveDepositAmount(serviceType, customerRequestsMaterials === true);
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: 2000, // $20.00 CAD
+      amount: Math.round(amount * 100),
       currency: "cad",
       customer: customerId,
       setup_future_usage: "off_session",
       automatic_payment_methods: { enabled: true },
       description: "Fixaro booking deposit",
-      metadata: { type: "deposit" },
+      metadata: {
+        type: "deposit",
+        serviceType: serviceType ?? "",
+        materials: customerRequestsMaterials === true ? "true" : "false",
+      },
     });
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       customerId,
       paymentIntentId: paymentIntent.id,
+      amount,
     });
   } catch (err: any) {
     console.error("charge-deposit error:", err);

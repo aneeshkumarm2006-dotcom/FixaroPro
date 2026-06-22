@@ -12,6 +12,7 @@ import { EmployeeModal } from "../EmployeeModal";
 import { assignKit } from "../../actions/assignKit";
 import { setEmployeeRating } from "../../actions/setEmployeeRating";
 import StrikesPanel from "./StrikesPanel";
+import EligibilityTab from "./EligibilityTab";
 import {
   ArrowLeft,
   Mail,
@@ -28,9 +29,10 @@ import {
   Plus,
   TrendingDown,
   Star,
+  Wrench,
 } from "lucide-react";
 
-type TabView = "overview" | "jobs" | "products" | "availability" | "strikes";
+type TabView = "overview" | "jobs" | "products" | "availability" | "strikes" | "services";
 
 const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
   [
@@ -53,6 +55,11 @@ const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
       id: "availability",
       label: "Availability",
       icon: <Calendar className="w-4 h-4" />,
+    },
+    {
+      id: "services",
+      label: "Services",
+      icon: <Wrench className="w-4 h-4" />,
     },
     {
       id: "strikes",
@@ -162,6 +169,7 @@ interface EmployeeDetailViewProps {
   upcomingJobCount: number;
   availability: AvailabilitySlot[];
   availabilityConflicts: AvailabilityConflict[];
+  serviceEligibilities: string[];
   strikeSummary: {
     activeCount: number;
     level: "none" | "warning" | "critical";
@@ -190,6 +198,7 @@ export default function EmployeeDetailView({
   upcomingJobCount,
   availability,
   availabilityConflicts,
+  serviceEligibilities,
   strikeSummary,
 }: EmployeeDetailViewProps) {
   const router = useRouter();
@@ -1028,6 +1037,9 @@ export default function EmployeeDetailView({
           {activeView === "jobs" && <JobsTab />}
           {activeView === "products" && <ProductsTab />}
           {activeView === "availability" && <AvailabilityTabContent />}
+          {activeView === "services" && (
+            <EligibilityTab employeeId={employee.id} initialEligible={serviceEligibilities} />
+          )}
           {activeView === "strikes" && (
             <StrikesPanel cleanerId={employee.id} summary={strikeSummary} />
           )}

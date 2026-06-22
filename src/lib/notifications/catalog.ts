@@ -747,4 +747,10 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "PROVIDER", category: "Clock in / clock out", key: "prov.clock.late_arrival", label: "You arrived late", trigger: "Cleaner clocked in more than 10 minutes after scheduled start time; rating cap applied.", channels: { EMAIL: true, APP_PUSH: true } },
   // Last-minute reassignment
   { recipient: "PROVIDER", category: "Unassigned booking", key: "prov.unassigned.last_minute", label: "Last minute booking", trigger: "A cleaner cancelled last minute and the job is open for claim with a $10 bonus.", channels: { EMAIL: true, APP_PUSH: true, SMS: true } },
+  // Painting bid workflow (SOP §6)
+  { recipient: "PROVIDER", category: "Painting bids", key: "prov.painting.new_job", label: "New painting job to bid", trigger: "A new painting booking is submitted; all painting-eligible providers are invited to bid.", channels: { EMAIL: true, APP_PUSH: true } },
+  { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.final_offer", label: "Painting final price offer", trigger: "Lowest valid bid auto-accepted and 35% surplus applied; customer asked to accept or reject the final amount.", channels: { EMAIL: true, SMS: true } },
+  { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.offer_reminder", label: "Painting offer daily reminder", trigger: "Daily reminder while a painting final offer is awaiting the customer's response.", channels: { EMAIL: true } },
+  { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.offer_rejected", label: "Painting offer rejected — deposit refunded", trigger: "Customer rejected the final painting amount; booking cancelled and $799 deposit refunded.", channels: { EMAIL: true } },
+  { recipient: "ADMIN", category: "Painting bids", key: "admin.painting.followup_24h", label: "Painting offer unanswered < 24h", trigger: "A painting final offer is unanswered within 24h of the job; ops must phone the client.", channels: { EMAIL: true, APP_PUSH: true } },
 ];

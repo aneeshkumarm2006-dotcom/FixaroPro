@@ -22,6 +22,8 @@ import {
 } from "@/lib/email";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 import { AFTER_PHOTO_CONSENT_VERSION } from "@/lib/policy";
+import { paintingQuoteRange } from "@/lib/painting";
+import { notifyPaintingProviders } from "@/lib/painting-workflow";
 
 type Frequency =
   | "ONE_TIME"
@@ -39,6 +41,10 @@ interface SubmitBookingInput {
   serviceType: string;
   frequency: Frequency;
   addOns: { name: string; price: number }[];
+  // SOP §4/§5 — all-or-nothing materials/equipment decision.
+  customerRequestsMaterials?: boolean;
+  // SOP §7 — painting scope drives the immediate quote range.
+  paintingScope?: string;
   // Step 3
   date: string; // YYYY-MM-DD
   isFlexible: boolean;
@@ -200,6 +206,7 @@ export async function submitBooking(input: SubmitBookingInput) {
       addOns: input.addOns,
       travelFee: areaCheck.travelFee ?? 0,
       discountAmount,
+      customerRequestsMaterials: input.customerRequestsMaterials === true,
     });
 
     // 5c. Idempotency guard — if the same client just created a job for the
@@ -233,6 +240,11 @@ export async function submitBooking(input: SubmitBookingInput) {
 
     // 6. Create the primary Job
 
+    // Painting jobs (SOP §6/§7): record the scope + immediate quote range and
+    // open the bid workflow. Final price follows the bid + 35% surplus flow.
+    const isPainting = input.serviceType === "PAINTING";
+    const painting = isPainting ? paintingQuoteRange(input.paintingScope) : null;
+
     const primaryJob = await db.job.create({
       data: {
         clientName: client.name,
@@ -252,6 +264,16 @@ export async function submitBooking(input: SubmitBookingInput) {
         discountAmount: discountAmount > 0 ? discountAmount : null,
         appliedPromoCode: input.promoCode?.trim() || null,
         promoDiscountAmount: input.promoDiscount && input.promoDiscount > 0 ? input.promoDiscount : null,
+        customerRequestsMaterials: input.customerRequestsMaterials === true,
+        materialsAmount: pricing.materialsAmount > 0 ? pricing.materialsAmount : null,
+        materialsType: pricing.materialsType,
+        ...(isPainting && {
+          paintingStatus: "BIDDING",
+          paintingScope: input.paintingScope || null,
+          quoteRangeMin: painting?.min ?? null,
+          quoteRangeMax: painting?.max ?? null,
+          paintingSurplusRate: 1.35,
+        }),
         bookingSource: "web",
         notes: input.notes?.trim() || null,
         afterPhotoConsent: input.afterPhotoConsent === true,
@@ -337,6 +359,7 @@ export async function submitBooking(input: SubmitBookingInput) {
             addOns: input.addOns,
             travelFee: pricing.travelFee,
             discountAmount: discountAmount + recurringDiscount,
+            customerRequestsMaterials: input.customerRequestsMaterials === true,
           })
         : pricing;
 
@@ -360,6 +383,9 @@ export async function submitBooking(input: SubmitBookingInput) {
             gstAmount: childPricing.gstAmount,
             qstAmount: childPricing.qstAmount,
             discountAmount: childPricing.discountAmount > 0 ? childPricing.discountAmount : null,
+            customerRequestsMaterials: input.customerRequestsMaterials === true,
+            materialsAmount: childPricing.materialsAmount > 0 ? childPricing.materialsAmount : null,
+            materialsType: childPricing.materialsType,
             parentJob: { connect: { id: primaryJob.id } },
             bookingSource: "web",
             afterPhotoConsent: input.afterPhotoConsent === true,
@@ -467,12 +493,19 @@ export async function submitBooking(input: SubmitBookingInput) {
     // Customer "Bookings pre-paid" email when a deposit was collected at
     // booking time — gated by `cust.fee.bookings_prepaid`.
     if (input.depositPaymentIntentId) {
+      // Deposit collected upfront: a refundable materials deposit (e.g. painting
+      // $799) when one applies, otherwise the $20 base booking deposit. Mirrors
+      // the server-authoritative logic in /api/stripe/charge-deposit.
+      const depositCollected =
+        pricing.materialsType === "deposit" && pricing.materialsAmount > 0
+          ? pricing.materialsAmount
+          : 20;
       sendCustomerBookingsPrepaid({
         to: email,
         clientName: client.name,
         jobId: primaryJob.id,
         jobNumber: primaryJob.jobNumber,
-        amount: 20, // $20 deposit per the existing booking flow
+        amount: depositCollected,
       }).catch((err) => console.error("customer prepaid email", err));
     }
 
@@ -484,6 +517,13 @@ export async function submitBooking(input: SubmitBookingInput) {
         description: `Booked via web by ${client.name}`,
       },
     });
+
+    // 10b. Painting (SOP §6): notify all painting-eligible providers to bid.
+    if (isPainting) {
+      notifyPaintingProviders(primaryJob.id).catch((err) =>
+        console.error("painting provider notification failed", err)
+      );
+    }
 
     return {
       success: true,

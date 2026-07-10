@@ -74,6 +74,7 @@ const ADMIN_NAV: NavSection[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
       { href: "/analytics", label: "Analytics", Icon: BarChart3 },
+      { href: "/reports", label: "Reports (CPA)", Icon: BarChart3 },
       { href: "/kpi", label: "Retention KPI", Icon: TrendingUp },
       { href: "/calendar", label: "Calendar", Icon: CalendarDays },
     ],
@@ -82,10 +83,13 @@ const ADMIN_NAV: NavSection[] = [
     label: "Operations",
     items: [
       { href: "/jobs", label: "Jobs", Icon: Briefcase },
+      { href: "/recurring", label: "Recurring", Icon: CalendarDays },
       { href: "/requests", label: "Requests", Icon: Inbox, badge: "requests" },
       { href: "/waitlist", label: "Wait Lists", Icon: Clock },
       { href: "/documents", label: "Documents", Icon: FileSignature },
       { href: "/clients", label: "Clients", Icon: Contact },
+      { href: "/contacts", label: "Contacts (CRM)", Icon: Contact },
+      { href: "/properties", label: "Properties", Icon: Settings },
       { href: "/web-bookings", label: "Web Bookings", Icon: Globe },
       { href: "/leads", label: "Leads", Icon: Flame },
       { href: "/chat", label: "Chat", Icon: MessageCircle, badge: "chat" },
@@ -127,6 +131,9 @@ const ADMIN_NAV: NavSection[] = [
     items: [
       { href: "/activity", label: "Activity Log", Icon: ScrollText },
       { href: "/audit", label: "Audit Log", Icon: ScrollText },
+      { href: "/logs", label: "System Logs", Icon: ScrollText },
+      { href: "/announcements", label: "Announcements", Icon: ScrollText },
+      { href: "/training-docs", label: "Training & Docs", Icon: GraduationCap },
       { href: "/settings", label: "Settings", Icon: Settings },
       { href: "/training", label: "Training", Icon: GraduationCap },
     ],

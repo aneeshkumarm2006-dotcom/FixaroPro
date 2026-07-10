@@ -72,8 +72,8 @@ export function hoursWorked(job: Pick<JobBillingLike, "clockInTime" | "clockOutT
   return round2(ms / 3600_000);
 }
 
-// Deposit collected upfront: a materials deposit (e.g. painting $799) when one
-// applied, else the $20 base booking deposit.
+// Amount collected upfront: a materials deposit or the painting $119 materials
+// charge when one applied, else the $20 base booking deposit.
 export function depositCollected(job: Pick<JobBillingLike, "depositPaid" | "materialsType" | "materialsAmount">): number {
   if (!job.depositPaid) return 0;
   if (job.materialsType === "deposit" && job.materialsAmount) return job.materialsAmount;

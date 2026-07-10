@@ -45,6 +45,13 @@ interface SubmitBookingInput {
   customerRequestsMaterials?: boolean;
   // SOP §7 — painting scope drives the immediate quote range.
   paintingScope?: string;
+  // SOP v4.2 §4 — service-specific intake. Small paint repair / AC installation.
+  paintRepairArea?: string;
+  paintRepairSurface?: string;
+  acType?: string;
+  acLocation?: string;
+  acMountType?: string;
+  clientHasAcUnit?: boolean | null;
   // Step 3
   date: string; // YYYY-MM-DD
   isFlexible: boolean;
@@ -245,6 +252,10 @@ export async function submitBooking(input: SubmitBookingInput) {
     const isPainting = input.serviceType === "PAINTING";
     const painting = isPainting ? paintingQuoteRange(input.paintingScope) : null;
 
+    // Service-specific intake (SOP v4.2 §4) — only persisted for its own service.
+    const isSmallPaintRepair = input.serviceType === "SMALL_PAINT_REPAIR";
+    const isAcInstallation = input.serviceType === "AC_INSTALLATION";
+
     const primaryJob = await db.job.create({
       data: {
         clientName: client.name,
@@ -273,6 +284,16 @@ export async function submitBooking(input: SubmitBookingInput) {
           quoteRangeMin: painting?.min ?? null,
           quoteRangeMax: painting?.max ?? null,
           paintingSurplusRate: 1.35,
+        }),
+        ...(isSmallPaintRepair && {
+          paintRepairArea: input.paintRepairArea?.trim() || null,
+          paintRepairSurface: input.paintRepairSurface || null,
+        }),
+        ...(isAcInstallation && {
+          acType: input.acType || null,
+          acLocation: input.acLocation?.trim() || null,
+          acMountType: input.acMountType || null,
+          clientHasAcUnit: input.clientHasAcUnit ?? null,
         }),
         bookingSource: "web",
         notes: input.notes?.trim() || null,
@@ -493,9 +514,9 @@ export async function submitBooking(input: SubmitBookingInput) {
     // Customer "Bookings pre-paid" email when a deposit was collected at
     // booking time — gated by `cust.fee.bookings_prepaid`.
     if (input.depositPaymentIntentId) {
-      // Deposit collected upfront: a refundable materials deposit (e.g. painting
-      // $799) when one applies, otherwise the $20 base booking deposit. Mirrors
-      // the server-authoritative logic in /api/stripe/charge-deposit.
+      // Amount collected upfront: a refundable materials deposit or the painting
+      // $119 materials charge when one applies, otherwise the $20 base booking
+      // deposit. Mirrors the server-authoritative logic in /api/stripe/charge-deposit.
       const depositCollected =
         pricing.materialsType === "deposit" && pricing.materialsAmount > 0
           ? pricing.materialsAmount

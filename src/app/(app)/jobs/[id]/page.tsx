@@ -189,6 +189,10 @@ export default async function JobPage({
     payRateMultiplier: job.payRateMultiplier,
     depositPaid: job.depositPaid,
     depositPaymentIntentId: job.depositPaymentIntentId,
+    // Needed so the refund cap/copy reflect the real amount collected at booking
+    // (materials deposit or the painting $119 charge), not a hardcoded $20.
+    materialsType: job.materialsType,
+    materialsAmount: job.materialsAmount,
     addOns: job.addOns.map((a) => ({
       id: a.id,
       name: a.name,

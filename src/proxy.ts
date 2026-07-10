@@ -10,6 +10,10 @@ const PUBLIC_EXACT = new Set<string>([
   '/portal/setup',
   '/book',
   '/quote',
+  '/careers', // public careers / job application page
+  '/join-waitlist', // public waitlist signup
+  '/faq', // public FAQ
+  '/reviews', // public reviews wall
   '/gift-card',
   '/apple-icon', // PWA icon for iOS home screen
 ])

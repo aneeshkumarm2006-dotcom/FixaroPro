@@ -38,8 +38,8 @@ export async function issueRefund(input: IssueRefundInput) {
     if (!job) return { success: false, error: "Job not found" };
 
     const totalCharged = job.price ?? 0;
-    // Deposit collected at booking: a materials deposit (e.g. painting $799)
-    // when one applied, otherwise the $20 base booking deposit.
+    // Amount collected at booking: a materials deposit, the painting $119
+    // materials charge, or otherwise the $20 base booking deposit.
     const depositAmount = job.depositPaid
       ? job.materialsType === "deposit" && job.materialsAmount
         ? job.materialsAmount

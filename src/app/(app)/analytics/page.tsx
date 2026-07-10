@@ -199,6 +199,29 @@ export default async function AnalyticsPage() {
     0
   );
 
+  // === MATERIALS / DEPOSIT STATS (SOP §9) ===
+  // Materials & equipment revenue counts every non-refunded materials/equipment
+  // line (flat costs like the painting $119, plus deposits that were applied).
+  const materialsRevenue = completedJobs.reduce(
+    (sum, j) => (j.materialsRefundedAt ? sum : sum + (j.materialsAmount ?? 0)),
+    0
+  );
+  // Deposits still held: collected, not refunded, not yet applied to a bill.
+  const depositsOutstanding = jobs.reduce((sum, j) => {
+    if (j.materialsType !== "deposit" || !j.depositPaid) return sum;
+    if (j.materialsRefundedAt) return sum;
+    const held = (j.materialsAmount ?? 0) - (j.materialsAppliedAmount ?? 0);
+    return sum + Math.max(0, held);
+  }, 0);
+  const depositsApplied = jobs.reduce(
+    (sum, j) => sum + (j.materialsAppliedAmount ?? 0),
+    0
+  );
+  const depositsRefunded = jobs.reduce(
+    (sum, j) => (j.materialsRefundedAt ? sum + (j.materialsAmount ?? 0) : sum),
+    0
+  );
+
   const revenueStats = {
     totalRevenue,
     monthlyRevenue,
@@ -212,6 +235,10 @@ export default async function AnalyticsPage() {
     profitMargin,
     pendingPayments: pendingPaymentJobs.length,
     pendingAmount,
+    materialsRevenue,
+    depositsOutstanding,
+    depositsApplied,
+    depositsRefunded,
   };
 
   // === INVENTORY STATS ===

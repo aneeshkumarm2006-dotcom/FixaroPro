@@ -50,6 +50,16 @@ export interface BookingDraft {
   // Painting scope (SOP §7) — drives the immediate quote range. Empty unless
   // the selected service is PAINTING.
   paintingScope: string;
+  // Service-specific intake (SOP v4.2 §4). Only set for their own service type.
+  // Small paint repair — the client always supplies the paint, so we never ask
+  // for paint colour or any procurement detail.
+  paintRepairArea: string;
+  paintRepairSurface: string;
+  // AC installation — client supplies the unit/accessories unless admin-approved.
+  acType: string;
+  acLocation: string;
+  acMountType: string;
+  clientHasAcUnit: boolean | null;
   // Step 3
   date: string;
   isFlexible: boolean;
@@ -82,6 +92,12 @@ export const EMPTY_DRAFT: BookingDraft = {
   addOns: [],
   customerRequestsMaterials: false,
   paintingScope: "",
+  paintRepairArea: "",
+  paintRepairSurface: "",
+  acType: "",
+  acLocation: "",
+  acMountType: "",
+  clientHasAcUnit: null,
   date: "",
   isFlexible: true,
   timeSlot: "",
@@ -112,6 +128,9 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "CAULKING_TOUCHUPS", label: "Caulking touch-ups", category: "Repairs", pricing: "hourly" },
   { value: "WEATHERSTRIPPING", label: "Weatherstripping", category: "Repairs", pricing: "hourly" },
   { value: "LOCK_REPLACEMENT", label: "Lock replacement", category: "Repairs", pricing: "hourly" },
+  // SOP v4.2 §4/§5: small paint repair — $79/hr labour, client provides paint,
+  // optional $49 materials/equipment when Fixaro-provided is requested.
+  { value: "SMALL_PAINT_REPAIR", label: "Small paint repair", category: "Repairs", pricing: "hourly", priceNote: "$79/hr — you provide the paint" },
 
   // Installation & Assembly
   { value: "TV_MOUNTING", label: "TV mounting", category: "Installation & Assembly", pricing: "hourly", priceNote: "Large TVs (60\"+) or brick/concrete walls: custom quote" },
@@ -126,6 +145,10 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "PICTURE_HANGING", label: "Picture hanging", category: "Installation & Assembly", pricing: "hourly" },
   { value: "LOCK_INSTALLATION", label: "Lock installation", category: "Installation & Assembly", pricing: "hourly" },
   { value: "APPLIANCE_HOOKUP", label: "Appliance hookup", category: "Installation & Assembly", pricing: "hourly" },
+  // SOP v4.2 §4/§5: AC installation — $79/hr labour, NO automatic materials
+  // charge. Any parts/brackets/accessories are client-provided or an admin-
+  // approved extra.
+  { value: "AC_INSTALLATION", label: "AC installation", category: "Installation & Assembly", pricing: "hourly", priceNote: "$79/hr labour" },
 
   // Home Improvement
   { value: "PAINTING", label: "Painting", category: "Home Improvement", pricing: "quote", priceNote: "Custom quote" },
@@ -156,8 +179,10 @@ export const SERVICE_CATALOG: ServiceItem[] = [
 // ── Materials / equipment pricing (SOP §5) ─────────────────────────────────
 // Amounts apply ONLY when the customer checks the all-or-nothing
 // "Fixaro provides all materials and equipment" checkbox. CAD.
-//   type "deposit" → refundable before job / applied to final bill, tracked separately
-//   type "cost"    → flat materials/equipment line item
+//   type "deposit" → captured upfront at booking; refundable before job / applied
+//                    to the final bill; tracked separately. (Also the upfront-
+//                    capture mechanism for painting's flat $119 charge — see below.)
+//   type "cost"    → flat materials/equipment line item, billed on final invoice
 export type MaterialsType = "deposit" | "cost";
 
 export interface MaterialsPricing {
@@ -175,6 +200,11 @@ export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
   WEATHERSTRIPPING: { amount: 249, type: "deposit" },
   CAULKING_TOUCHUPS: { amount: 75, type: "cost" },
   LOCK_REPLACEMENT: { amount: 49, type: "cost" },
+  // SOP v4.2 §5: small paint repair materials $49 (paint NOT included; client
+  // provides paint). Labour is billed separately at $79/hr.
+  SMALL_PAINT_REPAIR: { amount: 49, type: "cost" },
+  // AC installation has NO automatic materials/equipment charge (v4.2 §5), so it
+  // is intentionally absent from this map — getMaterialsPricing() returns null.
 
   // Installation & Assembly
   TV_MOUNTING: { amount: 49, type: "cost" },
@@ -191,7 +221,11 @@ export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
   APPLIANCE_HOOKUP: { amount: 49, type: "cost" },
 
   // Home Improvement
-  PAINTING: { amount: 799, type: "deposit" },
+  // SOP §5/§6 (v4.2): painting is a FLAT $119 materials/equipment charge — NOT a
+  // deposit, no unused-balance tracking. Client always provides the paint. It is
+  // captured upfront at booking (client decision D6) using the "deposit"
+  // mechanism, so a client rejection auto-refunds the $119.
+  PAINTING: { amount: 119, type: "deposit" },
   MOULDINGS: { amount: 49, type: "cost" },
   DOOR_HARDWARE: { amount: 99, type: "deposit" },
   CABINET_HARDWARE: { amount: 99, type: "cost" },
@@ -215,6 +249,32 @@ export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
   DRYER_VENT: { amount: 19, type: "cost" },
   MINOR_EXTERIOR: { amount: 59, type: "cost" },
 };
+
+// ── Service-specific intake options (SOP v4.2 §4) ──────────────────────────
+// Deliberately excludes any paint-colour / procurement field: Fixaro never
+// supplies or picks up paint, so that data is not collected.
+export const PAINT_REPAIR_SURFACES = [
+  "Drywall",
+  "Plaster",
+  "Wood / trim",
+  "Concrete / masonry",
+  "Other",
+] as const;
+
+export const AC_TYPES = [
+  "Window unit",
+  "Wall-mounted / mini-split",
+  "Portable",
+  "Through-the-wall",
+  "Other",
+] as const;
+
+export const AC_MOUNT_TYPES = [
+  "Window mount",
+  "Wall bracket",
+  "Floor / freestanding",
+  "Not sure",
+] as const;
 
 // Returns the materials/equipment pricing for a service, or null if none configured.
 export function getMaterialsPricing(serviceType?: string): MaterialsPricing | null {

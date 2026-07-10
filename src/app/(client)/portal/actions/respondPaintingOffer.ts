@@ -8,7 +8,7 @@ import { rejectPaintingAndRefund } from "@/lib/painting-workflow";
 
 // Client accepts or rejects the final painting offer from their portal (SOP §6).
 //   accept → booking confirmed at the agreed final price
-//   reject → booking cancelled + $799 deposit refunded
+//   reject → booking cancelled + $119 materials/equipment charge refunded/removed
 export async function respondPaintingOffer(input: {
   jobId: string;
   response: "ACCEPT" | "REJECT";

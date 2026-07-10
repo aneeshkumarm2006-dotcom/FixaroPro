@@ -242,7 +242,7 @@ function Avatar({ name, color }: { name: string; color?: string }) {
 
 /* ───────────────────────── props ───────────────────────── */
 interface JobStats { total: number; completed: number; inProgress: number; scheduled: number; cancelled: number; avgDuration: number; completionRate: number; }
-interface RevenueStats { totalRevenue: number; monthlyRevenue: number; weeklyRevenue: number; avgJobPrice: number; totalEmployeePay: number; totalTips: number; totalParking: number; totalProductCost: number; netProfit: number; profitMargin: number; pendingPayments: number; pendingAmount: number; }
+interface RevenueStats { totalRevenue: number; monthlyRevenue: number; weeklyRevenue: number; avgJobPrice: number; totalEmployeePay: number; totalTips: number; totalParking: number; totalProductCost: number; netProfit: number; profitMargin: number; pendingPayments: number; pendingAmount: number; materialsRevenue: number; depositsOutstanding: number; depositsApplied: number; depositsRefunded: number; }
 interface InventoryStats { totalProducts: number; totalValue: number; lowStockCount: number; totalUsageCost: number; avgUsagePerJob: number; inCirculationValue: number; }
 interface EmployeeStats { totalEmployees: number; admins: number; activeNow: number; avgJobsPerEmployee: number; topPerformer: string | null; }
 interface ProductUsage { id: string; name: string; unit: string; totalUsed: number; usageCount: number; totalCost: number; stockLevel: number; minStock: number; }
@@ -655,6 +655,15 @@ function Payments({ paymentJobs, revenueStats }: { paymentJobs: PaymentJob[]; re
         <MiniTile label="Tips" value={money(revenueStats.totalTips)} hint="passed through" />
         <MiniTile label="Pending" value={money(pending)} accent={pending ? "var(--amber-700)" : undefined} hint="not yet paid" />
       </div>
+      {/* Materials / equipment + deposit position (SOP §9 analytics). */}
+      <Panel title="Materials, equipment & deposits">
+        <div className="grid-3">
+          <MiniTile label="Materials revenue" value={money(revenueStats.materialsRevenue)} hint="completed, non-refunded" />
+          <MiniTile label="Deposits outstanding" value={money(revenueStats.depositsOutstanding)} accent={revenueStats.depositsOutstanding ? "var(--amber-700)" : undefined} hint="held, not applied" />
+          <MiniTile label="Deposits applied" value={money(revenueStats.depositsApplied)} hint="credited to bills" />
+          <MiniTile label="Deposits refunded" value={money(revenueStats.depositsRefunded)} hint="returned to clients" />
+        </div>
+      </Panel>
       <Panel title="Employee payment summary">
         <div className="atable-wrap" style={{ boxShadow: "none", border: "1px solid var(--primary-10)" }}>
           <div className="atable-scroll">

@@ -6,7 +6,8 @@
 //   • Providers place bids (one active bid each).
 //   • Bidding closes (admin action or cron window) → the LOWEST valid bid is
 //     auto-selected by the software, 35% surplus applied, client offer sent.
-//   • Client accepts (confirm) or rejects (cancel + refund $799).
+//   • Client accepts (confirm) or rejects (cancel + refund/remove the $119
+//     materials/equipment charge).
 //
 // Provider override is independent of price (tracker decision D3): swapping the
 // attached provider keeps the client's agreed final price and does NOT re-send
@@ -174,8 +175,8 @@ export async function rejectPaintingAndRefund(
     return { success: true, refunded: 0 }; // already refunded
   }
 
-  // Deposit collected at booking: the materials deposit (e.g. painting $799)
-  // when one applied, otherwise the $20 base booking deposit.
+  // Amount collected at booking: the painting $119 materials charge (or a
+  // refundable materials deposit) when one applied, otherwise the $20 base deposit.
   const depositAmount =
     job.materialsType === "deposit" && job.materialsAmount
       ? job.materialsAmount

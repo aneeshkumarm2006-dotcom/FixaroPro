@@ -87,8 +87,9 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
       }),
     ]);
 
-    // Optionally refund the deposit (materials deposit, e.g. painting $799, or
-    // the $20 base deposit), capped at the remaining deposit balance.
+    // Optionally refund what was collected (a materials deposit, the painting
+    // $119 materials charge, or the $20 base deposit), capped at the remaining
+    // balance.
     let refund: { success: boolean; error?: string } | null = null;
     if (input.refundDeposit && job.depositPaid) {
       const remaining = depositCollected(job) - (job.refundedAmount ?? 0);

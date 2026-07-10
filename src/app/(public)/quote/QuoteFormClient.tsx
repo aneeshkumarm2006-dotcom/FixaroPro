@@ -8,6 +8,9 @@ const SERVICE_OPTIONS = [
   "Installation & Assembly (TV, shelves, furniture…)",
   "Home Improvement (painting, carpentry, silicone sealing…)",
   "Outdoor & Seasonal (fence, deck, gutter, weatherproofing…)",
+  // SOP v4.2 §4/§9 — both must be selectable from Get a Quote.
+  "Small paint repair (you provide the paint)",
+  "AC installation",
   "Multiple services in one visit",
   "Commercial / business",
   "Other",

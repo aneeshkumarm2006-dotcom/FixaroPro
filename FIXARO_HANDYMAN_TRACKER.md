@@ -2,9 +2,50 @@
 
 > Living document. Tracks **what we're doing**, **what's decided**, and **what needs clarification**
 > for converting the Cleano-based app into the **Fixaro Handyman** product.
-> Source of truth: `Fixaro_Handyman_Software_Change_Requirements_AWER_Format_v2.docx` (SOP v4.0).
+> Source of truth: `Fixaro_Handyman_Software_Change_Requirements_AWER_Format_v4_2_Service_Update.pdf` (SOP **v4.2**).
+> ⚠️ Slices 1–6 below were built against **v4.0**. See the **v4.2 Delta** section for what changed.
 
 **Legend:** ✅ done · 🔨 in progress · ⬜ not started · ❓ needs clarification · 💡 decision made
+
+---
+
+## 🔺 v4.2 Delta (2026-07-10) — what changed vs the v4.0 build
+
+Verified against code (not the old tracker). Slices 1–6 are ~85% aligned but were built to v4.0.
+
+| # | v4.2 requirement | v4.0 code state | Action |
+|---|---|---|---|
+| Δ1 | **Painting = $119 flat materials/equipment charge** (client provides paint; not a deposit; no unused balance) | `PAINTING: { 799, "deposit" }` in 14 files | ✅ Converted to $119, captured **upfront** (D6); all copy fixed; Step2 shows flat-charge (not deposit) copy |
+| Δ2 | **Small paint repair** — $79/hr, **$49** materials (paint not incl.), intake fields | absent everywhere (src + prisma) | ✅ Catalog + `$49 cost` + equipment + eligibility + **structured intake** (area, surface) + copy |
+| Δ3 | **AC installation** — $79/hr, **no** auto materials, intake fields | absent everywhere | ✅ Catalog + no materials charge + equipment + eligibility + **structured intake** (type, location, mount, has-unit) + copy |
+| Δ4 | Both new services in **Get-a-Quote** form | quote form has 4 hardcoded category buckets only | ✅ Added as explicit options |
+| Δ5 | Painting quote range correct | `painting.ts` studio `baselineMax:945` double-counts surplus → shows ~$1,276 | ✅ Fixed → baseline 700–900 (=$945–$1,215) |
+| Δ6 | Client always provides paint | `painting.ts` notes say *"work + paint included"* | ✅ All scope notes now say "labour only, you provide the paint" |
+
+**Note:** §5 materials pricing for all ~40 other services was verified **line-by-line correct** vs v4.2.
+
+**Verified:** `npx tsc --noEmit` and `next build` both pass clean. No `$799`/"paint included" strings remain in `src/`.
+
+### Also closed out in this pass
+- ✅ **`JobDetailView` $20 hardcode** — was a real bug, not just copy: line ~321 fed `refundCap`, so a
+  painting job with $119 collected capped admin refunds at $20. Now derives from `materialsType`/
+  `materialsAmount` (mirrors `depositCollected()` in `billing.ts`, which is server-only). 3 sites fixed.
+- ✅ **Analytics deposit metrics (§9)** — `materialsRevenue`, `depositsOutstanding`, `depositsApplied`,
+  `depositsRefunded` computed in `analytics/page.tsx`, rendered in a new "Materials, equipment & deposits"
+  panel on the Payments tab.
+
+### ⚠️ Migrations — 4 now pending, NOT applied (DB is remote/prod)
+`20260618000000_job_materials` · `20260618001000_painting_workflow` · `20260618002000_provider_eligibility`
+· **`20260710000000_service_intake_fields`** (new — 6 nullable columns on `Job`, safe/additive)
+
+Then: `npx tsx prisma/seed-eligibility.ts`, and grant PAINTING / SMALL_PAINT_REPAIR / AC_INSTALLATION
+eligibility per provider or those job + bid lists stay empty.
+
+### 💡 Decision D6 — $119 capture timing
+**Confirmed with client: capture $119 UPFRONT at booking** (same mechanism as the old $799).
+On rejection → auto-refund $119. Internally the materials `type` stays `"deposit"` (the upfront-capture +
+refund + credit plumbing), but **all customer/admin-facing wording drops "deposit"** → "materials/equipment
+charge." Refund logic is data-driven off `job.materialsAmount`, so $799→$119 propagates automatically.
 
 ---
 
@@ -99,7 +140,7 @@ FIXARO HANDYMAN (re-skin + rework of Cleano)
 
 | # | Topic | Decision |
 |---|-------|----------|
-| D1 | Painting deposit | **Follow the doc as written**: $799 deposit in every painting scenario when materials are included. |
+| D1 | Painting deposit | ~~$799 deposit when materials included~~ **SUPERSEDED by v4.2 → see D6**: $119 flat materials charge. |
 | D2 | 35% surplus | **Confirmed.** Applied to (a) immediate quote range (estimate) and (b) final = winning bid × 1.35 (authoritative). |
 | D3 | Admin provider override — state model | **Proposed (awaiting final confirm):** provider swap and price are *independent*. Overriding the provider keeps the client's already-agreed price by default; client is re-notified **only** if an admin explicitly changes the final price. See state model below. |
 

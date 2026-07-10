@@ -64,8 +64,8 @@ export default async function BookingDetailPage({
 
   const isUpcoming = new Date(job.startTime) >= new Date();
   const isCompletedOrPaid = job.status === "COMPLETED" || job.status === "PAID";
-  // Deposit actually collected at booking (materials deposit, e.g. painting
-  // $799, or the $20 base booking deposit).
+  // Amount actually collected at booking (a refundable materials deposit, the
+  // painting $119 materials charge, or the $20 base booking deposit).
   const depositCollected =
     job.materialsType === "deposit" && job.materialsAmount ? job.materialsAmount : 20;
   const hasCancelRequest = !!job.cancellationRequestedAt;

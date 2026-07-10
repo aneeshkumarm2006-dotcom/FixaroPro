@@ -45,9 +45,10 @@ export async function chargeJob(jobId: string) {
   }
 
   // Credit the deposit already collected at booking (SOP §10 — deposits are
-  // applied to the final bill). For a materials deposit (e.g. painting $799)
-  // the admin-applied portion credits here; the unused balance is refunded via
-  // the deposit-adjust action. Otherwise the $20 base booking deposit credits.
+  // applied to the final bill). For a refundable materials deposit or the
+  // painting $119 materials charge the admin-applied portion credits here; any
+  // unused balance is refunded via the deposit-adjust action. Otherwise the $20
+  // base booking deposit credits.
   let depositCredit = 0;
   if (job.depositPaid) {
     if (job.materialsType === "deposit") {

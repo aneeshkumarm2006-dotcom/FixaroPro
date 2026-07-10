@@ -233,6 +233,7 @@ model Client {
   referrals              Client[]          @relation("ClientReferrals")
   recurringCancellations RecurringCancellation[]
   addresses              ClientAddress[]
+  contact                Contact?
 
   @@index([clientType])
   @@index([isActive])
@@ -341,6 +342,18 @@ model Job {
   providerOverrideReason    String?
   providerOverrideAt        DateTime?
   providerOverrideBy        String?
+  // Service-specific intake (SOP v4.2 §4). Photos reuse the JobPhoto relation and
+  // free-text detail goes in `notes`; these capture the structured answers.
+  // Small paint repair — client always supplies the paint (no paint-colour
+  // procurement is collected, per v4.2).
+  paintRepairArea           String?
+  paintRepairSurface        String?
+  // AC installation — client supplies the unit/accessories unless an admin
+  // approves a separate extra.
+  acType                    String?
+  acLocation                String?
+  acMountType               String?
+  clientHasAcUnit           Boolean?
   paymentFailedAt         DateTime?
   paymentFailureReason    String?
   paidAt                  DateTime?
@@ -489,6 +502,16 @@ model EmployeeServiceEligibility {
   @@index([serviceType])
 }
 
+// Stripe webhook idempotency (ported from Cleano). Claiming the event id before
+// processing makes duplicate deliveries (Stripe retries the same id) a no-op.
+model WebhookEvent {
+  id        String   @id // Stripe event id (evt_...)
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // Generic high-impact audit trail (SOP §9). Records who changed what, when, and
 // why for eligibility, deposits, refunds, charges, overrides, etc. JobLog stays
 // the job-scoped activity feed; this is the cross-entity admin audit log.
@@ -509,6 +532,53 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId])
   @@index([createdAt])
+}
+
+// System-wide activity/event log (ported from Cleano). Broader than AuditLog:
+// records email/SMS/payment/webhook/cron/auth events with status + provider ids
+// for an ops-facing timeline (the /logs view). Written via logActivity().
+model ActivityLog {
+  id         String           @id @default(cuid())
+  createdAt  DateTime         @default(now())
+  category   ActivityCategory
+  action     String
+  status     ActivityStatus   @default(SUCCESS)
+  actorId    String? // user who triggered it (null = system/anonymous)
+  actorLabel String? // denormalized name/email for display
+  targetType String? // e.g. "job", "client", "giftCard"
+  targetId   String?
+  message    String?
+  error      String?
+  amount     Float?
+  providerId String? // Stripe PI / Twilio SID / Resend id
+  metadata   Json?
+
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([targetType, targetId])
+}
+
+enum ActivityCategory {
+  EMAIL
+  SMS
+  PAYMENT
+  REFUND
+  DEPOSIT
+  WEBHOOK
+  AUTH
+  BOOKING
+  ADMIN
+  CRON
+  SYSTEM
+}
+
+enum ActivityStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  SKIPPED
 }
 
 model PricingRule {
@@ -1649,10 +1719,129 @@ model Lead {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   convertedJob    Job?       @relation(fields: [convertedJobId], references: [id], onDelete: SetNull)
+  contact         Contact?
 
   @@index([email])
   @@index([status])
   @@index([lastActivityAt])
+}
+
+// CRM contact (ported from Cleano). Unifies leads + clients + applicants into a
+// single pipeline record with lifecycle stage, activities, and a flexible props
+// bag. Optionally linked 1:1 to a Client and/or Lead.
+model Contact {
+  id                 String            @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  address            String?
+  lifecycle          LifecycleStage    @default(NEW_LEAD)
+  source             String?
+  sourceDetail       String?
+  latestSource       String?
+  campaign           String?
+  ownerId            String?
+  leadScore          Int?
+  nextStep           String?
+  nextStepDue        DateTime?
+  tags               String[]          @default([])
+  props              Json?
+  ratingAvg          Float?
+  ratingCount        Int               @default(0)
+  lifetimeValue      Float             @default(0)
+  bookingsCount      Int               @default(0)
+  duplicateDismissed Boolean           @default(false)
+  archivedAt         DateTime?
+  clientId           String?           @unique
+  leadId             String?           @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  lastActivityAt     DateTime          @default(now())
+  client             Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  lead               Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  activities         ContactActivity[]
+
+  @@index([lifecycle])
+  @@index([ownerId])
+  @@index([lastActivityAt])
+  @@index([email])
+  @@index([phone])
+}
+
+model ContactActivity {
+  id        String              @id @default(cuid())
+  contactId String
+  type      ContactActivityType @default(NOTE)
+  title     String
+  body      String?
+  actor     String?
+  createdAt DateTime            @default(now())
+  contact   Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([createdAt])
+}
+
+enum ContactActivityType {
+  NOTE
+  EMAIL
+  SMS
+  CALL
+  BOOKING
+  RATING
+  CANCEL
+  LIFECYCLE
+  CREATE
+}
+
+enum LifecycleStage {
+  NEW_LEAD
+  QUALIFIED
+  BOOKED
+  ACTIVE
+  RETURNING
+  PAST
+  LOST
+  APPLICANT
+  CLEANER
+  DNC
+}
+
+// Admin-defined custom properties (ported from Cleano). Drives the flexible
+// property cards on contacts/companies/bookings (stored in Contact.props).
+model PropertyDefinition {
+  id           String    @id @default(cuid())
+  objectType   String // contact | company | booking
+  groupName    String
+  label        String
+  internalName String
+  fieldType    String // text|textarea|number|email|phone|date|dropdown|multi|checkbox|user
+  options      String[]  @default([])
+  isSystem     Boolean   @default(false)
+  isRequired   Boolean   @default(false)
+  isUnique     Boolean   @default(false)
+  visibility   String    @default("everyone") // everyone | admin
+  sortOrder    Int       @default(0)
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([objectType, internalName])
+  @@index([objectType])
+}
+
+// Ad spend imports for cost-per-acquisition reporting (ported from Cleano).
+model AdSpendImport {
+  id           String   @id @default(cuid())
+  channel      String // normalized channel id: google | instagram | facebook | …
+  date         DateTime
+  amount       Float
+  source       String? // "Manual" | "CSV · file.csv"
+  importedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([channel])
+  @@index([date])
 }
 
 model Waitlist {

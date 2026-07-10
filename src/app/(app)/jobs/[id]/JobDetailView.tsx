@@ -70,6 +70,8 @@ interface Job {
   payRateMultiplier?: number | null;
   depositPaid?: boolean;
   depositPaymentIntentId?: string | null;
+  materialsType?: string | null;
+  materialsAmount?: number | null;
   refundedAmount?: number | null;
   stripePaymentIntentId?: string | null;
   addOns?: Array<{ id: string; name: string; price: number }>;
@@ -318,7 +320,16 @@ export default function JobDetailView({
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   const refundedSoFar = job.refundedAmount ?? 0;
-  const depositRemaining = job.depositPaid ? Math.max(0, 20 - refundedSoFar) : 0;
+  // Amount actually collected at booking — a materials deposit or the painting
+  // $119 materials charge when one applied, otherwise the $20 base booking
+  // deposit. Mirrors depositCollected() in src/lib/billing.ts (which is
+  // server-only, so it can't be imported here).
+  const depositCollected = !job.depositPaid
+    ? 0
+    : job.materialsType === "deposit" && job.materialsAmount
+    ? job.materialsAmount
+    : 20;
+  const depositRemaining = Math.max(0, depositCollected - refundedSoFar);
   const refundCap = job.stripePaymentIntentId
     ? Math.max(0, (job.price ?? 0) - refundedSoFar)
     : depositRemaining;
@@ -734,7 +745,7 @@ export default function JobDetailView({
                 </div>
                 <div className="label-stack">
                   <span className="top">Deposit paid</span>
-                  <span className="bottom">$20.00 collected at booking{job.depositPaymentIntentId ? ` · ${job.depositPaymentIntentId}` : ''}</span>
+                  <span className="bottom">${depositCollected.toFixed(2)} collected at booking{job.depositPaymentIntentId ? ` · ${job.depositPaymentIntentId}` : ''}</span>
                 </div>
               </div>
             </div>
@@ -1825,7 +1836,7 @@ export default function JobDetailView({
             {job.stripePaymentIntentId
               ? `Refundable: $${refundCap.toFixed(2)} (already refunded $${refundedSoFar.toFixed(2)}).`
               : depositRemaining > 0
-              ? `Deposit refundable: $${depositRemaining.toFixed(2)} of $20.00.`
+              ? `Deposit refundable: $${depositRemaining.toFixed(2)} of $${depositCollected.toFixed(2)}.`
               : "Nothing left to refund."}
           </p>
           <div>

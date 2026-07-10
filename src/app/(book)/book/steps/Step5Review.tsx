@@ -41,8 +41,9 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
-  // Deposit charged today — server-authoritative (painting $799, etc.). Defaults
-  // to the $20 base booking deposit until the charge-deposit route responds.
+  // Amount charged today — server-authoritative (painting $119 materials charge,
+  // refundable materials deposits, etc.). Defaults to the $20 base booking
+  // deposit until the charge-deposit route responds.
   const [depositAmount, setDepositAmount] = useState(20);
 
   // Promo code
@@ -65,7 +66,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
 
   // Create a deposit PaymentIntent when contact info is known. The amount is
   // server-authoritative and depends on the service + materials choice, so we
-  // re-create it if those change (e.g. selecting painting → $799 deposit).
+  // re-create it if those change (e.g. selecting painting → $119 materials charge).
   useEffect(() => {
     if (!draft.email || !draft.name) return;
     setStripeLoading(true);

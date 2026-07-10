@@ -878,8 +878,8 @@ export async function sendCustomerPaintingOffer(opts: {
   const html = layout(
     h1(heading) +
       p(`Hi ${opts.clientName.split(" ")[0]}, your final painting price for booking #${opts.jobNumber} is <strong>${fmt(opts.finalAmount)}</strong>.`) +
-      p("Please accept to confirm your booking, or reject to cancel. If you reject, your $799 materials deposit is refunded in full.") +
-      p("Primer, if required, may increase the final amount — we'll confirm before any extra work.") +
+      p("Please accept to confirm your booking, or reject to cancel. If you reject, your $119 materials/equipment charge is refunded in full.") +
+      p("Please note Fixaro does not supply paint — the exact paint/colour must be provided by you before the handyman arrives. Primer, if required, is client-provided or approved as a separate extra.") +
       btn("Review &amp; respond", `${appUrl}/portal/bookings/${opts.jobId}`)
   );
   return deliver({

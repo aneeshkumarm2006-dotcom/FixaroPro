@@ -17,6 +17,9 @@ export const EQUIPMENT_BY_SERVICE: Record<string, string[]> = {
   CAULKING_TOUCHUPS: ["Caulk gun", "Caulk smoothing tool", "Utility knife", "Painter's tape", "Rags"],
   WEATHERSTRIPPING: ["Utility knife", "Tape measure", "Scissors", "Cordless drill", "Cleaning cloth"],
   LOCK_REPLACEMENT: ["Cordless drill", "Screwdriver set", "Chisel", "Tape measure"],
+  // SOP v4.2 — small paint repair: client provides the paint; these cover the
+  // repair/prep work only.
+  SMALL_PAINT_REPAIR: ["Putty knife", "Sandpaper", "Filler/spackle", "Painter's tape", "Drop cloths", "Brushes & mini roller"],
 
   TV_MOUNTING: ["Stud finder", "Cordless drill", "Level", "Socket set", "Cable ties"],
   CURTAIN_ROD: ["Cordless drill", "Level", "Stud finder", "Tape measure", "Anchors"],
@@ -30,6 +33,9 @@ export const EQUIPMENT_BY_SERVICE: Record<string, string[]> = {
   PICTURE_HANGING: ["Hammer", "Level", "Tape measure", "Picture hooks", "Stud finder"],
   LOCK_INSTALLATION: ["Cordless drill", "Hole saw kit", "Chisel", "Screwdriver set", "Tape measure"],
   APPLIANCE_HOOKUP: ["Adjustable wrench", "Level", "Voltage tester", "Hand truck", "Plumber's tape"],
+  // SOP v4.2 — AC installation: client provides the AC unit/accessories unless
+  // an admin-approved extra; these are the install tools.
+  AC_INSTALLATION: ["Cordless drill", "Level", "Stud finder", "Bracket hardware", "Tape measure", "Caulk gun", "Voltage tester"],
 
   PAINTING: ["Drop cloths", "Rollers & trays", "Brushes", "Painter's tape", "Sandpaper", "Ladder"],
   MOULDINGS: ["Mitre saw", "Brad nailer", "Caulk gun", "Level", "Tape measure"],

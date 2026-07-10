@@ -214,6 +214,13 @@ export default function BookPage() {
         .map((a) => ({ name: a.name, price: a.price })),
       customerRequestsMaterials: draft.customerRequestsMaterials,
       paintingScope: draft.paintingScope,
+      // Service-specific intake (SOP v4.2 §4).
+      paintRepairArea: draft.paintRepairArea,
+      paintRepairSurface: draft.paintRepairSurface,
+      acType: draft.acType,
+      acLocation: draft.acLocation,
+      acMountType: draft.acMountType,
+      clientHasAcUnit: draft.clientHasAcUnit,
       date: draft.date,
       isFlexible: draft.isFlexible,
       timeSlot: draft.timeSlot,

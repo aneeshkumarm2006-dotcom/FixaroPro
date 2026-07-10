@@ -29,7 +29,7 @@ export default function PaintingOfferActions({
       <h2 className="cl-title-md">Your painting quote</h2>
       <p style={{ fontSize: 14, color: "var(--primary-70)", margin: 0, lineHeight: 1.55 }}>
         Your final painting price is <strong>${finalAmount.toFixed(2)}</strong>. Accept to confirm
-        your booking, or reject to cancel and have your $799 deposit refunded in full.
+        your booking, or reject to cancel and have your $119 materials/equipment charge refunded in full.
       </p>
       {error ? (
         <p style={{ fontSize: 13, color: "var(--red, #dc2626)", margin: 0 }}>{error}</p>
@@ -58,7 +58,7 @@ export default function PaintingOfferActions({
       ) : (
         <div className="cl-stack-8">
           <p style={{ fontSize: 13, color: "var(--ink)", margin: 0 }}>
-            Reject this quote? Your booking will be cancelled and your $799 deposit refunded.
+            Reject this quote? Your booking will be cancelled and your $119 materials/equipment charge refunded.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <button

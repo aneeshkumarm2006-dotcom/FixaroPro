@@ -6,10 +6,11 @@ import { db } from "@/db";
 // Base booking deposit collected on every web booking (CAD).
 const BASE_BOOKING_DEPOSIT = 20;
 
-// Server-authoritative deposit amount (in dollars). When the customer opts into
-// Fixaro-provided materials AND the service uses a refundable deposit (SOP §5,
-// e.g. painting $799), that deposit is collected upfront. "cost"-type materials
-// are billed on the final invoice, so the base booking deposit still applies.
+// Server-authoritative upfront amount (in dollars). When the customer opts into
+// Fixaro-provided materials AND the service uses the upfront-capture mechanism
+// (SOP §5 refundable deposits, or the painting $119 flat materials charge), that
+// amount is collected upfront. "cost"-type materials are billed on the final
+// invoice, so the base booking deposit still applies.
 function resolveDepositAmount(
   serviceType: string | undefined,
   customerRequestsMaterials: boolean

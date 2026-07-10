@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, getOrCreateStripeCustomer } from "@/lib/stripe";
-import { getMaterialsPricing } from "@/app/(book)/book/types";
+import { getMaterialsPricing, isUpfrontMaterials } from "@/app/(book)/book/types";
 import { db } from "@/db";
 
 // Base booking deposit collected on every web booking (CAD).
@@ -17,7 +17,9 @@ function resolveDepositAmount(
 ): number {
   if (customerRequestsMaterials) {
     const materials = getMaterialsPricing(serviceType);
-    if (materials && materials.type === "deposit") {
+    // Refundable deposits AND flat upfront charges (painting's $119) are both
+    // collected now; "cost"-type materials are billed on the final invoice.
+    if (materials && isUpfrontMaterials(materials.type)) {
       return materials.amount;
     }
   }

@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { stripe } from "@/lib/stripe";
+import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -41,7 +42,7 @@ export async function issueRefund(input: IssueRefundInput) {
     // Amount collected at booking: a materials deposit, the painting $119
     // materials charge, or otherwise the $20 base booking deposit.
     const depositAmount = job.depositPaid
-      ? job.materialsType === "deposit" && job.materialsAmount
+      ? isUpfrontMaterials(job.materialsType) && job.materialsAmount
         ? job.materialsAmount
         : 20
       : 0;

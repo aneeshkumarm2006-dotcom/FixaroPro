@@ -326,7 +326,8 @@ export default function JobDetailView({
   // server-only, so it can't be imported here).
   const depositCollected = !job.depositPaid
     ? 0
-    : job.materialsType === "deposit" && job.materialsAmount
+    : (job.materialsType === "deposit" || job.materialsType === "charge") &&
+      job.materialsAmount
     ? job.materialsAmount
     : 20;
   const depositRemaining = Math.max(0, depositCollected - refundedSoFar);

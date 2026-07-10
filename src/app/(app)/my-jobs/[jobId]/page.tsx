@@ -14,7 +14,7 @@ import PhotoGallery from "./PhotoGallery";
 import JobChecklistPanel from "./JobChecklistPanel";
 import MapLinks from "./MapLinksClient";
 import EquipmentPanel from "./EquipmentPanel";
-import { getRequiredEquipment } from "@/lib/equipment";
+import { getRequiredEquipmentFor } from "@/lib/equipment-server";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
@@ -100,6 +100,10 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         )
       : null;
 
+  // Admin-overridden checklist for this service, falling back to the seeded
+  // default (SOP §4/§8 — checklists are admin-editable per service).
+  const requiredEquipment = await getRequiredEquipmentFor(job.jobType);
+
   const canClockIn = !jobWithClock.clockInTime && job.status !== "COMPLETED";
   const canClockOut = jobWithClock.clockInTime && !jobWithClock.clockOutTime;
   const canCancelShift =
@@ -136,6 +140,18 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
           <span className={`cl-pill ${statusSlug}`}>{job.status.replace("_", " ")}</span>
           {job.jobType && (
             <span className="cl-pill">{jobTypeSlug(job.jobType)}</span>
+          )}
+          {/* Material status (SOP §8: "Show Fixaro-provided materials flag when
+              applicable"). The handyman must know before arriving whether they
+              bring everything or the client has it on site. */}
+          {job.customerRequestsMaterials ? (
+            <span className="cl-pill" title="Fixaro supplies the materials and equipment for this job">
+              📦 Fixaro-provided materials
+            </span>
+          ) : (
+            <span className="cl-pill warn" title="The client provides all materials and equipment">
+              🧰 Customer-provided materials
+            </span>
           )}
           <span className="cl-pill">JOB #{job.id.slice(-6).toUpperCase()}</span>
         </div>
@@ -453,7 +469,7 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         </>
       )}
 
-      <EquipmentPanel jobId={job.id} equipment={getRequiredEquipment(job.jobType)} />
+      <EquipmentPanel jobId={job.id} equipment={requiredEquipment} />
 
       {/* Photos */}
       {["IN_PROGRESS", "COMPLETED", "PAID"].includes(job.status) && (

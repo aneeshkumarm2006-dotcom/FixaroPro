@@ -174,6 +174,25 @@ export async function getJobsForCalendar(startDate?: Date, endDate?: Date) {
         employeeName: job.employee?.name ?? "Unassigned",
         cleaners: job.cleaners,
         missingEquipment: missingEquipmentMap[job.id] || [],
+        // SOP §9: "Calendar should show booking status, provider, material
+        // status, and D flags."
+        //   materialStatus     — who supplies the materials/equipment
+        //   needsDepositReview — the "D" indicator: a refundable materials
+        //     deposit was collected but has not yet been applied or refunded on
+        //     a still-active booking. Painting's flat $119 "charge" is NOT a
+        //     deposit and never raises D (SOP §5).
+        materialStatus: job.customerRequestsMaterials
+          ? ("FIXARO_PROVIDED" as const)
+          : ("CUSTOMER_PROVIDED" as const),
+        materialsAmount: job.materialsAmount,
+        materialsType: job.materialsType,
+        needsDepositReview:
+          job.depositPaid &&
+          job.materialsType === "deposit" &&
+          job.materialsAppliedAmount == null &&
+          job.materialsRefundedAt == null &&
+          job.status !== "CANCELLED" &&
+          !job.paymentReceived,
       },
     };
   });

@@ -16,7 +16,12 @@ model User {
   createdAt                    DateTime               @default(now())
   updatedAt                    DateTime               @updatedAt
   phone                        String?
-  role                         Roles                  @default(EMPLOYEE)
+  // Least-privilege default. Staff accounts are created by an admin via
+  // createEmployee (which sets `role` explicitly); the only other path that
+  // reaches better-auth's public signUp endpoint is the customer portal, whose
+  // accounts must be CLIENT anyway. Never default to a staff role — a public
+  // signUp would otherwise mint an EMPLOYEE.
+  role                         Roles                  @default(CLIENT)
   emailVerified                Boolean                @default(false)
   payMultiplier                Float                  @default(1.0)
   multiplierLastRecalculatedAt DateTime?
@@ -53,6 +58,7 @@ model User {
   strikes                      CleanerStrike[]        @relation("CleanerStrikes")
   paintingBids                 PaintingBid[]          @relation("ProviderPaintingBids")
   serviceEligibilities         EmployeeServiceEligibility[] @relation("EmployeeEligibilities")
+  serviceEquipmentEdits        ServiceEquipment[]     @relation("ServiceEquipmentUpdatedBy")
 }
 
 model Account {
@@ -121,6 +127,23 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@index([category])
+}
+
+// Admin-editable equipment/products checklist per service type (SOP §4/§8:
+// "Checklist templates must be admin-editable by service and visible to
+// handyman/admin where appropriate").
+//
+// A row here OVERRIDES the seeded defaults in src/lib/equipment.ts. Absence of a
+// row means "use the default" — so this table starts empty and only holds the
+// services an admin has actually customised.
+model ServiceEquipment {
+  serviceType String   @id // matches SERVICE_CATALOG value / Job.jobType
+  items       String[]
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("ServiceEquipmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
 }
 
 model KitTemplate {

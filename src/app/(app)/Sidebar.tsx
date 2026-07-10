@@ -34,6 +34,7 @@ import {
   ClipboardList,
   Boxes,
   Paintbrush,
+  Wrench,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -132,6 +133,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/activity", label: "Activity Log", Icon: ScrollText },
       { href: "/audit", label: "Audit Log", Icon: ScrollText },
       { href: "/logs", label: "System Logs", Icon: ScrollText },
+      { href: "/equipment-checklists", label: "Equipment Checklists", Icon: Wrench },
       { href: "/announcements", label: "Announcements", Icon: ScrollText },
       { href: "/training-docs", label: "Training & Docs", Icon: GraduationCap },
       { href: "/settings", label: "Settings", Icon: Settings },

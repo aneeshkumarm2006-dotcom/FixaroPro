@@ -54,6 +54,10 @@ export async function chargeJob(jobId: string) {
     if (job.materialsType === "deposit") {
       const collected = job.materialsAmount ?? 0;
       depositCredit = job.materialsAppliedAmount ?? Math.min(collected, grossAmount);
+    } else if (job.materialsType === "charge") {
+      // Flat upfront charge (painting $119): credited in full, never partially
+      // applied — there is no unused balance to reconcile (SOP §5/§6).
+      depositCredit = Math.min(job.materialsAmount ?? 0, grossAmount);
     } else {
       depositCredit = 20;
     }

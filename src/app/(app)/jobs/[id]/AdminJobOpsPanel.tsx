@@ -5,6 +5,7 @@ import { Paintbrush, Receipt, Loader2 } from "lucide-react";
 import { StatusChip, paintingStatusVisual } from "@/lib/status-icons";
 import { sendPaintingOffer } from "../../actions/sendPaintingOffer";
 import { overridePaintingProvider } from "../../actions/overridePaintingProvider";
+import { cancelPaintingNoAnswer } from "../../actions/cancelPaintingNoAnswer";
 import { adjustMaterialsDeposit } from "../../actions/adjustMaterialsDeposit";
 
 export interface OpsBilling {
@@ -76,6 +77,9 @@ function PaintingOps({
   const [providerId, setProviderId] = useState("");
   const [reason, setReason] = useState("");
   const [reprice, setReprice] = useState("");
+  // SOP §6 — "No phone answer → cancel appointment".
+  const [noAnswerOpen, setNoAnswerOpen] = useState(false);
+  const [callNote, setCallNote] = useState("");
 
   function send() {
     setMsg(null);
@@ -100,6 +104,25 @@ function PaintingOps({
       });
       setMsg(res.success ? { ok: true, text: res.repriced ? "Provider changed + re-priced (client re-notified)" : "Provider changed (price kept)" } : { ok: false, text: res.error ?? "Failed" });
       if (res.success) setOverrideOpen(false);
+    });
+  }
+
+  // Ops phoned the client inside the 24h window and got no answer: cancel the
+  // appointment and refund the captured $119 materials/equipment charge (SOP §6).
+  function doNoAnswerCancel() {
+    if (!callNote.trim()) {
+      setMsg({ ok: false, text: "Log the call attempt before cancelling." });
+      return;
+    }
+    setMsg(null);
+    start(async () => {
+      const res = await cancelPaintingNoAnswer({ jobId, reason: callNote });
+      setMsg(
+        res.success
+          ? { ok: true, text: `Appointment cancelled — ${money(res.refunded ?? 0)} refunded` }
+          : { ok: false, text: res.error ?? "Failed" }
+      );
+      if (res.success) setNoAnswerOpen(false);
     });
   }
 
@@ -154,7 +177,39 @@ function PaintingOps({
             Override provider
           </button>
         ) : null}
+        {/* SOP §6: the client never answered the follow-up call inside 24h. */}
+        {painting.status === "OFFER_SENT" ? (
+          <button
+            type="button"
+            onClick={() => setNoAnswerOpen((v) => !v)}
+            className="rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm font-medium">
+            No phone answer — cancel
+          </button>
+        ) : null}
       </div>
+
+      {noAnswerOpen ? (
+        <div className="mt-3 border-t border-neutral-100 pt-3 space-y-2">
+          <p className="text-xs text-neutral-500">
+            Cancels the booking and refunds the captured $119 materials/equipment charge.
+            The call attempt, reason and refund status are audit-logged.
+          </p>
+          <input
+            value={callNote}
+            onChange={(e) => setCallNote(e.target.value)}
+            placeholder="Call attempt — e.g. called twice at 09:10 and 14:30, no answer, voicemail left"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={doNoAnswerCancel}
+            className="rounded-lg bg-red-600 text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1 disabled:opacity-50">
+            {pending ? <Loader2 size={14} className="animate-spin" /> : null}
+            Cancel appointment &amp; refund
+          </button>
+        </div>
+      ) : null}
 
       {overrideOpen ? (
         <div className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
@@ -236,6 +291,8 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
         ) : (
           <Row label="Labour (no clock record)" value="—" />
         )}
+        {/* Only true deposits are labelled as such. A "charge" (painting's flat
+            $119) is a materials/equipment line item, never a deposit — SOP §5. */}
         {billing.materialsAmount > 0 ? (
           <Row label={billing.materialsType === "deposit" ? "Materials deposit" : "Materials & equipment"} value={money(billing.materialsAmount)} />
         ) : null}

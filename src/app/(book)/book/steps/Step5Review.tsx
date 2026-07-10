@@ -6,6 +6,7 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2, Banknote } from "lucide-react";
 import { applyPromoCode } from "../../actions/applyPromoCode";
 import { BookingDraft, SERVICE_TYPES, FREQUENCIES, getMaterialsPricing } from "../types";
+import { CANCELLATION_FEE_USD, CANCELLATION_FEE_WINDOW_HOURS } from "@/lib/policy";
 import { calculateTax } from "@/lib/tax";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -153,6 +154,10 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
               dt={materials.type === "deposit" ? "Materials deposit" : "Materials & equipment"}
               dd={`+$${materialsAmount.toFixed(2)}`}
             />
+          ) : draft.serviceType ? (
+            // SOP §4: when the materials checkbox is left unchecked, the booking
+            // must state that the customer is providing everything.
+            <Row dt="Materials & equipment" dd="Customer-provided" />
           ) : null}
           {draft.travelFee > 0 ? (
             <Row dt="Travel fee" dd={`+$${draft.travelFee.toFixed(2)}`} />
@@ -178,7 +183,8 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
             <dt style={{ color: "var(--primary)", fontWeight: 600 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Banknote size={15} />
-                Due today (deposit)
+                {/* Painting's $119 is a flat charge, not a deposit (SOP §5). */}
+                {materials?.type === "charge" ? "Due today" : "Due today (deposit)"}
               </span>
             </dt>
             <dd style={{ color: "var(--primary)", fontWeight: 700 }}>${depositAmount.toFixed(2)}</dd>
@@ -187,6 +193,22 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
             <dt style={{ color: "var(--primary-50)", fontSize: 12 }}>Remaining balance</dt>
             <dd style={{ color: "var(--primary-50)", fontSize: 12 }}>After the visit</dd>
           </div>
+          {/* Cancellation policy (SOP §4/§10). The customer must be told about the
+              late-cancellation fee before they pay, not after we charge it. */}
+          <p
+            style={{
+              marginTop: 10,
+              paddingTop: 10,
+              borderTop: "1px dashed var(--primary-15)",
+              fontSize: 12,
+              color: "var(--primary-60)",
+              lineHeight: 1.5,
+            }}>
+            Free cancellation up to {CANCELLATION_FEE_WINDOW_HOURS} hours before your
+            appointment. If you cancel less than {CANCELLATION_FEE_WINDOW_HOURS} hours
+            before the start time, a ${CANCELLATION_FEE_USD} cancellation fee applies —
+            any deposit you paid is still refunded.
+          </p>
         </dl>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BookingDraft,
   SERVICE_CATEGORIES,
@@ -16,6 +16,7 @@ import {
 } from "../types";
 import { PAINTING_SCOPES, paintingQuoteRange } from "@/lib/painting";
 import { getRequiredEquipment } from "@/lib/equipment";
+import { getServiceChecklist } from "../../actions/getServiceChecklist";
 import { Field, Input } from "@/components/customer/Field";
 import { ChoiceButton } from "@/components/customer/atoms";
 
@@ -48,6 +49,27 @@ export default function Step2Property({ draft, onChange }: Props) {
   const isPainting = draft.serviceType === "PAINTING";
   const isSmallPaintRepair = draft.serviceType === "SMALL_PAINT_REPAIR";
   const isAcInstallation = draft.serviceType === "AC_INSTALLATION";
+
+  // Equipment checklist (SOP §4). Seeded defaults render immediately; if an admin
+  // has customised this service's list, swap in their version once it loads.
+  const [checklist, setChecklist] = useState<string[]>(() =>
+    getRequiredEquipment(draft.serviceType)
+  );
+  useEffect(() => {
+    let cancelled = false;
+    setChecklist(getRequiredEquipment(draft.serviceType));
+    if (!draft.serviceType) return;
+    getServiceChecklist(draft.serviceType)
+      .then((items) => {
+        if (!cancelled) setChecklist(items);
+      })
+      .catch(() => {
+        /* keep the seeded default on failure */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.serviceType]);
   const paintingRange = isPainting ? paintingQuoteRange(draft.paintingScope) : null;
   const isQuoteOnly =
     draft.serviceType === "PAINTING" ||
@@ -406,7 +428,7 @@ export default function Step2Property({ draft, onChange }: Props) {
               flexWrap: "wrap",
               gap: 8,
             }}>
-            {getRequiredEquipment(draft.serviceType).map((item) => (
+            {checklist.map((item) => (
               <span
                 key={item}
                 style={{
@@ -449,19 +471,17 @@ export default function Step2Property({ draft, onChange }: Props) {
               </span>
             </div>
             <span className="cl-addon-price">
-              {isPainting
-                ? `+$${materials.amount.toFixed(0)}`
-                : materials.type === "deposit"
+              {materials.type === "deposit"
                 ? `$${materials.amount.toFixed(0)} deposit`
                 : `+$${materials.amount.toFixed(2)}`}
             </span>
           </label>
           <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
             {draft.customerRequestsMaterials
-              ? isPainting
-                ? `A flat $${materials.amount.toFixed(0)} painting materials & equipment charge is added. This does not include paint — you must provide the exact paint/colour before the handyman arrives. Fixaro does not supply or pick up paint.`
-                : materials.type === "deposit"
+              ? materials.type === "deposit"
                 ? `A $${materials.amount.toFixed(0)} materials deposit is collected now. Any unused balance is applied to your final bill or refunded.`
+                : materials.type === "charge"
+                ? `A flat $${materials.amount.toFixed(2)} materials & equipment charge is added${isPainting ? ". This does not include paint — you must provide the exact paint/colour before the handyman arrives. Fixaro does not supply or pick up paint." : "."}`
                 : `A $${materials.amount.toFixed(2)} materials & equipment charge is added to your booking.`
               : "Leave unchecked and you'll need to provide everything required before the handyman arrives."}
           </p>

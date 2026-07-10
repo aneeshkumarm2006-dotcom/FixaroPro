@@ -747,6 +747,10 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "PROVIDER", category: "Clock in / clock out", key: "prov.clock.late_arrival", label: "You arrived late", trigger: "Cleaner clocked in more than 10 minutes after scheduled start time; rating cap applied.", channels: { EMAIL: true, APP_PUSH: true } },
   // Last-minute reassignment
   { recipient: "PROVIDER", category: "Unassigned booking", key: "prov.unassigned.last_minute", label: "Last minute booking", trigger: "A cleaner cancelled last minute and the job is open for claim with a $10 bonus.", channels: { EMAIL: true, APP_PUSH: true, SMS: true } },
+  // New eligible job (SOP §8/§11) — only providers admin-approved for the
+  // service type are notified; ineligible providers never see the job.
+  { recipient: "PROVIDER", category: "Available jobs", key: "prov.job.new_eligible", label: "New eligible job available", trigger: "A new unassigned booking is submitted; only handymen approved for that service type are notified it is claimable.", channels: { APP_PUSH: true } },
+
   // Painting bid workflow (SOP §6)
   { recipient: "PROVIDER", category: "Painting bids", key: "prov.painting.new_job", label: "New painting job to bid", trigger: "A new painting booking is submitted; all painting-eligible providers are invited to bid.", channels: { EMAIL: true, APP_PUSH: true } },
   { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.final_offer", label: "Painting final price offer", trigger: "Lowest valid bid auto-accepted and 35% surplus applied; customer asked to accept or reject the final amount.", channels: { EMAIL: true, SMS: true } },

@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { checkServiceAreaInternal } from "@/lib/service-area";
 import { getBlockedDates, getBlockedSlots } from "@/lib/blocked-dates";
 import {
@@ -24,6 +25,7 @@ import { isValidEmail, isValidPhone } from "@/lib/validation";
 import { AFTER_PHOTO_CONSENT_VERSION } from "@/lib/policy";
 import { paintingQuoteRange } from "@/lib/painting";
 import { notifyPaintingProviders } from "@/lib/painting-workflow";
+import { notifyEligibleProviders } from "@/lib/provider-notify";
 
 type Frequency =
   | "ONE_TIME"
@@ -518,7 +520,7 @@ export async function submitBooking(input: SubmitBookingInput) {
       // $119 materials charge when one applies, otherwise the $20 base booking
       // deposit. Mirrors the server-authoritative logic in /api/stripe/charge-deposit.
       const depositCollected =
-        pricing.materialsType === "deposit" && pricing.materialsAmount > 0
+        isUpfrontMaterials(pricing.materialsType) && pricing.materialsAmount > 0
           ? pricing.materialsAmount
           : 20;
       sendCustomerBookingsPrepaid({
@@ -539,10 +541,17 @@ export async function submitBooking(input: SubmitBookingInput) {
       },
     });
 
-    // 10b. Painting (SOP §6): notify all painting-eligible providers to bid.
+    // 10b. Provider notifications (SOP §8/§11) — eligible providers only.
+    //   • Painting goes to the bid workflow: every painting-approved handyman.
+    //   • Everything else is a claimable job: notify the handymen an admin has
+    //     approved for that specific service type.
     if (isPainting) {
       notifyPaintingProviders(primaryJob.id).catch((err) =>
         console.error("painting provider notification failed", err)
+      );
+    } else {
+      notifyEligibleProviders(primaryJob.id).catch((err) =>
+        console.error("eligible provider notification failed", err)
       );
     }
 

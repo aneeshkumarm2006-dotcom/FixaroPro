@@ -61,6 +61,14 @@ export const EQUIPMENT_BY_SERVICE: Record<string, string[]> = {
   MINOR_EXTERIOR: ["Ladder", "Cordless drill", "Hand tools", "Sealant"],
 };
 
+/**
+ * Seeded default checklist for a service. Synchronous and client-safe.
+ *
+ * These are DEFAULTS only. An admin may override any service's list — see
+ * `getRequiredEquipmentFor` in equipment-server.ts, which reads the
+ * ServiceEquipment table and falls back to this map. Use the server version
+ * anywhere the admin's edits must be honoured (SOP §4/§8).
+ */
 export function getRequiredEquipment(serviceType?: string | null): string[] {
   if (!serviceType) return EQUIPMENT_BY_SERVICE["*"];
   return EQUIPMENT_BY_SERVICE[serviceType] ?? EQUIPMENT_BY_SERVICE["*"];

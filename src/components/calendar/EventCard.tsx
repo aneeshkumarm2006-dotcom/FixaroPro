@@ -145,6 +145,32 @@ export const EventCard: React.FC<EventCardProps> = ({
             Missing equipment
           </div>
         )}
+
+      {/* SOP §9: calendar shows material status and the "D" deposit-review flag.
+          D marks a refundable materials deposit that ops still has to apply or
+          refund. Painting's flat $119 charge is not a deposit and never shows D. */}
+      {event.metadata?.jobId &&
+        (event.metadata?.needsDepositReview ||
+          event.metadata?.materialStatus === "FIXARO_PROVIDED") && (
+          <div className="app-subtitle flex items-center gap-1 text-[10px]">
+            {event.metadata?.needsDepositReview && (
+              <span
+                title="Deposit review required — apply or refund the materials deposit"
+                style={{
+                  color: "#B45309",
+                  background: "rgba(217,119,6,0.14)",
+                  borderRadius: 4,
+                  padding: "0 4px",
+                  fontWeight: 700,
+                }}>
+                D
+              </span>
+            )}
+            {event.metadata?.materialStatus === "FIXARO_PROVIDED" && (
+              <span title="Fixaro provides the materials and equipment">📦</span>
+            )}
+          </div>
+        )}
     </Button>
   );
 };

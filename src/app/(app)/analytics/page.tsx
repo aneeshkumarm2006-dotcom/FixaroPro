@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { isAdminRole, homeForRole } from "@/lib/role-routing";
 import AnalyticsView from "./AnalyticsView";
 
 export default async function AnalyticsPage() {
@@ -13,12 +14,12 @@ export default async function AnalyticsPage() {
     redirect("/sign-in");
   }
 
-  const userWithRole = session.user as typeof session.user & {
-    role: "OWNER" | "ADMIN" | "EMPLOYEE";
-  };
-
-  if (userWithRole.role === "EMPLOYEE") {
-    redirect("/dashboard");
+  // Allow-list, not deny-list. Previously this only blocked EMPLOYEE, which let
+  // CLIENT (a paying customer with a portal login) and FIELD_LEAD read revenue,
+  // profit and payroll. Every other admin page allow-lists; this one didn't.
+  const role = (session.user as { role?: string }).role;
+  if (!isAdminRole(role)) {
+    redirect(homeForRole(role));
   }
 
   // Date calculations

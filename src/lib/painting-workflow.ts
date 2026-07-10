@@ -15,6 +15,7 @@
 
 import { db } from "@/db";
 import { stripe } from "@/lib/stripe";
+import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { paintingFinalAmount } from "@/lib/painting";
 import { getEligibleProviderIdsFor } from "@/lib/eligibility";
 import { sendCustomerPaintingOffer, sendCustomerPaintingRejected } from "@/lib/email";
@@ -175,10 +176,10 @@ export async function rejectPaintingAndRefund(
     return { success: true, refunded: 0 }; // already refunded
   }
 
-  // Amount collected at booking: the painting $119 materials charge (or a
+  // Amount collected at booking: the painting $119 flat materials charge (or a
   // refundable materials deposit) when one applied, otherwise the $20 base deposit.
   const depositAmount =
-    job.materialsType === "deposit" && job.materialsAmount
+    isUpfrontMaterials(job.materialsType) && job.materialsAmount
       ? job.materialsAmount
       : job.depositPaid
       ? 20

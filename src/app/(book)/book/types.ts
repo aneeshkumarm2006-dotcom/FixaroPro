@@ -179,11 +179,32 @@ export const SERVICE_CATALOG: ServiceItem[] = [
 // ── Materials / equipment pricing (SOP §5) ─────────────────────────────────
 // Amounts apply ONLY when the customer checks the all-or-nothing
 // "Fixaro provides all materials and equipment" checkbox. CAD.
-//   type "deposit" → captured upfront at booking; refundable before job / applied
-//                    to the final bill; tracked separately. (Also the upfront-
-//                    capture mechanism for painting's flat $119 charge — see below.)
-//   type "cost"    → flat materials/equipment line item, billed on final invoice
-export type MaterialsType = "deposit" | "cost";
+//
+//   "deposit" → refundable deposit. Captured upfront at booking. Refundable
+//               before the job, or applied to the final bill; admins may apply /
+//               refund / partially refund the unused balance. Flags the booking
+//               with the "D" deposit-review indicator (SOP §9).
+//
+//   "charge"  → FLAT materials/equipment line item. Captured upfront, but it is
+//               NOT a deposit: no unused-balance tracking, no partial refunds,
+//               no "D" indicator. Used for painting's $119 (SOP §5/§6/§7 are
+//               explicit: "Track the $119 as a flat materials/equipment line
+//               item, not a deposit"). Refunded in full only if the client
+//               rejects the final painting amount before job confirmation.
+//
+//   "cost"    → flat materials/equipment line item billed on the final invoice;
+//               nothing is captured upfront.
+export type MaterialsType = "deposit" | "cost" | "charge";
+
+/** Types whose amount is captured on the customer's card at booking time. */
+export function isUpfrontMaterials(type: string | null | undefined): boolean {
+  return type === "deposit" || type === "charge";
+}
+
+/** Only true deposits get the "D" review indicator and apply/refund controls. */
+export function isRefundableDeposit(type: string | null | undefined): boolean {
+  return type === "deposit";
+}
 
 export interface MaterialsPricing {
   amount: number;
@@ -222,10 +243,10 @@ export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
 
   // Home Improvement
   // SOP §5/§6 (v4.2): painting is a FLAT $119 materials/equipment charge — NOT a
-  // deposit, no unused-balance tracking. Client always provides the paint. It is
-  // captured upfront at booking (client decision D6) using the "deposit"
-  // mechanism, so a client rejection auto-refunds the $119.
-  PAINTING: { amount: 119, type: "deposit" },
+  // deposit, no unused-balance tracking. Client always provides the paint.
+  // Captured upfront at booking (client decision D6); refunded in full only if
+  // the client rejects the final painting amount before job confirmation.
+  PAINTING: { amount: 119, type: "charge" },
   MOULDINGS: { amount: 49, type: "cost" },
   DOOR_HARDWARE: { amount: 99, type: "deposit" },
   CABINET_HARDWARE: { amount: 99, type: "cost" },

@@ -67,7 +67,10 @@ export default async function BookingDetailPage({
   // Amount actually collected at booking (a refundable materials deposit, the
   // painting $119 materials charge, or the $20 base booking deposit).
   const depositCollected =
-    job.materialsType === "deposit" && job.materialsAmount ? job.materialsAmount : 20;
+    (job.materialsType === "deposit" || job.materialsType === "charge") &&
+    job.materialsAmount
+      ? job.materialsAmount
+      : 20;
   const hasCancelRequest = !!job.cancellationRequestedAt;
   const hasRescheduleRequest = !!job.rescheduleRequestedAt;
   const hasRequest = hasCancelRequest || hasRescheduleRequest;

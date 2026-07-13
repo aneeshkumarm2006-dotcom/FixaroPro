@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ClientModal from "../ClientModal";
 import ClientAddressManager from "../ClientAddressManager";
+import { StatusPill } from "@/lib/status-icons";
 
 type TabKey = "history" | "payments" | "ratings";
 
@@ -82,25 +83,6 @@ function avatarColor(name: string) {
 }
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map(p => p[0] ?? "").join("").toUpperCase();
-}
-
-const STATUS_PILLS: Record<string, { bg: string; fg: string; dot: string; label: string }> = {
-  CREATED:     { bg: "rgba(148,163,184,0.18)", fg: "#475569", dot: "#94a3b8", label: "Created" },
-  SCHEDULED:   { bg: "rgba(217,119,6,0.12)",   fg: "#92400e", dot: "#d97706", label: "Scheduled" },
-  IN_PROGRESS: { bg: "rgba(2,132,199,0.10)",   fg: "#075985", dot: "#0284c7", label: "In Progress" },
-  COMPLETED:   { bg: "rgba(5,150,105,0.10)",   fg: "#065f46", dot: "#10b981", label: "Completed" },
-  PAID:        { bg: "rgba(5,150,105,0.18)",   fg: "#065f46", dot: "#059669", label: "Paid" },
-  CANCELLED:   { bg: "rgba(220,38,38,0.10)",   fg: "#991b1b", dot: "#dc2626", label: "Cancelled" },
-};
-
-function StatusPill({ status }: { status: string }) {
-  const c = STATUS_PILLS[status] ?? { bg: "var(--primary-10)", fg: "var(--primary)", dot: "var(--primary)", label: status };
-  return (
-    <span className="pill" style={{ background: c.bg, color: c.fg }}>
-      <span className="pill-dot" style={{ background: c.dot }} />
-      {c.label}
-    </span>
-  );
 }
 
 function StarRow({ rating }: { rating: number }) {

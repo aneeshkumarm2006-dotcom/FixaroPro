@@ -6,7 +6,8 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { getRequiredEquipment } from "@/lib/equipment";
-import { SERVICE_CATALOG } from "@/app/(book)/book/types";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { findService } from "@/lib/config/types";
 
 const ADMIN_ROLES = ["OWNER", "ADMIN", "OPS_MANAGER"];
 
@@ -31,7 +32,11 @@ export async function setServiceEquipment(input: Input) {
       return { success: false, error: "Not authorized" };
     }
 
-    if (!SERVICE_CATALOG.some((s) => s.value === input.serviceType)) {
+    // Validate against the live catalog, not the seed constants — a service an
+    // admin ADDED must be able to get a checklist. Retired services are still
+    // valid here: their checklist stays editable while jobs on them finish.
+    const cfg = await getRuntimeConfig();
+    if (!findService(cfg, input.serviceType)) {
       return { success: false, error: "Unknown service type" };
     }
 

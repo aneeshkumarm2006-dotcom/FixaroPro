@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 import { invalidateCalendarDay } from "./invalidateCalendarDay";
 
 export async function deleteJob(jobId: string) {
@@ -32,6 +33,20 @@ export async function deleteJob(jobId: string) {
     if (!isAdmin && job.employeeId !== session.user.id) {
       return { error: "You do not have permission to delete this job" };
     }
+
+    // Audit BEFORE the delete captures the pre-image (SOP §9/§12 — deletions
+    // are high-impact and, because JobLog cascades on job delete, the per-job
+    // timeline is destroyed with it; the central AuditLog survives).
+    logAudit({
+      entityType: "Job",
+      entityId: jobId,
+      action: "JOB_DELETED",
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      oldValue: `#${job.jobNumber} ${job.clientName} — ${job.jobType ?? "service"}, status ${job.status}, price $${(job.price ?? 0).toFixed(2)}`,
+      newValue: null,
+      description: `Deleted job #${job.jobNumber} (${job.clientName}).`,
+    });
 
     await db.job.delete({
       where: { id: jobId },

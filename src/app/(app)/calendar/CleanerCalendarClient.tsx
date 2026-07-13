@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
 
 export type CalJob = {
   id: string;
@@ -12,12 +13,6 @@ export type CalJob = {
   status: string;
   jobType: string | null;
 };
-
-function eventCls(status: string) {
-  if (["COMPLETED", "PAID"].includes(status)) return "";
-  if (["SCHEDULED", "IN_PROGRESS"].includes(status)) return "scheduled";
-  return "created";
-}
 
 function fmtTime(iso: string | null) {
   if (!iso) return "";
@@ -71,7 +66,7 @@ const IconChevRight = () => (
 
 function MonthEvent({ job }: { job: CalJob }) {
   return (
-    <Link href={`/my-jobs/${job.id}`} className={`cl-cal-event ${eventCls(job.status)}`}>
+    <Link href={`/my-jobs/${job.id}`} className={`cl-cal-event ${jobStatusSlug(job.status)}`}>
       <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {job.clientName}
       </div>
@@ -151,7 +146,7 @@ function PositionedEvent({ job, expanded = false }: { job: CalJob; expanded?: bo
   return (
     <Link
       href={`/my-jobs/${job.id}`}
-      className={`cl-cal-time-event ${eventCls(job.status)}`}
+      className={`cl-cal-time-event ${jobStatusSlug(job.status)}`}
       style={{ top: `${top}px`, height: `${height}px` }}
     >
       <div className="ev-title">{job.clientName}</div>
@@ -303,12 +298,12 @@ function AgendaView({
                 <Link
                   key={j.id}
                   href={`/my-jobs/${j.id}`}
-                  className={`cl-agenda-event ${eventCls(j.status)}`}
+                  className={`cl-agenda-event ${jobStatusSlug(j.status)}`}
                 >
                   <div className="cl-agenda-event-head">
                     <span className="cl-agenda-event-title">{j.clientName}</span>
                     <span className="cl-pill" style={{ background: "rgba(0,0,0,0.04)", color: "var(--ink-soft)" }}>
-                      {j.status.toLowerCase().replace("_", " ")}
+                      {jobStatusLabel(j.status)}
                     </span>
                   </div>
                   {j.startTime && (

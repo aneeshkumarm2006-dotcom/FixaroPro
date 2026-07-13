@@ -1,6 +1,9 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { isAdminRole } from "@/lib/role-routing";
 import { syncDefaultLocationStock } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 import type { ProductCategory } from "@prisma/client";
@@ -9,6 +12,7 @@ const ALLOWED_CATEGORIES: readonly ProductCategory[] = [
   "LIQUID_SPRAY",
   "MOP_LIQUID",
   "DISPOSABLE",
+  "TOOL",
   "OTHER",
 ];
 
@@ -21,6 +25,14 @@ export default async function createProduct(
   prevState: State,
   formData: FormData
 ): Promise<State> {
+  // Inventory mutation is admin-only. `costPerUnit` feeds the SUPPLIES expense
+  // transaction recorded at clock-out, so this must not be an unauthenticated
+  // endpoint (SOP §2.2/§12). Matches the /inventory page's access.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || !isAdminRole((session.user as { role?: string }).role)) {
+    return { message: "", error: "Not authorized." };
+  }
+
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
   const unit = formData.get("unit") as string;

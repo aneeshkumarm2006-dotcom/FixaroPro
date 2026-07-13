@@ -1,0 +1,19 @@
+-- Stage 6 (6.1) — explicit tool designation for equipment readiness.
+--
+-- Equipment readiness (SOP §8 "Compare required equipment against handyman
+-- equipment profile", §11.1) needs to know which products are TOOLS. Before this,
+-- readiness matched the free-text tool checklist against the whole Product table —
+-- which is the cleaning-consumables catalog inherited from the fork. Its only two
+-- overlaps with the 84-item handyman checklist are "Bucket" and "Gloves": cleaning
+-- supplies that coincidentally share a noun. No handyman is ever issued those as
+-- EmployeeProduct rows, so every provider read as "missing" them, and strict mode
+-- would have silently notified NOBODY about toilet/faucet repair, faucet
+-- installation, grout cleaning or gutter cleaning.
+--
+-- Readiness now only considers products an admin has explicitly categorised TOOL.
+-- With none categorised yet, readiness is inert by construction — it cannot
+-- exclude anyone until ops deliberately opts a product in.
+--
+-- Additive enum value; safe and non-breaking. Requires PostgreSQL 12+ to run
+-- inside the migration transaction.
+ALTER TYPE "ProductCategory" ADD VALUE 'TOOL' BEFORE 'OTHER';

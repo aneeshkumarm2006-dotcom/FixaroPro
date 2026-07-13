@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { rejectPaintingAndRefund } from "@/lib/painting-workflow";
+import { taxInclusiveBreakdown } from "@/lib/tax";
 
 // Client accepts or rejects the final painting offer from their portal (SOP §6).
 //   accept → booking confirmed at the agreed final price
@@ -32,6 +33,11 @@ export async function respondPaintingOffer(input: {
     }
 
     if (input.response === "ACCEPT") {
+      // Confirm at the agreed final price and rewrite the stored tax split to
+      // reconcile with it (the final amount is all-in / tax-inclusive — chargeJob
+      // charges job.price directly). Keeps receipts/invoices consistent (SOP §10).
+      const finalPrice = job.paintingFinalAmount ?? job.price ?? 0;
+      const split = taxInclusiveBreakdown(finalPrice);
       await db.$transaction([
         db.job.update({
           where: { id: job.id },
@@ -41,7 +47,10 @@ export async function respondPaintingOffer(input: {
             offerRespondedAt: new Date(),
             // Confirm the booking at the agreed final painting price.
             status: "SCHEDULED",
-            price: job.paintingFinalAmount ?? job.price,
+            price: finalPrice,
+            subtotalAmount: split.subtotal,
+            gstAmount: split.gstAmount,
+            qstAmount: split.qstAmount,
           },
         }),
         db.jobLog.create({

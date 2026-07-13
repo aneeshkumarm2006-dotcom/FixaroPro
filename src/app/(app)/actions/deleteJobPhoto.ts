@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { cloudinary } from "@/lib/cloudinary";
+import { logAudit } from "@/lib/audit";
 
 function extractCloudinaryPublicId(url: string): string | null {
   try {
@@ -71,6 +72,20 @@ export async function deleteJobPhoto(photoId: string) {
     }
 
     await db.jobPhoto.delete({ where: { id: photoId } });
+
+    // SOP §8 — media is audited on the way in (uploadJobPhoto) and on the way
+    // out. The Cloudinary asset and the row are both gone by this point, so the
+    // audit entry is the only surviving record that the photo ever existed.
+    logAudit({
+      entityType: "Job",
+      entityId: photo.jobId,
+      action: "JOB_PHOTO_DELETED",
+      field: "photos",
+      oldValue: photo.url,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `${session.user.name ?? "User"} deleted a job photo${isAdmin && !isOwner ? " (admin)" : ""}.`,
+    }).catch((e) => console.error("audit (deleteJobPhoto)", e));
 
     revalidatePath(`/my-jobs/${photo.jobId}`);
 

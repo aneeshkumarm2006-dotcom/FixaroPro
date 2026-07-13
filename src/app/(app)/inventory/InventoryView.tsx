@@ -25,7 +25,7 @@ import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import CustomDropdown from "@/components/ui/custom-dropdown";
 
-type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "TOOL" | "OTHER";
 
 interface Product {
   id: string;

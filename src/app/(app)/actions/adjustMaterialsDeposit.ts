@@ -86,6 +86,7 @@ export async function adjustMaterialsDeposit(input: AdjustInput) {
       entityId: job.id,
       action: "MATERIALS_DEPOSIT_ADJUSTED",
       field: "materialsAppliedAmount",
+      oldValue: String(job.materialsAppliedAmount ?? 0),
       newValue: String(applied),
       reason,
       actorId: session.user.id,

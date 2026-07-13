@@ -23,9 +23,11 @@ import {
 } from "@/lib/email";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 import { AFTER_PHOTO_CONSENT_VERSION } from "@/lib/policy";
-import { paintingQuoteRange } from "@/lib/painting";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { paintingQuoteRange, findService } from "@/lib/config/types";
 import { notifyPaintingProviders } from "@/lib/painting-workflow";
 import { notifyEligibleProviders } from "@/lib/provider-notify";
+import { isTrustedIntakePhotoUrl } from "@/lib/cloudinary-url";
 
 type Frequency =
   | "ONE_TIME"
@@ -63,6 +65,9 @@ interface SubmitBookingInput {
   phone: string;
   email: string;
   notes: string;
+  // SOP v4.2 §4 — customer intake photos (Cloudinary secure URLs) uploaded in
+  // the notes step. Stored as INTAKE JobPhoto rows on the created job.
+  photoUrls?: string[];
   referralCode: string;
   // After-photo consent (checkbox at booking, unchecked by default).
   afterPhotoConsent?: boolean;
@@ -99,6 +104,26 @@ export async function submitBooking(input: SubmitBookingInput) {
     }
     if (!input.date) {
       return { success: false, error: "Date is required" };
+    }
+
+    // Reject a service that isn't in the catalog, or that an admin has RETIRED.
+    // Server-authoritative, for the same reason the blocked-date and service-area
+    // checks below are: the booking page only hides retired services, and a stale
+    // tab or a crafted POST would otherwise sail straight past that.
+    //
+    // Without this, D0.2's `active` flag was cosmetic — `setServiceActive(v,false)`
+    // hid the service but it stayed bookable, and its audit entry ("hidden from
+    // booking…") was simply untrue. Worse, an UNKNOWN service code was accepted:
+    // findService() → null → resolveBasePrice() falls back to "hourly", so a
+    // crafted request could book silicone work under a bogus code and be priced
+    // 2h × labour rate instead of the $209 fixed price, with no materials line.
+    const cfg = await getRuntimeConfig();
+    const service = findService(cfg, input.serviceType);
+    if (!service || !service.active) {
+      return {
+        success: false,
+        error: "Sorry, that service is no longer available. Please choose another.",
+      };
     }
 
     // Reject fully-closed days (admin-configured). Server-authoritative — the
@@ -208,15 +233,21 @@ export async function submitBooking(input: SubmitBookingInput) {
       discountAmount = creditSpent;
     }
 
-    // 5b. Server-authoritative pricing
-    const pricing = await computeBookingPrice({
-      hours: input.hours,
-      serviceType: input.serviceType,
-      addOns: input.addOns,
-      travelFee: areaCheck.travelFee ?? 0,
-      discountAmount,
-      customerRequestsMaterials: input.customerRequestsMaterials === true,
-    });
+    // 5b. Server-authoritative pricing. `cfg` was loaded during validation above
+    // and is reused here, so the primary job, every recurring child and the
+    // painting quote range all price against ONE snapshot — a mid-booking admin
+    // edit can't produce a parent and child on different rates.
+    const pricing = await computeBookingPrice(
+      {
+        hours: input.hours,
+        serviceType: input.serviceType,
+        addOns: input.addOns,
+        travelFee: areaCheck.travelFee ?? 0,
+        discountAmount,
+        customerRequestsMaterials: input.customerRequestsMaterials === true,
+      },
+      cfg
+    );
 
     // 5c. Idempotency guard — if the same client just created a job for the
     // same date + service within the last 60 seconds, treat this as a retry
@@ -250,9 +281,11 @@ export async function submitBooking(input: SubmitBookingInput) {
     // 6. Create the primary Job
 
     // Painting jobs (SOP §6/§7): record the scope + immediate quote range and
-    // open the bid workflow. Final price follows the bid + 35% surplus flow.
+    // open the bid workflow. Final price follows the bid + surplus flow.
     const isPainting = input.serviceType === "PAINTING";
-    const painting = isPainting ? paintingQuoteRange(input.paintingScope) : null;
+    const painting = isPainting
+      ? paintingQuoteRange(cfg, input.paintingScope)
+      : null;
 
     // Service-specific intake (SOP v4.2 §4) — only persisted for its own service.
     const isSmallPaintRepair = input.serviceType === "SMALL_PAINT_REPAIR";
@@ -274,6 +307,10 @@ export async function submitBooking(input: SubmitBookingInput) {
         subtotalAmount: pricing.subtotal,
         gstAmount: pricing.gstAmount,
         qstAmount: pricing.qstAmount,
+        // Immutable booked baseline — lets hourly charging swap in the clocked
+        // labour later without disturbing the other subtotal parts (§10).
+        basePriceAmount: pricing.basePrice,
+        bookedSubtotalAmount: pricing.subtotal,
         discountAmount: discountAmount > 0 ? discountAmount : null,
         appliedPromoCode: input.promoCode?.trim() || null,
         promoDiscountAmount: input.promoDiscount && input.promoDiscount > 0 ? input.promoDiscount : null,
@@ -285,7 +322,10 @@ export async function submitBooking(input: SubmitBookingInput) {
           paintingScope: input.paintingScope || null,
           quoteRangeMin: painting?.min ?? null,
           quoteRangeMax: painting?.max ?? null,
-          paintingSurplusRate: 1.35,
+          // Stamp the rate the job was BOOKED under. The bid → final-offer flow
+          // reads it from the job, so an admin changing the policy value later
+          // cannot silently reprice a job that is already mid-bid.
+          paintingSurplusRate: cfg.policy.paintingSurplusRate,
         }),
         ...(isSmallPaintRepair && {
           paintRepairArea: input.paintRepairArea?.trim() || null,
@@ -317,6 +357,25 @@ export async function submitBooking(input: SubmitBookingInput) {
         },
       },
     });
+
+    // 6a. Persist customer intake photos (SOP v4.2 §4) as INTAKE JobPhoto rows.
+    // Only Cloudinary URLs our upload action produced are trusted. Recurring
+    // child visits get their own copy below so any occurrence is self-describing
+    // to the provider/admin who opens it.
+    const intakeUrls = (input.photoUrls ?? [])
+      .filter((u): u is string => typeof u === "string")
+      .map((u) => u.trim())
+      .filter((u) => isTrustedIntakePhotoUrl(u))
+      .slice(0, 20);
+    if (intakeUrls.length > 0) {
+      await db.jobPhoto.createMany({
+        data: intakeUrls.map((url) => ({
+          jobId: primaryJob.id,
+          kind: "INTAKE" as const,
+          url,
+        })),
+      });
+    }
 
     // Spend the credit on this client (deduct from balance)
     if (creditSpent > 0) {
@@ -376,14 +435,17 @@ export async function submitBooking(input: SubmitBookingInput) {
         ? Math.round((pricing.basePrice * discountPct / 100) * 100) / 100
         : 0;
       const childPricing = recurringDiscount > 0
-        ? await computeBookingPrice({
-            hours: input.hours,
-            serviceType: input.serviceType,
-            addOns: input.addOns,
-            travelFee: pricing.travelFee,
-            discountAmount: discountAmount + recurringDiscount,
-            customerRequestsMaterials: input.customerRequestsMaterials === true,
-          })
+        ? await computeBookingPrice(
+            {
+              hours: input.hours,
+              serviceType: input.serviceType,
+              addOns: input.addOns,
+              travelFee: pricing.travelFee,
+              discountAmount: discountAmount + recurringDiscount,
+              customerRequestsMaterials: input.customerRequestsMaterials === true,
+            },
+            cfg
+          )
         : pricing;
 
       let cursor = startTime;
@@ -405,10 +467,23 @@ export async function submitBooking(input: SubmitBookingInput) {
             subtotalAmount: childPricing.subtotal,
             gstAmount: childPricing.gstAmount,
             qstAmount: childPricing.qstAmount,
+            basePriceAmount: childPricing.basePrice,
+            bookedSubtotalAmount: childPricing.subtotal,
             discountAmount: childPricing.discountAmount > 0 ? childPricing.discountAmount : null,
             customerRequestsMaterials: input.customerRequestsMaterials === true,
             materialsAmount: childPricing.materialsAmount > 0 ? childPricing.materialsAmount : null,
             materialsType: childPricing.materialsType,
+            // Service-specific intake carries to every occurrence (SOP v4.2 §4).
+            ...(isSmallPaintRepair && {
+              paintRepairArea: input.paintRepairArea?.trim() || null,
+              paintRepairSurface: input.paintRepairSurface || null,
+            }),
+            ...(isAcInstallation && {
+              acType: input.acType || null,
+              acLocation: input.acLocation?.trim() || null,
+              acMountType: input.acMountType || null,
+              clientHasAcUnit: input.clientHasAcUnit ?? null,
+            }),
             parentJob: { connect: { id: primaryJob.id } },
             bookingSource: "web",
             afterPhotoConsent: input.afterPhotoConsent === true,
@@ -424,6 +499,17 @@ export async function submitBooking(input: SubmitBookingInput) {
             },
           },
         });
+        // Copy the intake photos onto each occurrence so a provider viewing any
+        // visit sees them (same Cloudinary assets, separate rows).
+        if (intakeUrls.length > 0) {
+          await db.jobPhoto.createMany({
+            data: intakeUrls.map((url) => ({
+              jobId: child.id,
+              kind: "INTAKE" as const,
+              url,
+            })),
+          });
+        }
         childJobIds.push(child.id);
       }
     }
@@ -517,12 +603,14 @@ export async function submitBooking(input: SubmitBookingInput) {
     // booking time — gated by `cust.fee.bookings_prepaid`.
     if (input.depositPaymentIntentId) {
       // Amount collected upfront: a refundable materials deposit or the painting
-      // $119 materials charge when one applies, otherwise the $20 base booking
-      // deposit. Mirrors the server-authoritative logic in /api/stripe/charge-deposit.
+      // $119 materials charge when one applies, otherwise the base booking
+      // deposit. Mirrors the server-authoritative logic in /api/stripe/charge-deposit,
+      // which reads the same `pricing.baseBookingDeposit` config value — so the
+      // amount we tell the customer we took is the amount we took.
       const depositCollected =
         isUpfrontMaterials(pricing.materialsType) && pricing.materialsAmount > 0
           ? pricing.materialsAmount
-          : 20;
+          : cfg.policy.baseBookingDeposit;
       sendCustomerBookingsPrepaid({
         to: email,
         clientName: client.name,

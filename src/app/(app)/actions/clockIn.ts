@@ -10,6 +10,7 @@ import {
   sendProviderLateArrival,
 } from "@/lib/email";
 import { computeLateArrivalRatingCap } from "@/lib/policy";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import { applyStrike } from "@/lib/strikes";
 import { STRIKE_LATE_ARRIVAL_MIN } from "@/lib/strikes-constants";
 
@@ -58,7 +59,9 @@ export async function clockIn(jobId: string) {
       0,
       Math.floor((now.getTime() - job.startTime.getTime()) / 60_000)
     );
-    const ratingCap = computeLateArrivalRatingCap(minutesLate);
+    // The four late-arrival knobs are admin-editable policy values.
+    const { policy } = await getRuntimeConfig();
+    const ratingCap = computeLateArrivalRatingCap(minutesLate, policy);
 
     // Update the job with clock in time and the rating cap when applicable.
     await db.job.update({

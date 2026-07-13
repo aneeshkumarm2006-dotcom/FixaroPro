@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, MapPin, Sparkles, Globe, UserPlus, Clock, AlertCircle } from "lucide-react";
+import { StatusPill } from "@/lib/status-icons";
 
 interface WebJob {
   id: string;
@@ -36,19 +37,6 @@ function needsCleaner(j: WebJob) {
 }
 function hasRequest(j: WebJob) {
   return !!j.cancellationRequestedAt || !!j.rescheduleRequestedAt;
-}
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; color: string; dot: string }> = {
-    CREATED: { label: "Created", bg: "#f3f4f6", color: "#374151", dot: "#9ca3af" },
-    SCHEDULED: { label: "Scheduled", bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
-    IN_PROGRESS: { label: "In Progress", bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
-    COMPLETED: { label: "Completed", bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
-    PAID: { label: "Paid", bg: "#d1fae5", color: "#065f46", dot: "#059669" },
-    CANCELLED: { label: "Cancelled", bg: "#fee2e2", color: "#991b1b", dot: "#ef4444" },
-  };
-  const c = map[status] || { label: status, bg: "#f3f4f6", color: "#374151", dot: "#9ca3af" };
-  return <span className="pill" style={{ background: c.bg, color: c.color }}><span className="pill-dot" style={{ background: c.dot }} />{c.label}</span>;
 }
 
 function AvatarStack({ names }: { names: string[] }) {

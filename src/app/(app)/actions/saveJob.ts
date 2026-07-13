@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { isAdminRole } from "@/lib/role-routing";
 import { invalidateCalendarDay } from "./invalidateCalendarDay";
 import {
   sendAdminBookingModified,
@@ -47,6 +48,17 @@ export async function saveJob(formData: FormData) {
 
   if (!session) {
     return { error: "Unauthorized" };
+  }
+
+  // Admin-app roles only. This action writes price, employeePay, totalTip,
+  // payRateMultiplier, paymentReceived/invoiceSent and status onto ANY job by
+  // id (and reassigns it to the caller), so a bare "is signed in" check let any
+  // EMPLOYEE or CLIENT rewrite provider pay and payment status on any booking
+  // (SOP §2.2/§12 — money, pay and charges are admin-only). Matches the /jobs
+  // page guard (requireAdmin), which already gates the JobModal this submits.
+  const role = (session.user as { role?: string }).role;
+  if (!isAdminRole(role)) {
+    return { error: "Forbidden" };
   }
 
   try {

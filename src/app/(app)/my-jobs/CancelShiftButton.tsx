@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { cancelShift } from "../actions/cancelShift";
+import { WARNING_VISUAL } from "@/lib/status-icons";
+
+import { usePolicy } from "@/lib/config/ServiceConfigProvider";
+
+const WarningIcon = WARNING_VISUAL.Icon;
 
 interface Props {
   jobId: string;
@@ -10,6 +15,7 @@ interface Props {
 }
 
 export default function CancelShiftButton({ jobId, shiftStartTime }: Props) {
+  const policy = usePolicy();
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -17,7 +23,8 @@ export default function CancelShiftButton({ jobId, shiftStartTime }: Props) {
 
   const start = new Date(shiftStartTime);
   const hoursUntil = (start.getTime() - Date.now()) / (1000 * 60 * 60);
-  const isLateCancellation = hoursUntil < 24 && hoursUntil > 0;
+  const isLateCancellation =
+    hoursUntil < policy.cancellationWindowHours && hoursUntil > 0;
 
   async function handleConfirm() {
     setLoading(true);
@@ -55,9 +62,9 @@ export default function CancelShiftButton({ jobId, shiftStartTime }: Props) {
     }}>
       {isLateCancellation && (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#b91c1c" }}>
-          <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+          <WarningIcon size={15} style={{ marginTop: 1, flexShrink: 0 }} />
           <span>
-            <strong>Late cancellation:</strong> A $20 fee and a 1-star penalty will be applied.
+            <strong>Late cancellation:</strong> A ${policy.cancellationFee} fee and a 1-star penalty will be applied.
           </span>
         </div>
       )}

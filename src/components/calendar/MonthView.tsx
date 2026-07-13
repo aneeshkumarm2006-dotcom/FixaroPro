@@ -13,14 +13,16 @@ import {
   eventOverlapsDay,
 } from "@/components/calendar/utils";
 import { CalendarEvent } from "./types";
-import { jobTypeLabel } from "./job-type-label";
-import { DEPOSIT_VISUAL } from "@/lib/status-icons";
+import { useJobTypeLabel } from "./use-job-type-label";
+import { DepositBadge, WARNING_VISUAL, jobStatusLabel } from "@/lib/status-icons";
 import {
   getEventStyleInfo,
   getEventBackgroundColor,
   getEventBoxShadow,
   EventTypesConfig,
 } from "./event-styles";
+
+const WarningIcon = WARNING_VISUAL.Icon;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -36,6 +38,7 @@ export const MonthView = () => {
     eventsLoading: isLoading,
   } = useCalendar();
   const { config: calendarConfig } = useCalendarConfig();
+  const jobTypeLabel = useJobTypeLabel();
 
   const eventTypesConfig = (calendarConfig?.eventTypes ||
     {}) as EventTypesConfig;
@@ -192,7 +195,7 @@ export const MonthView = () => {
                                       backgroundColor: styleInfo.color + "30",
                                       color: styleInfo.color,
                                     }}>
-                                    {event.metadata.status.replace(/_/g, " ")}
+                                    {jobStatusLabel(event.metadata.status)}
                                   </div>
                                 )}
                             </div>
@@ -225,15 +228,10 @@ export const MonthView = () => {
                                     applied/refunded (painting's flat $119 charge
                                     is not a deposit and never shows D). */}
                                 {event.metadata?.needsDepositReview && (
-                                  <span
-                                    title={`${DEPOSIT_VISUAL.label} — apply or refund the materials deposit`}
-                                    className="app-subtitle !text-[9px] px-1 py-0 rounded font-[700]"
-                                    style={{
-                                      backgroundColor: DEPOSIT_VISUAL.color,
-                                      color: "#fff",
-                                    }}>
-                                    D
-                                  </span>
+                                  <DepositBadge
+                                    size={9}
+                                    hint="apply or refund the materials deposit"
+                                  />
                                 )}
                                 {event.metadata?.materialStatus ===
                                   "FIXARO_PROVIDED" && (
@@ -249,19 +247,10 @@ export const MonthView = () => {
                                   </span>
                                 )}
                                 {event.metadata?.missingEquipment?.length > 0 && (
-                                  <svg
+                                  <WarningIcon
                                     className="w-3 h-3 flex-shrink-0"
-                                    style={{ color: "#F59E0B" }}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}>
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-                                    />
-                                  </svg>
+                                    style={{ color: WARNING_VISUAL.color }}
+                                  />
                                 )}
                               </div>
                             )}

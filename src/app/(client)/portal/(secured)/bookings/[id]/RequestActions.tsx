@@ -13,7 +13,31 @@ function tomorrowISO() {
   return d.toISOString().slice(0, 10);
 }
 
-export default function RequestActions({ jobId }: { jobId: string }) {
+export default function RequestActions({
+  jobId,
+  startTime,
+  feeUsd,
+  feeWindowHours,
+  depositUsd,
+}: {
+  jobId: string;
+  /** ISO booking start — used to decide whether the late-cancellation fee applies. */
+  startTime: string;
+  /** Late-cancellation fee (from CANCELLATION_FEE_USD). */
+  feeUsd: number;
+  /** Hours before start inside which the fee applies (CANCELLATION_FEE_WINDOW_HOURS). */
+  feeWindowHours: number;
+  /** Amount collected at booking that is refunded on cancellation (0 if none). */
+  depositUsd: number;
+}) {
+  // Mirror the server rule in requestCancellation.ts: a cancellation inside the
+  // fee window incurs the late fee. This block only renders for upcoming
+  // bookings, so start is always in the future.
+  const msUntilStart = new Date(startTime).getTime() - Date.now();
+  const withinFeeWindow = msUntilStart < feeWindowHours * 60 * 60 * 1000;
+  const money = (n: number) =>
+    Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+
   const [busy, setBusy] = useState<"cancel" | "reschedule" | null>(null);
   const [msg, setMsg] = useState<{
     kind: "success" | "error";
@@ -158,6 +182,28 @@ export default function RequestActions({ jobId }: { jobId: string }) {
         title="Cancel this booking?"
         description="Our team reviews every cancellation and will reach out to confirm. Your booking won't be cancelled automatically.">
         <div className="cl-stack-16">
+          {withinFeeWindow ? (
+            <Banner kind="amber">
+              Cancelling less than {feeWindowHours} hours before your booking
+              incurs a {money(feeUsd)} late-cancellation fee, charged to the card
+              on file.
+            </Banner>
+          ) : null}
+          {depositUsd > 0 ? (
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--primary-70)",
+                background: "var(--primary-5, rgba(28,25,23,0.04))",
+                border: "1px solid var(--primary-10)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                lineHeight: 1.5,
+              }}>
+              Your {money(depositUsd)} deposit will be refunded once your
+              cancellation is confirmed by our team.
+            </div>
+          ) : null}
           <Field label="Reason (optional)" htmlFor="cn-reason">
             <Textarea
               id="cn-reason"

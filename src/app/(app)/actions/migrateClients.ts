@@ -1,6 +1,8 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 /**
  * One-time migration: deduplicates existing clientName strings into Client
@@ -11,6 +13,14 @@ export async function migrateClients(): Promise<{
   created: number;
   updated: number;
 }> {
+  // Admin-only: this is a bulk write (creates Clients, updates every Job) and
+  // was reachable unauthenticated as a POST server action.
+  const session = await auth.api.getSession({ headers: await headers() });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (role !== "OWNER" && role !== "ADMIN") {
+    return { created: 0, updated: 0 };
+  }
+
   // Gather all distinct clientName values from Job rows that have no clientId
   const unmigrated = await db.job.findMany({
     where: { clientId: null },

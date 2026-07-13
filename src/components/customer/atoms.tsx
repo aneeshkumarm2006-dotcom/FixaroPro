@@ -1,6 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
+import { jobStatusVisual } from "@/lib/status-icons";
 
 // ─── Number stepper ───
 export function NumberStepper({
@@ -96,33 +97,25 @@ export function ChoiceButton({
 }
 
 // ─── Status badge ───
-export function StatusBadge({
-  status,
-}: {
-  status: string;
-}) {
-  const s = (status || "").toLowerCase();
-  const key =
-    s === "created" || s === "scheduling"
-      ? "scheduling"
-      : s === "scheduled"
-      ? "scheduled"
-      : s === "in_progress" || s === "inprogress"
-      ? "inprogress"
-      : s === "completed"
-      ? "completed"
-      : s === "paid"
-      ? "paid"
-      : "cancelled";
-  const label = {
-    scheduling: "Scheduling",
-    scheduled: "Scheduled",
-    inprogress: "In progress",
-    completed: "Completed",
-    paid: "Paid",
-    cancelled: "Cancelled",
-  }[key];
-  return <span className={`cl-badge cl-badge-${key}`}>{label}</span>;
+//
+// Labels come from the central status map (SOP §11) so a future icon/asset
+// delivery is a one-file swap, and so an unrecognised status can never render as
+// "Cancelled" — which is what this used to do, telling a customer their booking
+// was cancelled on a parse miss. jobStatusVisual() normalises the spelling and
+// falls back to CREATED.
+//
+// The one deliberate divergence: a customer sees "Scheduling" for CREATED (we
+// have not attached a handyman yet), never the internal "Created".
+const CUSTOMER_STATUS_OVERRIDES: Record<string, { slug: string; label: string }> = {
+  created: { slug: "scheduling", label: "Scheduling" },
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  const visual = jobStatusVisual(status);
+  const override = CUSTOMER_STATUS_OVERRIDES[visual.slug];
+  const slug = override?.slug ?? visual.slug;
+  const label = override?.label ?? visual.label;
+  return <span className={`cl-badge cl-badge-${slug}`}>{label}</span>;
 }
 
 // ─── Date badge (used in portal overview & bookings) ───

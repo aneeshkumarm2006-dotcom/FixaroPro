@@ -24,9 +24,9 @@ interface Location {
   address: string | null;
 }
 
-// Per the rag-washing spec, supplies are pre-allocated per job + add-ons, so
-// cleaners no longer request refills manually. Restocking is driven by the
-// post-job inventory survey + admin warehouse flow.
+// Supplies are pre-allocated per job + add-ons, so providers no longer request
+// refills manually. Restocking is driven by the post-job inventory survey +
+// admin warehouse flow.
 interface MyInventoryClientProps {
   items: InventoryItem[];
   locations?: Location[];

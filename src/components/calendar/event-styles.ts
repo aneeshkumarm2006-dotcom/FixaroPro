@@ -1,5 +1,6 @@
 import { CalendarEvent } from "./types";
 import { hexToRgba } from "./utils";
+import { JOB_STATUS_VISUALS } from "@/lib/status-icons";
 
 // ============================================================================
 // CONSTANTS
@@ -45,32 +46,12 @@ export function getEventStyleInfo(
 ): EventStyleInfo {
   // Check if this is a job event (has jobId in metadata)
   if (event.metadata?.jobId) {
-    const jobStatus = event.metadata.status;
-    let jobColor = DEFAULT_EVENT_COLOR;
-
-    // Apply color based on job status
-    switch (jobStatus) {
-      case "CREATED":
-        jobColor = "#e85d04"; // Slate - newly created
-        break;
-      case "SCHEDULED":
-        jobColor = "#3B82F6"; // Blue - scheduled
-        break;
-      case "IN_PROGRESS":
-        jobColor = "#F59E0B"; // Amber - in progress
-        break;
-      case "COMPLETED":
-        jobColor = "#10B981"; // Green - completed
-        break;
-      case "PAID":
-        jobColor = "#059669"; // Darker green - paid
-        break;
-      case "CANCELLED":
-        jobColor = "#EF4444"; // Red - cancelled
-        break;
-      default:
-        jobColor = DEFAULT_EVENT_COLOR;
-    }
+    // Status colour comes from the central status map (SOP §11) — an unknown
+    // status keeps the neutral default rather than borrowing another status's
+    // colour.
+    const status = event.metadata.status;
+    const jobColor =
+      (status && JOB_STATUS_VISUALS[status]?.color) || DEFAULT_EVENT_COLOR;
 
     // All jobs are shown as confirmed (solid styling)
     return { color: jobColor, isBlock: false, isUnconfirmed: false };

@@ -40,8 +40,10 @@ export async function getJobPhotos(
       return { success: false, error: "Not authorized for this job" };
     }
 
+    // AFTER photos only — this powers the completion-photo gallery + uploader.
+    // Customer INTAKE photos are shown read-only in a dedicated section.
     const photos = await db.jobPhoto.findMany({
-      where: { jobId },
+      where: { jobId, kind: "AFTER" },
       orderBy: { createdAt: "desc" },
       include: {
         employee: { select: { id: true, name: true } },
@@ -52,11 +54,12 @@ export async function getJobPhotos(
       id: p.id,
       jobId: p.jobId,
       employeeId: p.employeeId,
-      employeeName: p.employee.name,
+      employeeName: p.employee?.name ?? "Team",
+      kind: p.kind,
       url: p.url,
       caption: p.caption,
       createdAt: p.createdAt,
-      canDelete: isAdmin || p.employeeId === session.user.id,
+      canDelete: isAdmin || (p.employeeId != null && p.employeeId === session.user.id),
     }));
 
     return { success: true, photos: dto };

@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { stripe } from "@/lib/stripe";
+import { getBillingConfig, computeChargeAmount, depositCredit } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
 import {
   queueAndSendReceipt,
   sendCustomerBookingCharged,
@@ -39,30 +41,52 @@ export async function chargeJob(jobId: string) {
   const client = job.client;
   if (!client) return { success: false, error: "No client on this job" };
 
-  const grossAmount = (job.price ?? 0) - (job.discountAmount ?? 0);
+  // Central audit trail (SOP §9/§12) for the card charge — the /audit page
+  // advertises charges but this path only wrote JobLog. Fired on every
+  // settlement branch (deposit-covered, gift-card-covered, Stripe) with the
+  // acting admin and the amount taken.
+  const auditCharge = (description: string) =>
+    logAudit({
+      entityType: "Job",
+      entityId: jobId,
+      action: "JOB_CHARGED",
+      field: "paymentReceived",
+      oldValue: "false",
+      newValue: "true",
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description,
+    });
+
+  // SOP §10: the amount to charge is derived from the catalog pricing model —
+  // clocked hours × rate for hourly services (not the static booked price),
+  // the fixed price for fixed services, the accepted bid × surplus for painting.
+  const billingCfg = await getBillingConfig();
+  const charge = computeChargeAmount(job, billingCfg);
+
+  // SOP §10 (guard 1.5): an hourly job with no usable clock record can't be
+  // priced — block the charge until the clock times are recorded/corrected.
+  if (charge.pricingModel === "hourly" && charge.clockMissing) {
+    return {
+      success: false,
+      error: "Cannot charge an hourly job before clock-out. Record or correct the clock times first.",
+    };
+  }
+
+  const grossAmount = charge.total;
   if (grossAmount <= 0) {
     return { success: false, error: "Invalid charge amount" };
   }
 
   // Credit the deposit already collected at booking (SOP §10 — deposits are
-  // applied to the final bill). For a refundable materials deposit or the
-  // painting $119 materials charge the admin-applied portion credits here; any
-  // unused balance is refunded via the deposit-adjust action. Otherwise the $20
-  // base booking deposit credits.
-  let depositCredit = 0;
-  if (job.depositPaid) {
-    if (job.materialsType === "deposit") {
-      const collected = job.materialsAmount ?? 0;
-      depositCredit = job.materialsAppliedAmount ?? Math.min(collected, grossAmount);
-    } else if (job.materialsType === "charge") {
-      // Flat upfront charge (painting $119): credited in full, never partially
-      // applied — there is no unused balance to reconcile (SOP §5/§6).
-      depositCredit = Math.min(job.materialsAmount ?? 0, grossAmount);
-    } else {
-      depositCredit = 20;
-    }
-  }
-  const totalAmount = Math.max(0, grossAmount - depositCredit);
+  // applied to the final bill). Shared with the bulk-charge review list and
+  // computeJobBilling's "amount due now", so the figure ops review is exactly the
+  // figure the card is charged. The base booking deposit comes from config: it
+  // used to be a hardcoded `20` here while /api/stripe/charge-deposit captured
+  // the configured amount, so raising the deposit would have overcharged every
+  // customer by the difference.
+  const credit = depositCredit(job, grossAmount, billingCfg);
+  const totalAmount = Math.max(0, grossAmount - credit);
   if (totalAmount <= 0) {
     // Fully covered by the deposit already paid — settle without a new charge.
     await db.$transaction([
@@ -75,15 +99,18 @@ export async function chargeJob(jobId: string) {
           jobId,
           userId: session.user.id,
           action: "PAYMENT_RECEIVED",
-          description: `Booking settled — covered by $${depositCredit.toFixed(2)} deposit already paid.`,
+          description: `Booking settled — covered by $${credit.toFixed(2)} deposit already paid.`,
         },
       }),
     ]);
+    auditCharge(`Booking #${job.jobNumber} settled — covered by $${credit.toFixed(2)} deposit already paid.`);
     queueAndSendReceipt(jobId).catch(() => {});
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath("/jobs");
     revalidatePath("/finances");
-    return { success: true, amount: grossAmount, giftCardApplied: 0, stripeCharged: 0 };
+    // Nothing was collected now — the deposit already paid covered the total.
+    // Report $0 so bulk-charge batch totals reflect money actually taken.
+    return { success: true, amount: 0, giftCardApplied: 0, stripeCharged: 0 };
   }
 
   // Auto-apply gift card balance before hitting Stripe. We draw the
@@ -125,6 +152,7 @@ export async function chargeJob(jobId: string) {
       }),
     ]);
 
+    auditCharge(`Booking #${job.jobNumber} charged $${totalAmount.toFixed(2)} — fully covered by gift card credit.`);
     queueAndSendReceipt(jobId).catch(() => {});
 
     revalidatePath(`/jobs/${jobId}`);
@@ -208,6 +236,11 @@ export async function chargeJob(jobId: string) {
       }),
     ]);
 
+    auditCharge(
+      giftCardApplied > 0
+        ? `Charged $${stripeAmount.toFixed(2)} to card + $${giftCardApplied.toFixed(2)} gift card on job #${job.jobNumber} (PI ${paymentIntent.id}).`
+        : `Charged $${stripeAmount.toFixed(2)} to card on job #${job.jobNumber} (PI ${paymentIntent.id}).`
+    );
     queueAndSendReceipt(jobId).catch(() => {});
 
     // Customer "booking charged" notification (separate from the receipt;

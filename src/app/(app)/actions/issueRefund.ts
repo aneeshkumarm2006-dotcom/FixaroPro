@@ -2,13 +2,14 @@
 
 import { db } from "@/db";
 import { stripe } from "@/lib/stripe";
-import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { queueAndSendRefund } from "@/lib/email";
 import { applyStrike } from "@/lib/strikes";
 import { STRIKE_REFUND_FRACTION } from "@/lib/strikes-constants";
+import { depositCollected, getBillingConfig } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
 
 interface IssueRefundInput {
   jobId: string;
@@ -40,12 +41,12 @@ export async function issueRefund(input: IssueRefundInput) {
 
     const totalCharged = job.price ?? 0;
     // Amount collected at booking: a materials deposit, the painting $119
-    // materials charge, or otherwise the $20 base booking deposit.
-    const depositAmount = job.depositPaid
-      ? isUpfrontMaterials(job.materialsType) && job.materialsAmount
-        ? job.materialsAmount
-        : 20
-      : 0;
+    // materials charge, or otherwise the base booking deposit. Read from the
+    // shared config helper (NOT a hardcoded 20) so this cap can't drift from
+    // what /api/stripe/charge-deposit actually captured — once the base deposit
+    // was made admin-editable, a literal 20 here rejected a legitimate
+    // config-sized deposit refund (and would over-refund if it were lowered).
+    const depositAmount = depositCollected(job, await getBillingConfig());
     const alreadyRefunded = job.refundedAmount ?? 0;
 
     // Pick the Stripe PI to refund against and the matching ceiling.
@@ -141,6 +142,26 @@ export async function issueRefund(input: IssueRefundInput) {
     ]);
 
     queueAndSendRefund(input.jobId, input.amount, input.reason).catch(() => {});
+
+    // Central audit trail (SOP §9/§12): every card refund records actor +
+    // old/new refunded total + reason. This is the money-out chokepoint every
+    // refund path (JobDetailView, refundJobDeposit, adjustMaterialsDeposit,
+    // painting reject) routes through, so logging here means the /audit page —
+    // whose header advertises "refunds" — actually shows them.
+    logAudit({
+      entityType: "Job",
+      entityId: input.jobId,
+      action: "REFUND_ISSUED",
+      field: "refundedAmount",
+      oldValue: String(alreadyRefunded),
+      newValue: String(alreadyRefunded + input.amount),
+      reason: input.reason?.trim() || null,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `Refund of $${input.amount.toFixed(2)} issued on job #${job.jobNumber}${
+        stripeRefundId ? ` (Stripe: ${stripeRefundId})` : ""
+      }.`,
+    });
 
     // Three-strike accountability: a refund of half or more of the job price
     // strikes each assigned cleaner (deduped per job + reason).

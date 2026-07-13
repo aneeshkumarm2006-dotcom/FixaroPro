@@ -12,14 +12,18 @@ import { sendAddCardLink } from "../../actions/sendAddCardLink";
 import { resendReceipt } from "../../actions/resendReceipt";
 import { generateInvoiceFromJob } from "../../actions/generateInvoiceFromJob";
 import { markJobComplete } from "../../actions/markJobComplete";
+import { usePolicy } from "@/lib/config/ServiceConfigProvider";
 import { createRatingToken } from "../../actions/createRatingToken";
 import { setAfterPhotoOverride } from "../../actions/setAfterPhotoOverride";
 import { duplicateJob } from "../../actions/duplicateJob";
+import { buildIntakeRows } from "@/lib/intake";
 import { BUSINESS_TZ } from "@/lib/timezone";
+import { StatusPill, WARNING_VISUAL } from "@/lib/status-icons";
+
 import {
   ArrowLeft, MapPin, Clock, DollarSign, Users,
   CheckCircle2, Package, Pencil, History, Activity,
-  AlertTriangle, Trash2, Loader, Briefcase, Receipt, Camera, X,
+  Trash2, Loader, Briefcase, Receipt, Camera, X,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText,
   Star, Copy, Check, Inbox, RotateCcw, XCircle,
 } from "lucide-react";
@@ -29,6 +33,8 @@ import { ConfirmDeleteModal } from "@/components/common/ConfirmDeleteModal";
 import Modal from "@/components/ui/Modal";
 import { cancelJobByAdmin } from "../../actions/cancelJobByAdmin";
 import { issueRefund } from "../../actions/issueRefund";
+
+const WarningIcon = WARNING_VISUAL.Icon;
 
 type TabView = "details" | "financials" | "products" | "logs" | "requests";
 
@@ -62,6 +68,8 @@ interface Job {
   isCashJob?: boolean;
   invoiceSent: boolean;
   notes: string | null;
+  /** The handyman's write-up at completion (SOP §8). Not the customer's brief. */
+  completionNotes?: string | null;
   paymentType?: string | null;
   discountAmount?: number | null;
   bedCount?: number | null;
@@ -74,6 +82,13 @@ interface Job {
   materialsAmount?: number | null;
   refundedAmount?: number | null;
   stripePaymentIntentId?: string | null;
+  // Service-specific intake (SOP v4.2 §4).
+  paintRepairArea?: string | null;
+  paintRepairSurface?: string | null;
+  acType?: string | null;
+  acLocation?: string | null;
+  acMountType?: string | null;
+  clientHasAcUnit?: boolean | null;
   addOns?: Array<{ id: string; name: string; price: number }>;
   employee: { id: string; name: string };
   cleaners: Array<{ id: string; name: string }>;
@@ -115,8 +130,10 @@ interface JobPhoto {
   id: string;
   url: string;
   caption: string | null;
+  kind?: "INTAKE" | "AFTER";
   createdAt: string;
-  employee: { id: string; name: string; };
+  // INTAKE (customer-uploaded) photos have no employee.
+  employee: { id: string; name: string; } | null;
 }
 
 interface User { id: string; name: string; email: string; }
@@ -155,23 +172,6 @@ function initials(name: string): string {
   return name.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
 }
 
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; color: string; dot: string }> = {
-    CREATED:     { label: 'Created',     bg: '#f3f4f6', color: '#374151', dot: '#9ca3af' },
-    SCHEDULED:   { label: 'Scheduled',   bg: '#dbeafe', color: '#1e40af', dot: '#3b82f6' },
-    IN_PROGRESS: { label: 'In Progress', bg: '#fef3c7', color: '#92400e', dot: '#f59e0b' },
-    COMPLETED:   { label: 'Completed',   bg: '#d1fae5', color: '#065f46', dot: '#10b981' },
-    PAID:        { label: 'Paid',        bg: '#d1fae5', color: '#065f46', dot: '#059669' },
-    CANCELLED:   { label: 'Cancelled',   bg: '#fee2e2', color: '#991b1b', dot: '#ef4444' },
-  };
-  const c = map[status] || { label: status, bg: '#f3f4f6', color: '#374151', dot: '#9ca3af' };
-  return (
-    <span className="pill" style={{ background: c.bg, color: c.color }}>
-      <span className="pill-dot" style={{ background: c.dot }} />
-      {c.label}
-    </span>
-  );
-}
 
 function TypePill({ type }: { type: string | null }) {
   if (!type) return null;
@@ -224,6 +224,10 @@ export default function JobDetailView({
 }: JobDetailViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const policy = usePolicy();
+
+  // Service-specific intake the customer gave at booking (SOP v4.2 §4).
+  const intakeRows = buildIntakeRows(job);
 
   const returnToUrl = searchParams.get("returnTo");
   const backUrl   = returnToUrl ? decodeURIComponent(returnToUrl) : "/jobs";
@@ -321,15 +325,17 @@ export default function JobDetailView({
 
   const refundedSoFar = job.refundedAmount ?? 0;
   // Amount actually collected at booking — a materials deposit or the painting
-  // $119 materials charge when one applied, otherwise the $20 base booking
-  // deposit. Mirrors depositCollected() in src/lib/billing.ts (which is
-  // server-only, so it can't be imported here).
+  // $119 materials charge when one applied, otherwise the base booking deposit.
+  // Mirrors depositCollected() in src/lib/billing.ts (server-only, so it can't
+  // be imported here) — but the base deposit is the CONFIGURED value, not a
+  // hardcoded 20. It caps the refund modal: with the old literal, an admin could
+  // not refund a customer past $20 no matter what was actually captured.
   const depositCollected = !job.depositPaid
     ? 0
     : (job.materialsType === "deposit" || job.materialsType === "charge") &&
       job.materialsAmount
     ? job.materialsAmount
-    : 20;
+    : policy.baseBookingDeposit;
   const depositRemaining = Math.max(0, depositCollected - refundedSoFar);
   const refundCap = job.stripePaymentIntentId
     ? Math.max(0, (job.price ?? 0) - refundedSoFar)
@@ -624,6 +630,38 @@ export default function JobDetailView({
         </p>
       </div>
 
+      {/* Provider completion write-up (SOP §8). Written by the handyman at
+          clock-out; distinct from the customer's brief above. Only rendered
+          when there is one, so it never reads as a missing field. */}
+      {job.completionNotes && (
+        <div className="dcard tab-panel-wide">
+          <div className="dcard-head">
+            <h3>Completion notes</h3>
+            <span style={{ fontSize: 12, color: 'var(--primary-50)', fontWeight: 600 }}>From the provider</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 14.5, color: 'var(--ink-soft)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            {job.completionNotes}
+          </p>
+        </div>
+      )}
+
+      {/* Service intake (SOP v4.2 §4) — structured answers for Small paint
+          repair / AC installation. Photos are shown in the Photos tab, badged
+          "Customer". */}
+      {intakeRows.length > 0 && (
+        <div className="dcard tab-panel-wide">
+          <div className="dcard-head"><h3>Service intake</h3></div>
+          <dl style={{ margin: 0, display: 'grid', gap: 10 }}>
+            {intakeRows.map((r) => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 14 }}>
+                <dt style={{ color: 'var(--primary-60)', fontWeight: 500 }}>{r.label}</dt>
+                <dd style={{ margin: 0, color: 'var(--ink)', fontWeight: 500, textAlign: 'right' }}>{r.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
       {/* Location */}
       {job.location && (
         <div className="dcard tab-panel-wide">
@@ -881,11 +919,30 @@ export default function JobDetailView({
                 key={photo.id}
                 type="button"
                 className="photo-cell"
+                style={{ position: 'relative' }}
                 onClick={() => setLightboxIdx(idx)}
-                aria-label={photo.caption || `Job photo ${idx + 1}`}
+                aria-label={photo.caption || `${photo.kind === 'INTAKE' ? 'Customer' : 'Job'} photo ${idx + 1}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photo.url} alt={photo.caption || 'Job photo'} loading="lazy" />
+                {photo.kind === 'INTAKE' && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      left: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      color: '#fff',
+                      background: 'rgba(0,0,0,0.62)',
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                    }}>
+                    Customer
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1320,7 +1377,7 @@ export default function JobDetailView({
         {/* Payment warning banner */}
         {showPayWarning && (
           <div className="banner banner-amber">
-            <AlertTriangle size={18} style={{ flex: '0 0 auto', marginTop: 1 }} />
+            <WarningIcon size={18} style={{ flex: '0 0 auto', marginTop: 1 }} />
             <div style={{ flex: 1 }}>
               <strong>Payment outstanding.</strong> This job was completed but hasn't been paid.
               {!job.isCashJob ? ' Card may be on file — charge anytime.' : ''}

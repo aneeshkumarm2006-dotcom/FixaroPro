@@ -4,6 +4,10 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import {
+  policyDefByKey,
+  validatePolicyValue,
+} from "@/lib/config/policy-registry";
 
 interface UpdateAppSettingParams {
   key: string;
@@ -29,6 +33,19 @@ export async function updateAppSetting(params: UpdateAppSettingParams) {
     const { key, category, value } = params;
     if (!key || !category) {
       return { success: false, error: "Key and category are required" };
+    }
+
+    // If this key is a registered policy value, enforce its rule here too.
+    // This action is the generic setting writer (the Settings → Pricing tab uses
+    // it for `pricing.labourRate` and `pricing.threeHourPackage`), and it used to
+    // accept anything. resolvePolicy() then SILENTLY discarded an out-of-range
+    // row in favour of the default — so an admin could save "-5 $/hr", see it
+    // rendered back on the Pricing tab, and be billing at $79 with no indication
+    // their edit was being ignored. Fail loudly instead.
+    const def = policyDefByKey(key);
+    if (def) {
+      const problem = validatePolicyValue(def, value);
+      if (problem) return { success: false, error: problem };
     }
 
     await db.appSetting.upsert({

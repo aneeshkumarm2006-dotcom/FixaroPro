@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 export async function deleteEmployee(employeeId: string): Promise<{
   success: boolean;
@@ -46,6 +47,17 @@ export async function deleteEmployee(employeeId: string): Promise<{
     // Delete the employee
     await db.user.delete({
       where: { id: employeeId },
+    });
+
+    logAudit({
+      entityType: "User",
+      entityId: employeeId,
+      action: "USER_DELETED",
+      actorId: session!.user.id,
+      actorEmail: session!.user.email ?? null,
+      oldValue: `${employee.name} <${employee.email}> (${employee.role})`,
+      newValue: null,
+      description: `Deleted employee ${employee.name}.`,
     });
 
     revalidatePath("/employees");

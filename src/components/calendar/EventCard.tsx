@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import Button from "@/components/ui/Button";
 import {
@@ -7,8 +9,10 @@ import {
   getEventBoxShadow,
 } from "./event-styles";
 import { CalendarEvent } from "./types";
-import { jobTypeLabel } from "./job-type-label";
-import { DEPOSIT_VISUAL } from "@/lib/status-icons";
+import { useJobTypeLabel } from "./use-job-type-label";
+import { DepositBadge, WARNING_VISUAL, jobStatusLabel } from "@/lib/status-icons";
+
+const WarningIcon = WARNING_VISUAL.Icon;
 
 export interface EventCardProps {
   event: CalendarEvent;
@@ -43,6 +47,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   renderLocation,
   className,
 }) => {
+  const jobTypeLabel = useJobTypeLabel();
+
   return (
     <Button
       data-event-card
@@ -83,7 +89,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             style={{
               backgroundColor: styleInfo.color + "30",
             }}>
-            {event.metadata.status.replace("_", " ")}
+            {jobStatusLabel(event.metadata.status)}
           </span>
         )}
       </div>
@@ -123,19 +129,8 @@ export const EventCard: React.FC<EventCardProps> = ({
         event.metadata?.missingEquipment?.length > 0 && (
           <div
             className="app-subtitle truncate text-[10px] flex items-center gap-0.5"
-            style={{ color: "#F59E0B" }}>
-            <svg
-              className="w-3 h-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
+            style={{ color: WARNING_VISUAL.color }}>
+            <WarningIcon className="w-3 h-3 flex-shrink-0" />
             Missing equipment
           </div>
         )}
@@ -148,17 +143,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           event.metadata?.materialStatus === "FIXARO_PROVIDED") && (
           <div className="app-subtitle flex items-center gap-1 text-[10px]">
             {event.metadata?.needsDepositReview && (
-              <span
-                title={`${DEPOSIT_VISUAL.label} — apply or refund the materials deposit`}
-                style={{
-                  color: "#fff",
-                  background: DEPOSIT_VISUAL.color,
-                  borderRadius: 4,
-                  padding: "0 4px",
-                  fontWeight: 700,
-                }}>
-                D
-              </span>
+              <DepositBadge size={10} hint="apply or refund the materials deposit" />
             )}
             {event.metadata?.materialStatus === "FIXARO_PROVIDED" && (
               <span title="Fixaro supplies the materials and equipment for this job">

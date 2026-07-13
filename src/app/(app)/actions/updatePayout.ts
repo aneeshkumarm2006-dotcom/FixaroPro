@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 function parseFloatSafe(v: FormDataEntryValue | null): number {
   if (v === null || v === "") return 0;
@@ -41,6 +42,7 @@ export async function updatePayout(formData: FormData) {
 
     const finalAmount = baseAmount + adjustments - deductions + reimbursements;
 
+    const newFinal = Number(finalAmount.toFixed(2));
     await db.payout.update({
       where: { id },
       data: {
@@ -48,9 +50,26 @@ export async function updatePayout(formData: FormData) {
         adjustments,
         deductions,
         reimbursements,
-        finalAmount: Number(finalAmount.toFixed(2)),
+        finalAmount: newFinal,
         notes,
       },
+    });
+
+    // Audit the payout edit (SOP §9/§12 — provider pay is a high-impact money
+    // change). Records who changed it and the old→new final amount + components.
+    logAudit({
+      entityType: "Payout",
+      entityId: id,
+      action: "PAYOUT_UPDATED",
+      field: "finalAmount",
+      oldValue: String(payout.finalAmount),
+      newValue: String(newFinal),
+      reason: notes,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `Payout for period ${payout.payPeriodId}: final $${payout.finalAmount.toFixed(
+        2
+      )} → $${newFinal.toFixed(2)} (base ${baseAmount}, adj ${adjustments}, ded ${deductions}, reimb ${reimbursements}).`,
     });
 
     revalidatePath("/payouts");

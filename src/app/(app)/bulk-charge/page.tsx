@@ -1,40 +1,28 @@
 import { requireAdmin } from "@/lib/page-guards";
 import { db } from "@/db";
-import { computeJobBilling, getLabourRate } from "@/lib/billing";
+import {
+  computeJobBilling,
+  getBillingConfig,
+  depositCredit,
+  type BillingConfig,
+  type JobBillingLike,
+} from "@/lib/billing";
 import BulkChargeClient from "./BulkChargeClient";
 
-// Mirrors the deposit-credit math in actions/chargeJob.ts (lines ~42-65)
-// exactly, so the amount ops review here is the amount the card is actually
-// charged (SOP §10.3). Any divergence from computeJobBilling's SOP review
-// figure is surfaced as a per-row flag instead of silently hidden.
-function chargeJobMirror(job: {
-  price: number | null;
-  discountAmount: number | null;
-  depositPaid: boolean;
-  materialsType: string | null;
-  materialsAmount: number | null;
-  materialsAppliedAmount: number | null;
-}) {
-  const gross = (job.price ?? 0) - (job.discountAmount ?? 0);
-  let depositCredit = 0;
-  if (job.depositPaid) {
-    if (job.materialsType === "deposit") {
-      const collected = job.materialsAmount ?? 0;
-      depositCredit = job.materialsAppliedAmount ?? Math.min(collected, gross);
-    } else if (job.materialsType === "charge") {
-      depositCredit = Math.min(job.materialsAmount ?? 0, gross);
-    } else {
-      depositCredit = 20;
-    }
-  }
-  const amountDue = Math.max(0, gross - depositCredit);
-  return { gross, depositCredit, amountDue };
+// The amount ops review here MUST be the amount the card is actually charged
+// (SOP §10.3). This used to be a hand-copied duplicate of chargeJob's credit
+// math — with the base booking deposit hardcoded as `20`, so it silently
+// diverged from Stripe the moment the deposit became admin-editable. It now
+// calls the same depositCredit() that chargeJob calls.
+function chargeJobMirror(job: JobBillingLike, gross: number, cfg: BillingConfig) {
+  const credit = depositCredit(job, gross, cfg);
+  return { gross, depositCredit: credit, amountDue: Math.max(0, gross - credit) };
 }
 
 export default async function BulkChargePage() {
   await requireAdmin();
 
-  const labourRate = await getLabourRate();
+  const billingCfg = await getBillingConfig();
 
   const jobs = await db.job.findMany({
     where: {
@@ -53,6 +41,8 @@ export default async function BulkChargePage() {
       subtotalAmount: true,
       gstAmount: true,
       qstAmount: true,
+      basePriceAmount: true,
+      bookedSubtotalAmount: true,
       clockInTime: true,
       clockOutTime: true,
       depositPaid: true,
@@ -73,8 +63,8 @@ export default async function BulkChargePage() {
   });
 
   const rows = jobs.map((j) => {
-    const billing = computeJobBilling(j, labourRate);
-    const charge = chargeJobMirror(j);
+    const billing = computeJobBilling(j, billingCfg);
+    const charge = chargeJobMirror(j, billing.total, billingCfg);
     return {
       id: j.id,
       jobNumber: j.jobNumber,
@@ -89,7 +79,9 @@ export default async function BulkChargePage() {
       clockInAt: j.clockInTime?.toISOString() ?? null,
       clockOutAt: j.clockOutTime?.toISOString() ?? null,
       billing: {
+        pricingModel: billing.pricingModel,
         hoursWorked: billing.hoursWorked,
+        billableHours: billing.billableHours,
         labourRate: billing.labourRate,
         labourFromClock: billing.labourFromClock,
         materialsAmount: billing.materialsAmount,
@@ -102,8 +94,11 @@ export default async function BulkChargePage() {
         gst: billing.gst,
         qst: billing.qst,
         total: billing.total,
+        bookedTotal: billing.bookedTotal,
         refunded: billing.refunded,
         amountDueNow: billing.amountDueNow,
+        clockMissing: billing.clockMissing,
+        baseMissing: billing.baseMissing,
       },
       // What chargeJob will actually put on the card (before gift card credit).
       grossAmount: charge.gross,

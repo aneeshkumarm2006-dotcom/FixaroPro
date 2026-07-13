@@ -120,19 +120,16 @@ export async function checkEquipmentForJob(
       }
     }
 
-    if (requiredMap.size === 0) {
-      const inventoryRules = await db.inventoryRule.findMany({
-        where: { usagePerJob: { gt: 0 } },
-        include: { product: true },
-      });
-      for (const rule of inventoryRules) {
-        requiredMap.set(rule.productId, {
-          needed: rule.usagePerJob,
-          product: { name: rule.product.name, unit: rule.product.unit },
-          source: "USAGE_RULE",
-        });
-      }
-    }
+    // NB: there is deliberately no "fall back to every InventoryRule" branch
+    // here any more. It used to fire whenever no KitTemplate matched the job
+    // type — which is every handyman service, since the kits (R, C, PC…) are
+    // the cleaning fork's. The result was a toilet-repair job reporting the
+    // provider short of mop pads. A consumable is required only when an admin
+    // has actually put it in a kit for this job type or add-on, mirroring the
+    // TOOL-category rule that governs the equipment checklist (D6.1).
+    //
+    // This page is the CONSUMABLES restock flow. Missing *tools* are a separate
+    // signal, surfaced on the job's equipment panel (src/lib/equipment-readiness.ts).
 
     const missing: MissingEquipmentItem[] = [];
     for (const [productId, req] of requiredMap.entries()) {

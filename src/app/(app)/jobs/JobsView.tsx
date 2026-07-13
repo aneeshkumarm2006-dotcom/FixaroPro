@@ -8,6 +8,9 @@ import {
 import Button from "@/components/ui/Button";
 import PremiumSelect from "@/components/ui/PremiumSelect";
 import DatePicker from "@/components/ui/DatePicker";
+import { StatusPill, DepositBadge } from "@/lib/status-icons";
+import { useJobTypeLabel } from "@/components/calendar/use-job-type-label";
+import { useServiceCatalog } from "@/lib/config/ServiceConfigProvider";
 
 interface Job {
   id: string;
@@ -115,34 +118,25 @@ function AvatarStack({ cleaners, max = 3 }: { cleaners: Array<{ id: string; name
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; color: string; dot: string }> = {
-    CREATED:     { label: 'Created',     bg: '#f3f4f6', color: '#374151', dot: '#9ca3af' },
-    SCHEDULED:   { label: 'Scheduled',   bg: '#dbeafe', color: '#1e40af', dot: '#3b82f6' },
-    IN_PROGRESS: { label: 'In Progress', bg: '#fef3c7', color: '#92400e', dot: '#f59e0b' },
-    COMPLETED:   { label: 'Completed',   bg: '#d1fae5', color: '#065f46', dot: '#10b981' },
-    PAID:        { label: 'Paid',        bg: '#d1fae5', color: '#065f46', dot: '#059669' },
-    CANCELLED:   { label: 'Cancelled',   bg: '#fee2e2', color: '#991b1b', dot: '#ef4444' },
+// The legacy cleaning short codes keep their colour; every real Fixaro service
+// resolves its label from the live catalog. Before this, the `map[type] || …`
+// fallback printed the RAW ENUM CODE — an admin's jobs table read
+// "LIGHT_FIXTURE", not "Light fixture installation".
+function TypePill({ type }: { type: string | null }) {
+  const jobTypeLabel = useJobTypeLabel();
+  if (!type) return null;
+  const colours: Record<string, { bg: string; color: string }> = {
+    R:  { bg: 'var(--primary-10)', color: 'var(--primary)' },
+    C:  { bg: '#dbeafe',           color: '#1e40af' },
+    PC: { bg: '#fef3c7',           color: '#92400e' },
+    F:  { bg: '#f3f4f6',           color: '#374151' },
   };
-  const c = map[status] || { label: status, bg: '#f3f4f6', color: '#374151', dot: '#9ca3af' };
+  const c = colours[type] ?? { bg: '#f3f4f6', color: '#374151' };
   return (
     <span className="pill" style={{ background: c.bg, color: c.color }}>
-      <span className="pill-dot" style={{ background: c.dot }} />
-      {c.label}
+      {jobTypeLabel(type, 'compact')}
     </span>
   );
-}
-
-function TypePill({ type }: { type: string | null }) {
-  if (!type) return null;
-  const map: Record<string, { label: string; bg: string; color: string }> = {
-    R:  { label: 'R',  bg: 'var(--primary-10)', color: 'var(--primary)' },
-    C:  { label: 'C',  bg: '#dbeafe',           color: '#1e40af' },
-    PC: { label: 'PC', bg: '#fef3c7',           color: '#92400e' },
-    F:  { label: 'F',  bg: '#f3f4f6',           color: '#374151' },
-  };
-  const c = map[type] || { label: type, bg: '#f3f4f6', color: '#374151' };
-  return <span className="pill" style={{ background: c.bg, color: c.color }}>{c.label}</span>;
 }
 
 function PayIcons({ paymentReceived, invoiceSent }: { paymentReceived: boolean; invoiceSent: boolean }) {
@@ -285,6 +279,10 @@ export default function JobsView({
   onEmployeeFilterChange,
   onPaymentTypeFilterChange,
 }: JobsViewProps) {
+  // The job-type filter used to offer ONLY the cleaning fork's R/C/PC/F codes —
+  // none of which Fixaro sells — so an admin could not filter the jobs table by
+  // any real service. It now lists the live catalog.
+  const catalog = useServiceCatalog();
   const [tab, setTab] = useState<TabId>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -481,10 +479,7 @@ export default function JobsView({
               size="sm"
               options={[
                 { value: "all", label: "All types" },
-                { value: "R", label: "Residential (R)" },
-                { value: "C", label: "Commercial (C)" },
-                { value: "PC", label: "Post-Construction (PC)" },
-                { value: "F", label: "Follow-up (F)" },
+                ...catalog.map((s) => ({ value: s.value, label: s.label })),
               ]}
             />
           </div>
@@ -616,23 +611,8 @@ export default function JobsView({
                         <div className="col-client">
                           {job.clientName}
                           {job.needsDepositReview && (
-                            <span
-                              title="Deposit / materials review needed"
-                              style={{
-                                marginLeft: 6,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 18,
-                                height: 18,
-                                borderRadius: 5,
-                                background: 'var(--accent, #e85d04)',
-                                color: '#fff',
-                                fontSize: 11,
-                                fontWeight: 700,
-                                verticalAlign: 'middle',
-                              }}>
-                              D
+                            <span style={{ marginLeft: 6, verticalAlign: 'middle' }}>
+                              <DepositBadge />
                             </span>
                           )}
                         </div>

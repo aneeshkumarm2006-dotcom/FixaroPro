@@ -28,3 +28,18 @@ export function calculateTax(subtotal: number): TaxBreakdown {
     total,
   };
 }
+
+/**
+ * Reverse of calculateTax: given a TAX-INCLUSIVE total (an all-in price the
+ * customer pays, e.g. a painting bid × surplus), derive the implied pre-tax
+ * subtotal + GST/QST so a stored breakdown reconciles with the total. `total`
+ * is preserved exactly (the split absorbs any rounding), so line items always
+ * sum back to it.
+ */
+export function taxInclusiveBreakdown(totalInclusive: number): TaxBreakdown {
+  const total = round2(Math.max(0, totalInclusive));
+  const subtotal = round2(total / (1 + COMBINED_RATE));
+  const gstAmount = round2(subtotal * GST_RATE);
+  const qstAmount = round2(total - subtotal - gstAmount);
+  return { subtotal, gstAmount, qstAmount, total };
+}

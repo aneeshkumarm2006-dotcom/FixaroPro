@@ -4,6 +4,54 @@ This bundle covers five features. Each section lists **what was built**, **what 
 
 ---
 
+## 0. Fixaro v4.2 — Stage 9: QA, security & documentation (2026-07-14)
+
+Full report: `_ai_context/Fixaro_v4.2_Stage9_QA_Report.md`.
+
+### What was built
+- **A test runner + 91 money-math unit tests.** There was no test infrastructure; added **Vitest**
+  (`site/vitest.config.ts`, with `@/db` stubbed so the pure billing functions test hermetically) and
+  a suite under `site/test/` covering tax, service-config pricing/materials, `computeChargeAmount` /
+  `computeJobBilling` / deposit credit, policy resolution + the cancellation window, and booking
+  pricing (including the $119 painting materials trace and AC-installation-has-no-materials). Run with
+  `npm test`.
+- **Security & permissions fixes** surfaced by the §12 QA pass, each verified against the code first:
+  - **`saveJob` is now admin-only** — it previously checked only "is signed in", then wrote
+    `employeePay` / `price` / `totalTip` / `payRateMultiplier` / `paymentReceived` / `status` onto any
+    job by id. Any employee or client could have paid themselves an arbitrary amount. **(CRITICAL)**
+  - **Product create/update/delete now require an admin session** — they were fully unauthenticated,
+    and `costPerUnit` feeds expense accounting. **(HIGH)**
+  - **Alert dismiss/read/create require an admin session** (were an unauthenticated IDOR on the ops
+    inbox); `migrateClients` now requires admin; a temp Cloudinary debug route was deleted.
+  - **`issueRefund` no longer hardcodes the base deposit as `$20`** — it reads the configured value,
+    so one-click deposit refunds keep working after the deposit amount is changed. **(HIGH, money)**
+  - **The customer monthly statement no longer subtracts the discount twice.** **(MEDIUM, money)**
+- **Audit-trail completeness** — added the central audit log (who / old→new / when) to payroll edits
+  and release, provider cash-out, role changes, card charges, refunds, deletions, and deposit
+  adjustments, so the Audit page reflects every high-impact money and permission change.
+
+### What was already in place
+- The money math itself (`computeChargeAmount` / `computeJobBilling`), the eligibility self-approval
+  lock, server-side available-jobs filtering, the painting bid→offer→reminder workflow, and the
+  no-secrets posture all **passed** QA unchanged.
+
+### Known follow-ups (documented, not changed this pass)
+- **F1 (HIGH):** a partial materials-deposit refund is clawed back on the card charge (the full
+  materials amount stays in the taxable subtotal). Fix belongs in `computeChargeAmount` with its own
+  review. **F2:** the single-job "Charge" modal previews a number higher than what is actually charged
+  (display only). **F3:** add Stripe idempotency keys. See report §4 for F4–F9.
+
+### Test plan
+| Role | Task | Outcome |
+|---|---|---|
+| Developer | `cd site && npm test` | 91 tests pass |
+| Employee (non-admin) | Attempt `saveJob` / product create by id (e.g. via a crafted request) | Rejected — "Forbidden" / "Not authorized" |
+| Admin | Change the base booking deposit to ≠ $20, cancel a booking, click "Refund deposit" | Refund succeeds for the configured amount (not capped at $20) |
+| Admin | Open the Audit page after a payout edit / card charge / refund / role change | Each shows actor + old→new value |
+| Admin | Run the Stripe-sandbox walkthrough (report §5) | Amounts match the expected figures; **watch F1 at steps 10–12** |
+
+---
+
 ## 1. PWA Install — Drawer button + smarter banner
 
 ### What was built

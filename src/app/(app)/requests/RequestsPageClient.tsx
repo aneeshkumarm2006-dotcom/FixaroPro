@@ -5,8 +5,9 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, MapPin, Briefcase, X, CheckCircle2 } from "lucide-react";
+import { CalendarClock, MapPin, Briefcase, X, CheckCircle2, RotateCcw } from "lucide-react";
 import { resolveJobRequest } from "../actions/resolveJobRequest";
+import { refundJobDeposit } from "../actions/refundJobDeposit";
 
 interface JobRow {
   id: string;
@@ -19,6 +20,9 @@ interface JobRow {
   price: number | null;
   cancellationRequestedAt: string | null;
   rescheduleRequestedAt: string | null;
+  depositPaid: boolean;
+  depositAmount: number;
+  depositRefundable: number;
   client: { id: string; name: string; email: string | null; phone: string | null } | null;
   cleaners: { id: string; name: string }[];
 }
@@ -47,6 +51,8 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
   const [pending, setPending] = useState<{ jobId: string; kind: Kind; decision: "approve" | "deny" } | null>(null);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
+  const [refundedIds, setRefundedIds] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     if (filter === "cancellation") return jobs.filter((j) => j.cancellationRequestedAt);
@@ -69,6 +75,20 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
     setNote("");
     setError(null);
     setPending({ jobId, kind, decision });
+  }
+
+  // One-click deposit refund (D0.6). No auto-refund happens in
+  // requestCancellation — the deposit is only returned once an admin acts here.
+  async function handleRefundDeposit(jobId: string) {
+    setRefundBusyId(jobId);
+    setError(null);
+    const res = await refundJobDeposit(jobId);
+    setRefundBusyId(null);
+    if (!res.success) {
+      setError(res.error || "Failed to refund deposit");
+      return;
+    }
+    setRefundedIds((prev) => new Set(prev).add(jobId));
   }
   async function confirmHandle() {
     if (!pending) return;
@@ -170,6 +190,22 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
                   <div className="req-price">{money(price)}</div>
                   <div className="req-actions">
                     <Link href={`/jobs/${j.id}`} className="btn btn-secondary btn-sm">Open job</Link>
+                    {j.cancellationRequestedAt && j.depositPaid ? (
+                      refundedIds.has(j.id) || j.depositRefundable <= 0 ? (
+                        <span className="req-refunded" title="The deposit has been refunded to the customer">
+                          <CheckCircle2 size={13} /> Deposit refunded
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          disabled={refundBusyId === j.id}
+                          title={`Refund the ${money(j.depositAmount)} deposit to the customer`}
+                          onClick={() => handleRefundDeposit(j.id)}>
+                          <RotateCcw size={13} />
+                          {refundBusyId === j.id ? "Refunding…" : `Refund ${money(j.depositRefundable)} deposit`}
+                        </button>
+                      )
+                    ) : null}
                     {kinds.map((k) => (
                       <Fragment key={k}>
                         <button className="btn btn-secondary btn-sm req-deny" disabled={busyId === j.id} onClick={() => handle(j.id, k, "deny")}>Deny</button>

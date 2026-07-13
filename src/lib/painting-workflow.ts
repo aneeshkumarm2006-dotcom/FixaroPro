@@ -17,8 +17,15 @@ import { db } from "@/db";
 import { stripe } from "@/lib/stripe";
 import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { paintingFinalAmount } from "@/lib/painting";
-import { getEligibleProviderIdsFor } from "@/lib/eligibility";
-import { sendCustomerPaintingOffer, sendCustomerPaintingRejected } from "@/lib/email";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { getEligibleProviderIdsFor, getNotificationTargetsFor } from "@/lib/eligibility";
+import { missingEquipmentSummary } from "@/lib/equipment-readiness";
+import { isNotificationEnabled } from "@/lib/notifications";
+import {
+  sendCustomerPaintingOffer,
+  sendCustomerPaintingRejected,
+  sendProviderPaintingBidInvite,
+} from "@/lib/email";
 import { smsPaintingOffer } from "@/lib/sms";
 
 // How long bidding stays open before the cron auto-closes it and sends the
@@ -42,29 +49,93 @@ export async function getPaintingEligibleProviderIds(): Promise<string[]> {
   return providers.map((p) => p.id);
 }
 
-/** Notify painting-eligible providers of a new painting job to bid on. */
+/**
+ * Notify painting-eligible providers of a new painting job to bid on.
+ *
+ * Channels come from the catalog (D0.5): `prov.painting.new_job` declares
+ * EMAIL + APP_PUSH, so both are dispatched here, each gated independently on
+ * its own NotificationSetting toggle. Targeting runs through
+ * getNotificationTargetsFor, so equipment readiness is respected per §11.1 —
+ * but only for *notification*: eligibility alone still decides who may bid
+ * (see getPaintingEligibleProviderIds, used by placeBid). A provider short of a
+ * tool is warned in the invite, never silently barred from bidding.
+ *
+ * Returns how many providers were reached on at least one channel.
+ */
 export async function notifyPaintingProviders(jobId: string): Promise<number> {
   const job = await db.job.findUnique({
     where: { id: jobId },
-    select: { id: true, jobNumber: true, location: true, paintingScope: true },
+    select: {
+      id: true,
+      jobNumber: true,
+      location: true,
+      paintingScope: true,
+      startTime: true,
+      isFlexible: true,
+    },
   });
   if (!job) return 0;
 
-  const providerIds = await getPaintingEligibleProviderIds();
-  if (providerIds.length === 0) return 0;
+  const targets = await getNotificationTargetsFor("PAINTING");
+  if (targets.length === 0) return 0;
 
-  await db.alert.createMany({
-    data: providerIds.map((uid) => ({
-      type: "GENERAL" as const,
-      severity: "INFO" as const,
-      title: "New painting job — open for bids",
-      message: `Painting booking #${job.jobNumber}${job.location ? ` · ${job.location}` : ""} is open for bids. Submit your lowest bid to win the job.`,
-      relatedId: job.id,
-      relatedType: "painting_bid",
-      recipientUserId: uid,
-    })),
-  });
-  return providerIds.length;
+  const [appPushOn, emailOn] = await Promise.all([
+    isNotificationEnabled("PROVIDER", "prov.painting.new_job", "APP_PUSH"),
+    isNotificationEnabled("PROVIDER", "prov.painting.new_job", "EMAIL"),
+  ]);
+  if (!appPushOn && !emailOn) return 0;
+
+  if (appPushOn) {
+    await db.alert.createMany({
+      data: targets.map(({ employeeId, readiness }) => {
+        const shortOf = missingEquipmentSummary(readiness);
+        return {
+          type: "GENERAL" as const,
+          severity: "INFO" as const,
+          title: "New painting job — open for bids",
+          message:
+            `Painting booking #${job.jobNumber}${job.location ? ` · ${job.location}` : ""} is open for bids. Submit your lowest bid to win the job.` +
+            (shortOf ? ` Check your kit before you bid — you may be missing: ${shortOf}.` : ""),
+          relatedId: job.id,
+          relatedType: "painting_bid",
+          recipientUserId: employeeId,
+        };
+      }),
+    });
+  }
+
+  // Reached = the in-app Alert landed (it goes to every target) or their email
+  // actually went out. Providers with no address, and failed sends, don't count.
+  const reached = new Set<string>();
+  if (appPushOn) for (const t of targets) reached.add(t.employeeId);
+
+  if (emailOn) {
+    const readinessById = new Map(targets.map((t) => [t.employeeId, t.readiness]));
+    const providers = await db.user.findMany({
+      where: { id: { in: targets.map((t) => t.employeeId) } },
+      select: { id: true, name: true, email: true },
+    });
+    for (const provider of providers) {
+      if (!provider.email) continue;
+      try {
+        await sendProviderPaintingBidInvite({
+          to: provider.email,
+          providerName: provider.name ?? "there",
+          jobId: job.id,
+          jobNumber: job.jobNumber,
+          location: job.location,
+          paintingScope: job.paintingScope,
+          startTime: job.isFlexible ? null : job.startTime.toISOString(),
+          missingEquipment: missingEquipmentSummary(readinessById.get(provider.id)),
+        });
+        reached.add(provider.id);
+      } catch (err) {
+        console.error("painting bid invite email failed", provider.email, err);
+      }
+    }
+  }
+
+  return reached.size;
 }
 
 interface CloseBiddingResult {
@@ -99,7 +170,11 @@ export async function closeBiddingAndSendOffer(
     (a, b) => a.amount - b.amount || a.createdAt.getTime() - b.createdAt.getTime()
   )[0];
 
-  const surplus = job.paintingSurplusRate ?? 1.35;
+  // The rate the job was BOOKED under wins — an admin changing the policy value
+  // mid-bid must not reprice a job the customer already saw a range for. Only a
+  // legacy job with no stamped rate falls back to the configured one.
+  const cfg = await getRuntimeConfig();
+  const surplus = job.paintingSurplusRate ?? cfg.policy.paintingSurplusRate;
   const finalAmount = paintingFinalAmount(winner.amount, surplus);
 
   await db.$transaction([
@@ -177,12 +252,18 @@ export async function rejectPaintingAndRefund(
   }
 
   // Amount collected at booking: the painting $119 flat materials/equipment
-  // charge when one applied, otherwise the $20 base deposit.
+  // charge when one applied, otherwise the base booking deposit — the CONFIGURED
+  // one, matching what /api/stripe/charge-deposit actually captured. Normally
+  // painting takes the $119 branch, but the materials record is admin-editable
+  // now: clear it (or switch it to "cost") and the base deposit is what was
+  // captured. Refunding a hardcoded 20 against a larger capture would have left
+  // us holding the difference while the books recorded a full refund.
+  const { policy } = await getRuntimeConfig();
   const depositAmount =
     isUpfrontMaterials(job.materialsType) && job.materialsAmount
       ? job.materialsAmount
       : job.depositPaid
-      ? 20
+      ? policy.baseBookingDeposit
       : 0;
 
   let stripeRefundId: string | null = null;

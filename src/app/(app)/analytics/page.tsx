@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { isAdminRole, homeForRole } from "@/lib/role-routing";
+import { getLabourRate } from "@/lib/billing";
 import AnalyticsView from "./AnalyticsView";
 
 export default async function AnalyticsPage() {
@@ -242,6 +243,80 @@ export default async function AnalyticsPage() {
     depositsRefunded,
   };
 
+  // === LABOUR HOURS (SOP §9/§10) ===
+  // §9 names "labour hours" as an ops deliverable. Clocked hours = clock-out −
+  // clock-in. Labour revenue uses the persisted computed labour (Stage 1.3)
+  // where available, else billable/clocked hours × the configured rate. Reported
+  // overall, per period (monthly, below) and per provider (in employee perf).
+  const labourRate = await getLabourRate();
+  const clockedHoursOf = (j: (typeof jobs)[number]): number | null => {
+    if (!j.clockInTime || !j.clockOutTime) return null;
+    const ms =
+      new Date(j.clockOutTime).getTime() - new Date(j.clockInTime).getTime();
+    return ms > 0 ? ms / 3_600_000 : null;
+  };
+  const jobLabourRevenue = (j: (typeof jobs)[number]): number => {
+    if (j.computedLabourAmount != null) return j.computedLabourAmount;
+    if (j.billableHours != null) return j.billableHours * labourRate;
+    const h = clockedHoursOf(j);
+    return h != null ? h * labourRate : 0;
+  };
+
+  const clockedCompletedJobs = completedJobs.filter(
+    (j) => clockedHoursOf(j) != null
+  );
+  const totalClockedHours = clockedCompletedJobs.reduce(
+    (s, j) => s + (clockedHoursOf(j) ?? 0),
+    0
+  );
+  const totalBillableHours = clockedCompletedJobs.reduce(
+    (s, j) => s + (j.billableHours ?? 0),
+    0
+  );
+  const totalLabourRevenue = clockedCompletedJobs.reduce(
+    (s, j) => s + jobLabourRevenue(j),
+    0
+  );
+  const labourStats = {
+    labourRate,
+    clockedJobCount: clockedCompletedJobs.length,
+    totalClockedHours: parseFloat(totalClockedHours.toFixed(2)),
+    avgClockedHours:
+      clockedCompletedJobs.length > 0
+        ? parseFloat((totalClockedHours / clockedCompletedJobs.length).toFixed(2))
+        : 0,
+    totalBillableHours: parseFloat(totalBillableHours.toFixed(2)),
+    totalLabourRevenue: parseFloat(totalLabourRevenue.toFixed(2)),
+  };
+
+  // Per provider (crew member): each crew member is credited the full wall-clock
+  // hours they were on site; labour revenue is split evenly across the crew (as
+  // employee pay is), so summed provider revenue reconciles to job labour.
+  const labourByProvider = new Map<
+    string,
+    { clockedHours: number; billableHours: number; labourRevenue: number; jobs: number }
+  >();
+  for (const j of clockedCompletedJobs) {
+    const crew = j.cleaners;
+    if (crew.length === 0) continue;
+    const h = clockedHoursOf(j) ?? 0;
+    const rev = jobLabourRevenue(j);
+    const bh = j.billableHours ?? 0;
+    for (const c of crew) {
+      const e = labourByProvider.get(c.id) ?? {
+        clockedHours: 0,
+        billableHours: 0,
+        labourRevenue: 0,
+        jobs: 0,
+      };
+      e.clockedHours += h;
+      e.billableHours += bh / crew.length;
+      e.labourRevenue += rev / crew.length;
+      e.jobs += 1;
+      labourByProvider.set(c.id, e);
+    }
+  }
+
   // === INVENTORY STATS ===
   const lowStockProducts = products.filter((p) => p.stockLevel <= p.minStock);
   const totalInventoryValue = products.reduce(
@@ -396,6 +471,10 @@ export default async function AnalyticsPage() {
       const ratingsCount = ratingAgg?.count || 0;
       const complaints = complaintsByEmployee.get(e.id) || 0;
 
+      // Labour hours (SOP §9): clocked person-hours and labour revenue for this
+      // provider, from the crew-attributed map built above.
+      const lab = labourByProvider.get(e.id);
+
       return {
         id: e.id,
         name: e.name,
@@ -409,6 +488,9 @@ export default async function AnalyticsPage() {
         currentRating,
         ratingsCount,
         complaints,
+        clockedHours: parseFloat((lab?.clockedHours ?? 0).toFixed(2)),
+        billableHours: parseFloat((lab?.billableHours ?? 0).toFixed(2)),
+        labourRevenue: parseFloat((lab?.labourRevenue ?? 0).toFixed(2)),
       };
     })
     .sort((a, b) => b.totalJobs - a.totalJobs);
@@ -500,7 +582,14 @@ export default async function AnalyticsPage() {
   // === MONTHLY DATA (12 months) ===
   const monthlyDataMap = new Map<
     string,
-    { revenue: number; jobs: number; costs: number; period: string }
+    {
+      revenue: number;
+      jobs: number;
+      costs: number;
+      labourHours: number;
+      labourRevenue: number;
+      period: string;
+    }
   >();
 
   for (let i = 11; i >= 0; i--) {
@@ -511,7 +600,14 @@ export default async function AnalyticsPage() {
       year: "2-digit",
     });
     const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    monthlyDataMap.set(monthKey, { revenue: 0, jobs: 0, costs: 0, period });
+    monthlyDataMap.set(monthKey, {
+      revenue: 0,
+      jobs: 0,
+      costs: 0,
+      labourHours: 0,
+      labourRevenue: 0,
+      period,
+    });
   }
 
   completedJobs.forEach((job) => {
@@ -526,6 +622,7 @@ export default async function AnalyticsPage() {
         (sum, u) => sum + u.quantity * u.product.costPerUnit,
         0
       );
+      const clockedH = clockedHoursOf(job);
       monthlyDataMap.set(monthKey, {
         ...existing,
         revenue: existing.revenue + (job.price || 0),
@@ -535,6 +632,9 @@ export default async function AnalyticsPage() {
           (job.employeePay || 0) +
           (job.parking || 0) +
           jobProductCost,
+        labourHours: existing.labourHours + (clockedH ?? 0),
+        labourRevenue:
+          existing.labourRevenue + (clockedH != null ? jobLabourRevenue(job) : 0),
       });
     }
   });
@@ -547,6 +647,8 @@ export default async function AnalyticsPage() {
       expenses: data.costs,
       net: data.revenue - data.costs,
       profit: data.revenue - data.costs,
+      labourHours: parseFloat(data.labourHours.toFixed(2)),
+      labourRevenue: parseFloat(data.labourRevenue.toFixed(2)),
       period: data.period,
     })
   );
@@ -807,6 +909,7 @@ export default async function AnalyticsPage() {
       <AnalyticsView
         jobStats={jobStats}
         revenueStats={revenueStats}
+        labourStats={labourStats}
         inventoryStats={inventoryStats}
         employeeStats={employeeStats}
         productUsage={productUsage}

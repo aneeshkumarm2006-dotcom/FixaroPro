@@ -1,3 +1,9 @@
+// Deliberately does NOT load the runtime config. Most pages in this group are
+// static marketing pages (/faq, /reviews, …) and should stay statically
+// prerendered; a DB read here would either force the whole group dynamic or —
+// worse — be executed once at BUILD time and freeze a stale catalog into them.
+// Only /quote needs the catalog, so it mounts the provider itself and opts into
+// per-request rendering.
 export default function PublicLayout({
   children,
 }: {

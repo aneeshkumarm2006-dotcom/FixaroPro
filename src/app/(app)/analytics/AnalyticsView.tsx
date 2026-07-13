@@ -27,6 +27,7 @@ const FILTER_STYLE: React.CSSProperties = {
 
 /* ───────────────────────── formatting ───────────────────────── */
 const money = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-CA");
+const hrs = (n: number) => (n || 0).toLocaleString("en-CA", { maximumFractionDigits: 1 }) + "h";
 const moneyShort = (n: number) =>
   Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1)}k` : `$${Math.round(n || 0)}`;
 
@@ -244,12 +245,13 @@ function Avatar({ name, color }: { name: string; color?: string }) {
 interface JobStats { total: number; completed: number; inProgress: number; scheduled: number; cancelled: number; avgDuration: number; completionRate: number; }
 interface RevenueStats { totalRevenue: number; monthlyRevenue: number; weeklyRevenue: number; avgJobPrice: number; totalEmployeePay: number; totalTips: number; totalParking: number; totalProductCost: number; netProfit: number; profitMargin: number; pendingPayments: number; pendingAmount: number; materialsRevenue: number; depositsOutstanding: number; depositsApplied: number; depositsRefunded: number; }
 interface InventoryStats { totalProducts: number; totalValue: number; lowStockCount: number; totalUsageCost: number; avgUsagePerJob: number; inCirculationValue: number; }
+interface LabourStats { labourRate: number; clockedJobCount: number; totalClockedHours: number; avgClockedHours: number; totalBillableHours: number; totalLabourRevenue: number; }
 interface EmployeeStats { totalEmployees: number; admins: number; activeNow: number; avgJobsPerEmployee: number; topPerformer: string | null; }
 interface ProductUsage { id: string; name: string; unit: string; totalUsed: number; usageCount: number; totalCost: number; stockLevel: number; minStock: number; }
-interface EmployeePerformance { id: string; name: string; totalJobs: number; completedJobs: number; totalRevenue: number; totalPaid: number; avgJobPrice: number; completionRate: number; avgTimePerJob: number; currentRating: number; ratingsCount: number; complaints: number; }
+interface EmployeePerformance { id: string; name: string; totalJobs: number; completedJobs: number; totalRevenue: number; totalPaid: number; avgJobPrice: number; completionRate: number; avgTimePerJob: number; currentRating: number; ratingsCount: number; complaints: number; clockedHours: number; billableHours: number; labourRevenue: number; }
 interface LowStockProduct { id: string; name: string; stockLevel: number; minStock: number; unit: string; }
 interface JobTypeBreakdown { type: string; count: number; revenue: number; }
-interface MonthlyData { month: string; revenue: number; jobs: number; expenses: number; net: number; profit: number; period: string; }
+interface MonthlyData { month: string; revenue: number; jobs: number; expenses: number; net: number; profit: number; labourHours: number; labourRevenue: number; period: string; }
 interface PaymentJob { id: string; employeeId: string; employeeName: string; employeePay: number; status: string; startTime: string; endTime: string | null; createdAt: string; totalWorkers: number; }
 interface BudgetVsActual { id: string; category: string; period: string; budgetAmount: number; actualAmount: number; variance: number; percentUsed: number; }
 interface TargetWithActual { id: string; metric: string; period: string; periodStart: string; targetValue: number; actual: number; variance: number; progress: number; notes: string | null; }
@@ -259,7 +261,7 @@ interface MarketingLandingPageData { id: string; title: string; slug: string; is
 interface MarketingData { campaigns: MarketingCampaignData[]; landingPages: MarketingLandingPageData[]; totalPageVisits: number; activeCampaigns: number; publishedPages: number; totalBudget: number; totalSpent: number; }
 
 interface AnalyticsViewProps {
-  jobStats: JobStats; revenueStats: RevenueStats; inventoryStats: InventoryStats; employeeStats: EmployeeStats;
+  jobStats: JobStats; revenueStats: RevenueStats; labourStats: LabourStats; inventoryStats: InventoryStats; employeeStats: EmployeeStats;
   productUsage: ProductUsage[]; employeePerformance: EmployeePerformance[]; lowStockProducts: LowStockProduct[];
   jobTypeBreakdown: JobTypeBreakdown[]; monthlyData: MonthlyData[];
   recentJobs: Array<{ id: string; clientName: string; status: string; price: number | null; date: string; employeeName: string }>;
@@ -289,7 +291,7 @@ const METRIC_LABEL: Record<string, string> = {
 
 export default function AnalyticsView(props: AnalyticsViewProps) {
   const {
-    jobStats, revenueStats, inventoryStats, employeeStats, productUsage, employeePerformance,
+    jobStats, revenueStats, labourStats, inventoryStats, employeeStats, productUsage, employeePerformance,
     lowStockProducts, jobTypeBreakdown, monthlyData, paymentJobs, budgetVsActuals,
     targetsWithActuals, alerts, supplierComparisonData, supplierNames, inventoryValueData,
     marketingData, ratingTrendData, ratingTrendEmployeeNames,
@@ -357,7 +359,7 @@ export default function AnalyticsView(props: AnalyticsViewProps) {
         {tab === "budget" && <Budget budgetVsActuals={budgetVsActuals} />}
         {tab === "targets" && <Targets targetsWithActuals={targetsWithActuals} />}
         {tab === "inventory" && <Inventory inventoryStats={inventoryStats} productUsage={productUsage} lowStockProducts={lowStockProducts} inventoryValueData={inventoryValueData} />}
-        {tab === "employees" && <Employees employeeStats={employeeStats} employeePerformance={employeePerformance} ratingTrendData={ratingTrendData} ratingTrendEmployeeNames={ratingTrendEmployeeNames} />}
+        {tab === "employees" && <Employees employeeStats={employeeStats} employeePerformance={employeePerformance} labourStats={labourStats} monthlyData={monthlyData} ratingTrendData={ratingTrendData} ratingTrendEmployeeNames={ratingTrendEmployeeNames} />}
         {tab === "payments" && <Payments paymentJobs={paymentJobs} revenueStats={revenueStats} />}
         {tab === "alerts" && <Alerts alerts={alerts} />}
         {tab === "marketing" && <Marketing marketingData={marketingData} />}
@@ -578,13 +580,15 @@ function Inventory({ inventoryStats, productUsage, lowStockProducts, inventoryVa
   );
 }
 
-function Employees({ employeeStats, employeePerformance, ratingTrendData, ratingTrendEmployeeNames }: {
-  employeeStats: EmployeeStats; employeePerformance: EmployeePerformance[]; ratingTrendData: Array<Record<string, string | number>>; ratingTrendEmployeeNames: string[];
+function Employees({ employeeStats, employeePerformance, labourStats, monthlyData, ratingTrendData, ratingTrendEmployeeNames }: {
+  employeeStats: EmployeeStats; employeePerformance: EmployeePerformance[]; labourStats: LabourStats; monthlyData: MonthlyData[]; ratingTrendData: Array<Record<string, string | number>>; ratingTrendEmployeeNames: string[];
 }) {
   const perf = employeePerformance;
   const avgRating = perf.length ? (perf.reduce((a, p) => a + p.currentRating, 0) / perf.length).toFixed(1) : "0.0";
   const totalCompleted = perf.reduce((a, p) => a + p.completedJobs, 0);
   const complaints = perf.reduce((a, p) => a + p.complaints, 0);
+  // Providers who actually clocked time, for the labour-hours breakdown.
+  const labourPerf = [...perf].filter((p) => p.clockedHours > 0).sort((a, b) => b.clockedHours - a.clockedHours);
   const trend = ratingTrendData.map((row) => {
     const vals = ratingTrendEmployeeNames.map((n) => Number(row[n])).filter((v) => !isNaN(v));
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
@@ -598,11 +602,30 @@ function Employees({ employeeStats, employeePerformance, ratingTrendData, rating
         <MiniTile label="Jobs completed" value={totalCompleted} hint="last 30 days" />
         <MiniTile label="Complaints" value={complaints} accent={complaints ? "var(--amber-700)" : undefined} hint="open" />
       </div>
+      {/* Labour hours (SOP §9) — clocked person-hours and labour revenue at the
+          configured rate, overall and per provider. */}
+      <Panel title="Labour hours" sub={`Clocked time & labour revenue at $${labourStats.labourRate}/hr · ${labourStats.clockedJobCount} clocked jobs`}>
+        <div className="astat-grid">
+          <MiniTile label="Total clocked hours" value={hrs(labourStats.totalClockedHours)} hint="clock-out − clock-in" />
+          <MiniTile label="Avg hours / job" value={hrs(labourStats.avgClockedHours)} hint="clocked jobs only" />
+          <MiniTile label="Billable hours" value={hrs(labourStats.totalBillableHours)} hint="hourly jobs, rounded" />
+          <MiniTile label="Labour revenue" value={money(labourStats.totalLabourRevenue)} hint="at configured rate" />
+        </div>
+        {labourPerf.length > 0 ? (
+          <div className="an-grid-2" style={{ marginTop: 16 }}>
+            <div><p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--primary-60)" }}>Clocked hours by provider</p><Bars data={labourPerf.map((p) => ({ label: p.name.split(" ")[0], value: p.clockedHours, color: "#0284c7" }))} fmt={(v) => hrs(Number(v))} /></div>
+            <div><p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--primary-60)" }}>Labour revenue by provider</p><Bars data={labourPerf.map((p) => ({ label: p.name.split(" ")[0], value: p.labourRevenue }))} /></div>
+          </div>
+        ) : <div className="an-empty" style={{ marginTop: 12 }}>No clocked labour yet.</div>}
+      </Panel>
+      {monthlyData.some((m) => m.labourHours > 0) && (
+        <Panel title="Labour hours by month" sub="Clocked hours per period"><Bars color="#0284c7" data={monthlyData.map((m) => ({ label: m.month, value: m.labourHours }))} fmt={(v) => hrs(Number(v))} /></Panel>
+      )}
       <Panel title="Performance">
         <div className="atable-wrap" style={{ boxShadow: "none", border: "1px solid var(--primary-10)" }}>
           <div className="atable-scroll">
             <table className="atable">
-              <thead><tr><th>Employee</th><th className="num">Jobs</th><th className="num">Completed</th><th className="num">Rate</th><th className="num">Revenue</th><th className="num">Avg / job</th><th className="num">Rating</th></tr></thead>
+              <thead><tr><th>Employee</th><th className="num">Jobs</th><th className="num">Completed</th><th className="num">Rate</th><th className="num">Clocked</th><th className="num">Labour rev.</th><th className="num">Revenue</th><th className="num">Avg / job</th><th className="num">Rating</th></tr></thead>
               <tbody>
                 {perf.map((p) => (
                   <tr key={p.id} style={{ cursor: "default" }}>
@@ -610,6 +633,8 @@ function Employees({ employeeStats, employeePerformance, ratingTrendData, rating
                     <td className="num">{p.totalJobs}</td>
                     <td className="num">{p.completedJobs}</td>
                     <td className="num"><span className={`profit-pct ${p.completionRate >= 90 ? "good" : p.completionRate >= 75 ? "warn" : "bad"}`}>{Math.round(p.completionRate)}%</span></td>
+                    <td className="num">{p.clockedHours > 0 ? hrs(p.clockedHours) : "—"}</td>
+                    <td className="num">{p.labourRevenue > 0 ? money(p.labourRevenue) : "—"}</td>
                     <td className="num">{money(p.totalRevenue)}</td>
                     <td className="num">{money(p.avgJobPrice)}</td>
                     <td className="num">{p.currentRating.toFixed(1)}★</td>

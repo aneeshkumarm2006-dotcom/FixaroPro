@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { getBillingConfig, computeChargeAmount } from "@/lib/billing";
 
 const ADMIN_ROLES = ["OWNER", "ADMIN", "OPS_MANAGER"];
 
@@ -157,6 +158,23 @@ export async function adjustClockTimes(input: AdjustClockInput) {
         jobDate: true,
         startTime: true,
         cleaners: { select: { id: true } },
+        // Fields computeChargeAmount needs to recompute hourly labour (SOP §10.1.3).
+        jobType: true,
+        price: true,
+        discountAmount: true,
+        subtotalAmount: true,
+        gstAmount: true,
+        qstAmount: true,
+        basePriceAmount: true,
+        bookedSubtotalAmount: true,
+        paymentReceived: true,
+        depositPaid: true,
+        materialsAmount: true,
+        materialsType: true,
+        materialsAppliedAmount: true,
+        materialsRefundedAt: true,
+        cancellationFeeChargedAt: true,
+        refundedAmount: true,
       },
     });
     if (!job) return { success: false, error: "Job not found" };
@@ -171,9 +189,48 @@ export async function adjustClockTimes(input: AdjustClockInput) {
       return { success: false, error: "Clock-out must be after clock-in" };
     }
 
-    const updateData: { clockInTime?: Date; clockOutTime?: Date } = {};
+    const updateData: {
+      clockInTime?: Date;
+      clockOutTime?: Date;
+      price?: number;
+      subtotalAmount?: number;
+      gstAmount?: number;
+      qstAmount?: number;
+      billableHours?: number | null;
+      computedLabourAmount?: number | null;
+      computedTotal?: number | null;
+    } = {};
     if (newIn) updateData.clockInTime = newIn;
     if (newOut) updateData.clockOutTime = newOut;
+
+    // Re-run the hourly labour recompute against the corrected clock record and
+    // rewrite the stored charge fields so downstream consumers stay in sync (SOP
+    // §10.1.3). Skip once the job is PAID: the card was already charged at the
+    // prior amount, so silently rewriting the stored price would misrepresent it
+    // (a post-payment correction is an ops refund/top-up decision, not automatic).
+    const billingCfg = await getBillingConfig();
+    const charge = computeChargeAmount(
+      { ...job, clockInTime: effectiveIn, clockOutTime: effectiveOut },
+      billingCfg
+    );
+    if (charge.pricingModel === "hourly" && !job.paymentReceived) {
+      if (!charge.clockMissing && !charge.baseMissing) {
+        updateData.price = charge.total;
+        updateData.subtotalAmount = charge.subtotal;
+        updateData.gstAmount = charge.gst;
+        updateData.qstAmount = charge.qst;
+        updateData.billableHours = charge.billableHours;
+        updateData.computedLabourAmount = charge.labourAmount;
+        updateData.computedTotal = charge.total;
+      } else {
+        // Correction left the record incomplete — clear the computed cache; the
+        // stored price stays at its booked baseline (it was never overwritten).
+        updateData.billableHours = null;
+        updateData.computedLabourAmount = null;
+        updateData.computedTotal = null;
+      }
+    }
+
     await db.job.update({ where: { id: job.id }, data: updateData });
 
     const changes: Array<{ field: string; oldValue: string; newValue: string; label: string }> = [];

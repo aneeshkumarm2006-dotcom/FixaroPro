@@ -42,7 +42,7 @@ const INITIAL: Announcement[] = [
   {
     id: "AN-5", pinned: true, audience: "all", author: "Diane Moreau", hoursAgo: 5, unread: true,
     title: "New supply pickup hours start Monday",
-    body: "The supply room is now open 7:00–9:30 AM on weekdays only. Please grab your rags and refills before your first job. Weekend pickups move to the Friday window.",
+    body: "The supply room is now open 7:00–9:30 AM on weekdays only. Please grab your supplies and refills before your first job. Weekend pickups move to the Friday window.",
     reactions: { "👍": 6, "🎉": 2 }, acked: 4, total: 12,
   },
   {
@@ -59,8 +59,8 @@ const INITIAL: Announcement[] = [
   },
   {
     id: "AN-2", pinned: false, audience: "all", author: "Diane Moreau", hoursAgo: 140, unread: false,
-    title: "Reminder: log rag washes for payout",
-    body: "Don't forget to log your rag washes in the app — each logged wash adds $0.50 to your next payout. Unlogged washes can't be reimbursed.",
+    title: "Reminder: confirm your tools before each job",
+    body: "Please run through the equipment checklist in the app before heading out — jobs like AC installation and paint repair need specific tools on hand. Flag any missing items so we can restock before your next booking.",
     reactions: { "👍": 7 }, acked: 9, total: 12,
   },
 ];

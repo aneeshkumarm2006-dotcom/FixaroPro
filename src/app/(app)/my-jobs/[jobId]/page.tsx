@@ -14,24 +14,25 @@ import PhotoGallery from "./PhotoGallery";
 import JobChecklistPanel from "./JobChecklistPanel";
 import MapLinks from "./MapLinksClient";
 import EquipmentPanel from "./EquipmentPanel";
+import CompletionPanel from "./CompletionPanel";
 import { getRequiredEquipmentFor } from "@/lib/equipment-server";
+import {
+  getEquipmentReadiness,
+  getEquipmentReadinessMode,
+} from "@/lib/equipment-readiness";
+import { buildIntakeRows } from "@/lib/intake";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { jobTypeLabelWith } from "@/components/calendar/job-type-label";
+import { jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
   searchParams?: Promise<{ clockout?: string }>;
 };
 
-function jobTypeLabel(type: string | null) {
-  if (!type) return null;
-  switch (type) {
-    case "R": return "Residential service";
-    case "C": return "Commercial service";
-    case "PC": return "Post-construction service";
-    case "F": return "Follow-up service";
-    case "move-in-out": return "Move-in / move-out service";
-    default: return type;
-  }
-}
+// Label resolves against the live catalog (see below) — the local switch this
+// replaces printed the raw enum code for every real service.
+
 
 function jobTypeSlug(type: string | null) {
   if (!type) return null;
@@ -46,6 +47,11 @@ function jobTypeSlug(type: string | null) {
 
 export default async function JobDetailPage({ params, searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
+  // Late-cancel fee/window copy must quote the fee the server actually deducts;
+  // the service label comes from the same config.
+  const cfg = await getRuntimeConfig();
+  const { policy } = cfg;
+  const jobTypeLabel = (type: string | null) => jobTypeLabelWith(cfg, type);
   if (!session) redirect("/sign-in");
 
   const { jobId } = await params;
@@ -59,6 +65,13 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
       cleaners: true,
       addOns: true,
       productUsage: { include: { product: true } },
+      // Customer intake photos (SOP v4.2 §4) — shown read-only so the handyman
+      // can see the work before arriving.
+      photos: {
+        where: { kind: "INTAKE" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, url: true },
+      },
     },
   });
 
@@ -104,6 +117,19 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
   // default (SOP §4/§8 — checklists are admin-editable per service).
   const requiredEquipment = await getRequiredEquipmentFor(job.jobType);
 
+  // Which of those this provider is provably short of (SOP §8 missing-equipment
+  // validation). Fail-open: only tools matched to a TOOL-category product they
+  // hold none of can appear here, so this is empty until ops categorise tools.
+  const readinessMode = await getEquipmentReadinessMode();
+  const missingEquipment =
+    readinessMode === "off"
+      ? []
+      : (await getEquipmentReadiness(job.jobType, session.user.id)).missing;
+
+  // Service-specific intake the customer gave at booking (SOP v4.2 §4).
+  const intakeRows = buildIntakeRows(job);
+  const intakePhotos = (job as { photos?: { id: string; url: string }[] }).photos ?? [];
+
   const canClockIn = !jobWithClock.clockInTime && job.status !== "COMPLETED";
   const canClockOut = jobWithClock.clockInTime && !jobWithClock.clockOutTime;
   const canCancelShift =
@@ -112,7 +138,7 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
   const instantPayoutEligible =
     job.status === "COMPLETED" && job.paymentReceived === true && isEmployee;
 
-  const statusSlug = job.status.toLowerCase().replace("_", "");
+  const statusSlug = jobStatusSlug(job.status);
 
   const addOnsArr = (job as any).addOns ?? [];
 
@@ -137,7 +163,7 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
           <div className="job-type">{jobTypeLabel(job.jobType)}</div>
         )}
         <div className="pills">
-          <span className={`cl-pill ${statusSlug}`}>{job.status.replace("_", " ")}</span>
+          <span className={`cl-pill ${statusSlug}`}>{jobStatusLabel(job.status)}</span>
           {job.jobType && (
             <span className="cl-pill">{jobTypeSlug(job.jobType)}</span>
           )}
@@ -254,7 +280,7 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
           </span>
           <div className="cl-jd-cancel-meta">
             <strong>{"Can't make it?"}</strong>
-            <span>Cancelling less than 24 hours before the shift incurs a $20 fee and a 1-star penalty.</span>
+            <span>Cancelling less than {policy.cancellationWindowHours} hours before the shift incurs a ${policy.cancellationFee} fee and a 1-star penalty.</span>
           </div>
           <CancelShiftButton jobId={job.id} shiftStartTime={job.startTime} />
         </div>
@@ -456,6 +482,54 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         {job.notes || "No special instructions from the client. The team will be in touch if anything changes."}
       </div>
 
+      {/* Customer intake (SOP v4.2 §4) — service-specific details + photos the
+          customer supplied at booking. Read-only, always visible so the
+          handyman can prepare before arriving. */}
+      {(intakeRows.length > 0 || intakePhotos.length > 0) && (
+        <>
+          <h2 className="cl-jd-section-title">What the customer sent</h2>
+          <div className="cl-jd-card" style={{ marginBottom: 28, padding: 20 }}>
+            {intakeRows.length > 0 && (
+              <dl style={{ margin: 0, display: "grid", gap: 10 }}>
+                {intakeRows.map((r) => (
+                  <div
+                    key={r.label}
+                    style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 14 }}>
+                    <dt style={{ color: "var(--primary-60)", fontWeight: 500 }}>{r.label}</dt>
+                    <dd style={{ margin: 0, color: "var(--ink)", fontWeight: 500, textAlign: "right" }}>{r.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {intakePhotos.length > 0 && (
+              <div style={{ marginTop: intakeRows.length > 0 ? 16 : 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-60)", marginBottom: 10 }}>
+                  Customer photos · {intakePhotos.length}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {intakePhotos.map((p, i) => (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "block", width: 104, height: 104, borderRadius: 12, overflow: "hidden", border: "1px solid var(--primary-15)" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.url}
+                        alt={`Customer photo ${i + 1}`}
+                        loading="lazy"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Checklist */}
       {["SCHEDULED", "IN_PROGRESS", "COMPLETED", "PAID"].includes(job.status) && (
         <>
@@ -469,7 +543,23 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         </>
       )}
 
-      <EquipmentPanel jobId={job.id} equipment={requiredEquipment} />
+      <EquipmentPanel
+        jobId={job.id}
+        equipment={requiredEquipment}
+        missing={missingEquipment}
+      />
+
+      {/* Job completion (SOP §8). Clock-out is the primary path and collects the
+          write-up itself; this covers notes after the fact and jobs with no
+          clock record. */}
+      <CompletionPanel
+        jobId={job.id}
+        status={job.status}
+        completionNotes={job.completionNotes}
+        hasClockIn={Boolean(jobWithClock.clockInTime)}
+        hasClockOut={Boolean(jobWithClock.clockOutTime)}
+        completedAt={job.completedAt ? job.completedAt.toISOString() : null}
+      />
 
       {/* Photos */}
       {["IN_PROGRESS", "COMPLETED", "PAID"].includes(job.status) && (

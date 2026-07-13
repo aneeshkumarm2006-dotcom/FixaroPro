@@ -2,6 +2,10 @@ import { requireCleaner } from "@/lib/page-guards";
 import { db } from "@/db";
 import { getEligibleServiceTypes } from "@/lib/eligibility";
 import { getRequiredEquipmentFor } from "@/lib/equipment-server";
+import {
+  getEquipmentReadinessByService,
+  getEquipmentReadinessMode,
+} from "@/lib/equipment-readiness";
 import AvailableJobsClient from "./AvailableJobsClient";
 
 export default async function AvailableJobsPage() {
@@ -38,29 +42,50 @@ export default async function AvailableJobsPage() {
   // Required equipment per job type (SOP §8.4: providers must see the kit
   // before claiming). Resolved server-side via the admin-overridable checklist
   // (equipment-server), deduped by type so we hit the DB once per type.
+  //
+  // Per D0.9.2 this STATIC list stays visible pre-claim regardless of readiness
+  // — "sees required equipment before booking" is about knowing what the job
+  // needs, not about what this particular provider is short of.
   const uniqueTypes = [...new Set(openJobs.map((j) => j.jobType ?? "*"))];
   const equipmentEntries = await Promise.all(
     uniqueTypes.map(async (t) => [t, await getRequiredEquipmentFor(t === "*" ? null : t)] as const)
   );
   const equipmentByType = Object.fromEntries(equipmentEntries);
 
-  const serialized = openJobs.map((j) => ({
-    id: j.id,
-    jobNumber: j.jobNumber,
-    startTime: j.startTime.toISOString(),
-    isFlexible: j.isFlexible,
-    location: j.location,
-    jobType: j.jobType,
-    price: j.price,
-    bedCount: j.bedCount,
-    bathCount: j.bathCount,
-    requiredCleaners: j.requiredCleaners,
-    claimedCount: j.cleaners.length,
-    notes: j.notes,
-    // SOP §8.4: material status must be visible before claiming.
-    customerRequestsMaterials: j.customerRequestsMaterials,
-    requiredEquipment: equipmentByType[j.jobType ?? "*"] ?? [],
-  }));
+  // Equipment readiness for THIS provider (SOP §8 "Missing equipment
+  // validation", §3.3 warn-vs-block). One batched pass over the distinct
+  // service types on the board — never a query per card. Fail-open: only tools
+  // matched to a TOOL-category product they hold none of can ever appear here,
+  // so with no TOOL products categorised every job comes back ready.
+  const readinessMode = await getEquipmentReadinessMode();
+  const readinessByType =
+    readinessMode === "off"
+      ? new Map<string, { missing: string[] }>()
+      : await getEquipmentReadinessByService(uniqueTypes, session.user.id);
+
+  const serialized = openJobs.map((j) => {
+    const readiness = readinessByType.get(j.jobType ?? "*");
+    return {
+      id: j.id,
+      jobNumber: j.jobNumber,
+      startTime: j.startTime.toISOString(),
+      isFlexible: j.isFlexible,
+      location: j.location,
+      jobType: j.jobType,
+      price: j.price,
+      bedCount: j.bedCount,
+      bathCount: j.bathCount,
+      requiredCleaners: j.requiredCleaners,
+      claimedCount: j.cleaners.length,
+      notes: j.notes,
+      // SOP §8.4: material status must be visible before claiming.
+      customerRequestsMaterials: j.customerRequestsMaterials,
+      requiredEquipment: equipmentByType[j.jobType ?? "*"] ?? [],
+      // Tools we can positively prove this provider holds none of. The claim
+      // action re-checks this server-side — the UI never gets the last word.
+      missingEquipment: readiness?.missing ?? [],
+    };
+  });
 
   return (
     <div className="cl-page-wrap">
@@ -76,7 +101,7 @@ export default async function AvailableJobsPage() {
         </div>
       </div>
 
-      <AvailableJobsClient jobs={serialized} />
+      <AvailableJobsClient jobs={serialized} readinessMode={readinessMode} />
     </div>
   );
 }

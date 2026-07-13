@@ -1,3 +1,5 @@
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { jobTypeLabelWith } from "@/components/calendar/job-type-label";
 import Link from "next/link";
 import { db } from "@/db";
 import {
@@ -6,6 +8,7 @@ import {
 } from "lucide-react";
 import { getStrikeSummary } from "@/lib/strikes";
 import { STRIKE_THRESHOLD, STRIKE_WINDOW_DAYS } from "@/lib/strikes-constants";
+import { jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
 
 interface Props {
   userId: string;
@@ -30,13 +33,13 @@ function greeting(name: string) {
   return { g, firstName };
 }
 
-function jobTypeLabel(type: string | null) {
-  if (!type) return null;
-  const map: Record<string, string> = { R: "Residential", C: "Commercial", PC: "Post-Construction", F: "Follow-up" };
-  return map[type] ?? type;
-}
 
 export default async function CleanerDashboard({ userId, userName }: Props) {
+  // Service labels resolve against the live catalog. The local R/C/PC/F map this
+  // replaces returned the raw enum code for every Fixaro service.
+  const cfg = await getRuntimeConfig();
+  const jobTypeLabel = (type: string | null) =>
+    jobTypeLabelWith(cfg, type) || null;
   const now = new Date();
   const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
@@ -316,7 +319,7 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
                   {j.location ? ` · ${j.location}` : ""}
                 </div>
               </div>
-              <span className={`cl-pill ${j.status.toLowerCase().replace(/_/g, "")}`}>{j.status.replace(/_/g, " ")}</span>
+              <span className={`cl-pill ${jobStatusSlug(j.status)}`}>{jobStatusLabel(j.status)}</span>
             </Link>
           ))}
         </div>
@@ -334,8 +337,6 @@ export default async function CleanerDashboard({ userId, userName }: Props) {
               </div>
             </div>
           )}
-
-          {/* Rag wash reminder removed from Fixaro (SOP §9). */}
         </div>
       </div>
 

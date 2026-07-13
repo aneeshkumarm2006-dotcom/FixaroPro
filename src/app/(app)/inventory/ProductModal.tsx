@@ -21,7 +21,7 @@ import createProduct from "../actions/createProduct";
 import { updateProduct } from "../actions/updateProduct";
 import { deleteProduct } from "../actions/deleteProduct";
 
-type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "TOOL" | "OTHER";
 
 interface Product {
   id: string;
@@ -48,7 +48,7 @@ const formSchema = z.object({
   costPerUnit: z.coerce.number().min(0, "Cost must be 0 or greater"),
   stockLevel: z.coerce.number().min(0, "Stock level must be 0 or greater"),
   minStock: z.coerce.number().min(0, "Minimum stock must be 0 or greater"),
-  category: z.enum(["LIQUID_SPRAY", "MOP_LIQUID", "DISPOSABLE", "OTHER"]).default("OTHER"),
+  category: z.enum(["LIQUID_SPRAY", "MOP_LIQUID", "DISPOSABLE", "TOOL", "OTHER"]).default("OTHER"),
 });
 
 type FormInput = z.input<typeof formSchema>;
@@ -345,10 +345,13 @@ export function ProductModal({
                   <option value="LIQUID_SPRAY">Liquid spray (Windex, all-purpose, CLR…)</option>
                   <option value="MOP_LIQUID">Mop-based liquid (floor cleaner, Murphy Oil…)</option>
                   <option value="DISPOSABLE">Disposable (sponges, gloves, paper towels…)</option>
+                  <option value="TOOL">Tool (drill, level, stud finder…)</option>
                   <option value="OTHER">Other</option>
                 </select>
                 <p className="text-xs text-[#1c1917]/60 mt-1">
-                  Determines how cleaners log usage at clock-out.
+                  Determines how cleaners log usage at clock-out. <strong>Tool</strong> is the only
+                  category checked against the per-service equipment checklist — categorise a product
+                  as a tool and assign it to handymen to make equipment readiness real for it.
                 </p>
               </div>
 

@@ -5,8 +5,12 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2, Banknote } from "lucide-react";
 import { applyPromoCode } from "../../actions/applyPromoCode";
-import { BookingDraft, SERVICE_TYPES, FREQUENCIES, getMaterialsPricing } from "../types";
-import { CANCELLATION_FEE_USD, CANCELLATION_FEE_WINDOW_HOURS } from "@/lib/policy";
+import { BookingDraft, FREQUENCIES } from "../types";
+import {
+  useService,
+  useMaterialsPricing,
+  usePolicy,
+} from "@/lib/config/ServiceConfigProvider";
 import { calculateTax } from "@/lib/tax";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -18,10 +22,12 @@ interface Props {
 }
 
 export default function Step5Review({ draft, basePrice, onChange }: Props) {
+  const service = useService(draft.serviceType);
+  const configuredMaterials = useMaterialsPricing(draft.serviceType);
+  const policy = usePolicy();
+
   // Materials/equipment line (SOP §4/§5) — only when the customer opted in.
-  const materials = draft.customerRequestsMaterials
-    ? getMaterialsPricing(draft.serviceType)
-    : null;
+  const materials = draft.customerRequestsMaterials ? configuredMaterials : null;
   const materialsAmount = materials?.amount ?? 0;
 
   const breakdown = useMemo(() => {
@@ -43,9 +49,9 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   // Amount charged today — server-authoritative (painting $119 materials charge,
-  // refundable materials deposits, etc.). Defaults to the $20 base booking
-  // deposit until the charge-deposit route responds.
-  const [depositAmount, setDepositAmount] = useState(20);
+  // refundable materials deposits, etc.). Shows the configured base booking
+  // deposit until the charge-deposit route responds with the real figure.
+  const [depositAmount, setDepositAmount] = useState(policy.baseBookingDeposit);
 
   // Promo code
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -97,11 +103,12 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.email, draft.name, draft.serviceType, draft.customerRequestsMaterials]);
 
-  const service = SERVICE_TYPES.find((s) => s.value === draft.serviceType);
   const freq = FREQUENCIES.find((f) => f.value === draft.frequency);
 
-  const isSiliconeSealing = draft.serviceType === "SILICONE_SEALING";
-  const durationLine = isSiliconeSealing
+  // Per-unit fixed-price services (Silicone sealing) count rooms, not hours —
+  // read from the service's own config rather than a hardcoded service name.
+  const isPerUnit = service?.pricing === "fixed" && service.fixedPricePerUnit;
+  const durationLine = isPerUnit
     ? `${draft.hours} room${draft.hours > 1 ? "s" : ""}`
     : `${draft.hours} hour${draft.hours > 1 ? "s" : ""}`;
 
@@ -136,6 +143,31 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           <Row dt="Address" dd={draft.address || "—"} />
           <Row dt="Date" dd={dateLine} />
         </dl>
+        {draft.photoUrls.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <span className="cl-label" style={{ display: "block", marginBottom: 8 }}>
+              Photos ({draft.photoUrls.length})
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {draft.photoUrls.map((url, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={url}
+                  src={url}
+                  alt={`Attached photo ${i + 1}`}
+                  loading="lazy"
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 10,
+                    objectFit: "cover",
+                    border: "1px solid var(--primary-15)",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="cl-card-soft">
@@ -204,9 +236,9 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
               color: "var(--primary-60)",
               lineHeight: 1.5,
             }}>
-            Free cancellation up to {CANCELLATION_FEE_WINDOW_HOURS} hours before your
-            appointment. If you cancel less than {CANCELLATION_FEE_WINDOW_HOURS} hours
-            before the start time, a ${CANCELLATION_FEE_USD} cancellation fee applies —
+            Free cancellation up to {policy.cancellationWindowHours} hours before your
+            appointment. If you cancel less than {policy.cancellationWindowHours} hours
+            before the start time, a ${policy.cancellationFee} cancellation fee applies —
             any deposit you paid is still refunded.
           </p>
         </dl>

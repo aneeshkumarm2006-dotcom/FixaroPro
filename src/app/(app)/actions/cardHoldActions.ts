@@ -55,7 +55,11 @@ export async function placeCardHold(jobId: string) {
     return { success: false, error: "No saved card on file for this client" };
   }
 
-  const amount = Math.max(0, (job.price ?? 0) - (job.discountAmount ?? 0));
+  // job.price is already net of any discount (booking-pricing folds discount
+  // into the subtotal), so do NOT subtract it again. For an hourly job placed
+  // before clock-out this authorizes the booked estimate; capture is later
+  // capped at this authorization (see captureCardHold).
+  const amount = Math.max(0, job.price ?? 0);
   if (amount <= 0) return { success: false, error: "Invalid hold amount" };
   const amountCents = Math.round(amount * 100);
 
@@ -134,7 +138,17 @@ export async function captureCardHold(jobId: string) {
     return { success: false, error: "Hold was already released" };
   }
 
-  const amount = job.holdAmount ?? Math.max(0, (job.price ?? 0) - (job.discountAmount ?? 0));
+  // Capture the amount actually owed (job.price is authoritative — for hourly
+  // jobs clock-out rewrites it to the clocked total), but never more than the
+  // authorized hold (Stripe caps amount_to_capture at the authorization). job.price
+  // is already net of discount, so it is not subtracted again.
+  // NOTE: unlike chargeJob, this path does NOT credit a deposit collected at
+  // booking, so a deposit-paid job settled via hold-capture would over-collect by
+  // the deposit. These hold actions are currently unwired (no caller); wire the
+  // deposit-credit logic from chargeJob before exposing them in the UI.
+  const owed = Math.max(0, job.price ?? 0);
+  const authorized = job.holdAmount ?? owed;
+  const amount = Math.min(owed, authorized);
   const amountCents = Math.round(amount * 100);
 
   try {

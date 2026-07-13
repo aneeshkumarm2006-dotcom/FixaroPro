@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 import type { WithdrawalStatus } from "@prisma/client";
 
 type Action = "APPROVE" | "REJECT" | "COMPLETE";
@@ -75,6 +76,21 @@ export async function processWithdrawal(
             : withdrawal.processedAt,
         notes: notes?.trim() ? notes.trim() : withdrawal.notes,
       },
+    });
+
+    // Audit the withdrawal decision (SOP §9/§12) — records WHICH admin released
+    // or rejected the provider cash-out, the status change, and the amount.
+    logAudit({
+      entityType: "Withdrawal",
+      entityId: withdrawalId,
+      action: `WITHDRAWAL_${action}`,
+      field: "status",
+      oldValue: withdrawal.status,
+      newValue: nextStatus,
+      reason: notes?.trim() || null,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `Withdrawal of $${withdrawal.amount.toFixed(2)} for provider ${withdrawal.employeeId}: ${withdrawal.status} → ${nextStatus}.`,
     });
 
     revalidatePath("/my-pay");

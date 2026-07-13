@@ -5,7 +5,9 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { paintingFinalAmount } from "@/lib/painting";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import { sendCustomerPaintingOffer } from "@/lib/email";
+import { logAudit } from "@/lib/audit";
 
 const ADMIN_ROLES = ["OWNER", "ADMIN", "OPS_MANAGER"];
 
@@ -39,7 +41,11 @@ export async function overridePaintingProvider(input: OverrideInput) {
 
     const job = await db.job.findUnique({
       where: { id: input.jobId },
-      include: { client: { select: { email: true } } },
+      include: {
+        client: { select: { email: true } },
+        // Previous provider — captured as the audit `oldValue`.
+        employee: { select: { id: true, name: true } },
+      },
     });
     if (!job || job.jobType !== "PAINTING") {
       return { success: false, error: "Not a painting job" };
@@ -56,7 +62,9 @@ export async function overridePaintingProvider(input: OverrideInput) {
       Number.isFinite(input.newBidAmount) &&
       input.newBidAmount > 0;
 
-    const surplus = job.paintingSurplusRate ?? 1.35;
+    // Reprice at the rate the job was booked under, not today's policy value.
+    const cfg = await getRuntimeConfig();
+    const surplus = job.paintingSurplusRate ?? cfg.policy.paintingSurplusRate;
     const newFinal = reprice
       ? paintingFinalAmount(input.newBidAmount!, surplus)
       : job.paintingFinalAmount;
@@ -93,6 +101,25 @@ export async function overridePaintingProvider(input: OverrideInput) {
           ? `Provider overridden to ${newProvider.name} and re-priced to $${newFinal!.toFixed(2)} — new offer sent to client. Reason: ${input.reason.trim()}`
           : `Provider overridden to ${newProvider.name}; client price unchanged ($${(job.paintingFinalAmount ?? 0).toFixed(2)}). Reason: ${input.reason.trim()}`,
       },
+    });
+
+    // High-impact change → central AuditLog (SOP §9). The Audit page advertises
+    // "provider overrides"; every other high-impact action already uses logAudit.
+    // old/new provider, actor, reason and timestamp are all recorded.
+    const prevProviderName = job.employee?.name ?? "Unassigned";
+    await logAudit({
+      entityType: "Job",
+      entityId: job.id,
+      action: "PAINTING_PROVIDER_OVERRIDE",
+      field: "employeeId",
+      oldValue: prevProviderName,
+      newValue: newProvider.name,
+      reason: input.reason.trim(),
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: reprice
+        ? `Painting provider on booking #${job.jobNumber} overridden from ${prevProviderName} to ${newProvider.name} and re-priced to $${newFinal!.toFixed(2)} — new offer sent to client.`
+        : `Painting provider on booking #${job.jobNumber} overridden from ${prevProviderName} to ${newProvider.name}; client price unchanged ($${(job.paintingFinalAmount ?? 0).toFixed(2)}).`,
     });
 
     // Only re-notify the client when the price actually changed (D3).

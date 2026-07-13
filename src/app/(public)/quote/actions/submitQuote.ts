@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { sendCustomerQuoteReceived, sendAdminQuoteRequest } from "@/lib/email";
+import { isTrustedIntakePhotoUrl } from "@/lib/cloudinary-url";
 
 export interface QuoteSubmissionInput {
   name: string;
@@ -9,11 +10,16 @@ export interface QuoteSubmissionInput {
   phone?: string;
   address?: string;
   serviceType?: string;
-  bedCount?: number;
-  bathCount?: number;
-  squareFootage?: number;
   preferredDate?: string;
   message?: string;
+  // Service-specific intake (SOP v4.2 §4).
+  paintRepairArea?: string;
+  paintRepairSurface?: string;
+  acType?: string;
+  acLocation?: string;
+  acMountType?: string;
+  clientHasAcUnit?: boolean;
+  photoUrls?: string[];
 }
 
 export async function submitQuote(input: QuoteSubmissionInput) {
@@ -24,6 +30,12 @@ export async function submitQuote(input: QuoteSubmissionInput) {
     return { success: false, error: "Valid email is required" };
   }
 
+  const photoUrls = (input.photoUrls ?? [])
+    .filter((u): u is string => typeof u === "string")
+    .map((u) => u.trim())
+    .filter((u) => isTrustedIntakePhotoUrl(u))
+    .slice(0, 20);
+
   const quote = await db.quoteRequest.create({
     data: {
       name,
@@ -31,11 +43,15 @@ export async function submitQuote(input: QuoteSubmissionInput) {
       phone: input.phone?.trim() || null,
       address: input.address?.trim() || null,
       serviceType: input.serviceType?.trim() || null,
-      bedCount: input.bedCount ?? null,
-      bathCount: input.bathCount ?? null,
-      squareFootage: input.squareFootage ?? null,
       preferredDate: input.preferredDate ? new Date(input.preferredDate) : null,
       message: input.message?.trim() || null,
+      paintRepairArea: input.paintRepairArea?.trim() || null,
+      paintRepairSurface: input.paintRepairSurface?.trim() || null,
+      acType: input.acType?.trim() || null,
+      acLocation: input.acLocation?.trim() || null,
+      acMountType: input.acMountType?.trim() || null,
+      clientHasAcUnit: input.clientHasAcUnit ?? null,
+      photoUrls,
       source: "landing_page",
     },
   });

@@ -6,6 +6,12 @@ import {
   setServiceEquipment,
   resetServiceEquipment,
 } from "../actions/setServiceEquipment";
+import { updateAppSetting } from "../actions/updateAppSetting";
+import {
+  EQUIPMENT_READINESS_SETTING_KEY,
+  EQUIPMENT_READINESS_SETTING_CATEGORY,
+  type EquipmentReadinessMode,
+} from "@/lib/equipment-readiness-constants";
 
 interface Checklist {
   serviceType: string;
@@ -15,19 +21,75 @@ interface Checklist {
   customised: boolean;
 }
 
+interface Coverage {
+  totalItems: number;
+  trackedItems: number;
+}
+
+const READINESS_MODES: Array<{
+  value: EquipmentReadinessMode;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "off",
+    label: "Off",
+    hint: "Ignore equipment entirely. Providers are notified and can claim on service eligibility alone.",
+  },
+  {
+    value: "warn",
+    label: "Warn (recommended)",
+    hint: "Notify every eligible provider, but tell them what they are short of before they claim or bid.",
+  },
+  {
+    value: "strict",
+    label: "Strict",
+    hint: "Additionally hide the job from providers who are provably short of a required item.",
+  },
+];
+
 export default function EquipmentChecklistsClient({
   checklists,
   categories,
+  readinessMode,
+  coverage,
 }: {
   checklists: Checklist[];
   categories: string[];
+  readinessMode: EquipmentReadinessMode;
+  coverage: Coverage;
 }) {
   const [rows, setRows] = useState<Checklist[]>(checklists);
   const [openService, setOpenService] = useState<string | null>(null);
   const [draftItems, setDraftItems] = useState<string[]>([]);
   const [newItem, setNewItem] = useState("");
+  const [mode, setMode] = useState<EquipmentReadinessMode>(readinessMode);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
+
+  // An item is only checkable when it matches a row in the product catalog.
+  // With none matched, "strict" has nothing to act on — say so rather than let
+  // ops believe they have turned on a filter that does anything.
+  const nothingTracked = coverage.trackedItems === 0;
+
+  function saveMode(next: EquipmentReadinessMode) {
+    const previous = mode;
+    setMode(next);
+    setMsg(null);
+    start(async () => {
+      const res = await updateAppSetting({
+        key: EQUIPMENT_READINESS_SETTING_KEY,
+        category: EQUIPMENT_READINESS_SETTING_CATEGORY,
+        value: next,
+      });
+      if (res.success) {
+        setMsg({ ok: true, text: `Equipment readiness set to “${next}”.` });
+      } else {
+        setMode(previous);
+        setMsg({ ok: false, text: res.error ?? "Failed to save readiness mode" });
+      }
+    });
+  }
 
   function open(row: Checklist) {
     setOpenService(row.serviceType);
@@ -100,6 +162,88 @@ export default function EquipmentChecklistsClient({
           {msg.text}
         </p>
       ) : null}
+
+      <section
+        style={{
+          border: "1px solid rgba(28,25,23,0.10)",
+          borderRadius: 14,
+          padding: "16px 18px",
+          background: "#fff",
+        }}>
+        <h2 className="cl-label" style={{ margin: 0 }}>
+          Missing-equipment flow
+        </h2>
+        <p
+          className="cl-subtitle"
+          style={{ margin: "6px 0 14px", maxWidth: 720, fontSize: 13 }}>
+          What happens when a handyman is short of something on the list — both when we
+          decide who to notify about a new job, and when they try to claim it.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {READINESS_MODES.map((option) => (
+            <label
+              key={option.value}
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                cursor: pending ? "default" : "pointer",
+                opacity: pending ? 0.6 : 1,
+              }}>
+              <input
+                type="radio"
+                name="equipment-readiness-mode"
+                value={option.value}
+                checked={mode === option.value}
+                disabled={pending}
+                onChange={() => saveMode(option.value)}
+                style={{ marginTop: 3 }}
+              />
+              <span>
+                <strong style={{ fontSize: 13 }}>{option.label}</strong>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    color: "var(--primary-60)",
+                    marginTop: 2,
+                  }}>
+                  {option.hint}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <p
+          style={{
+            margin: "14px 0 0",
+            fontSize: 12,
+            color: nothingTracked ? "#92400e" : "var(--primary-60)",
+            background: nothingTracked ? "rgba(217,119,6,0.10)" : "transparent",
+            padding: nothingTracked ? "8px 10px" : 0,
+            borderRadius: 8,
+          }}>
+          {nothingTracked ? (
+            <>
+              <strong>None of the {coverage.totalItems} checklist items match a product
+              categorised “Tool” yet</strong>, so we cannot prove anyone is missing anything —
+              “strict” currently hides nothing and behaves like “warn”. To make readiness real:
+              add the tool under Inventory → Products with the <strong>Tool</strong> category,
+              then assign it to the handymen who own one. Only Tool products are ever checked;
+              consumables never count against anyone.
+            </>
+          ) : (
+            <>
+              {coverage.trackedItems} of {coverage.totalItems} checklist items match a{" "}
+              <strong>Tool</strong> product and can be checked against a handyman’s kit. The
+              other {coverage.totalItems - coverage.trackedItems} are never counted against
+              anyone. Only Tool-category products are considered — consumables are ignored.
+            </>
+          )}
+        </p>
+      </section>
 
       {categories.map((cat) => {
         const inCat = rows.filter((r) => r.category === cat);

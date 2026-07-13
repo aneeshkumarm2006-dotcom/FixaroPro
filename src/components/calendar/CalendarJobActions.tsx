@@ -16,25 +16,30 @@ import {
   Camera,
   StickyNote,
   HelpCircle,
-  AlertTriangle,
   ExternalLink,
   FileText,
 } from "lucide-react";
 import { markArrived } from "@/app/(app)/actions/markArrived";
 import { addJobNote } from "@/app/(app)/actions/addJobNote";
 // SOP §9.10: shared label helper so new services never render as raw codes.
-import { jobTypeLabel as getJobTypeLabel } from "./job-type-label";
+import { useJobTypeLabel } from "./use-job-type-label";
+import { WARNING_VISUAL, jobStatusLabel } from "@/lib/status-icons";
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "cleano" | "warning" | "error" }
-> = {
-  CREATED: { label: "Created", variant: "default" },
-  SCHEDULED: { label: "Scheduled", variant: "secondary" },
-  IN_PROGRESS: { label: "In Progress", variant: "warning" },
-  COMPLETED: { label: "Completed", variant: "cleano" },
-  PAID: { label: "Paid", variant: "cleano" },
-  CANCELLED: { label: "Cancelled", variant: "error" },
+const WarningIcon = WARNING_VISUAL.Icon;
+
+
+// Only the Badge variant lives here — that is a design-system concern the status
+// map has no notion of. The label comes from status-icons (SOP §11), so it can
+// never drift from the rest of the app again.
+type BadgeVariant = "default" | "secondary" | "cleano" | "warning" | "error";
+
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  CREATED: "default",
+  SCHEDULED: "secondary",
+  IN_PROGRESS: "warning",
+  COMPLETED: "cleano",
+  PAID: "cleano",
+  CANCELLED: "error",
 };
 
 export default function CalendarJobActions() {
@@ -57,6 +62,9 @@ export default function CalendarJobActions() {
 
   const event = selectedEvent;
   const isJobEvent = !!event?.metadata?.jobId;
+
+  // Above the early returns below — hooks may not be called conditionally.
+  const getJobTypeLabel = useJobTypeLabel();
 
   const handleClose = useCallback(() => {
     setShowEventModal(false);
@@ -142,7 +150,7 @@ export default function CalendarJobActions() {
 
   const meta = event.metadata!;
   const status = meta.status as string;
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.CREATED;
+  const statusVariant = STATUS_VARIANT[status] ?? STATUS_VARIANT.CREATED;
   const jobTypeLabel = meta.jobType ? getJobTypeLabel(meta.jobType) : null;
   const hasMissingEquipment =
     meta.missingEquipment && meta.missingEquipment.length > 0;
@@ -152,8 +160,8 @@ export default function CalendarJobActions() {
       <div className="space-y-4">
         {/* Job Info Header */}
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={statusConfig.variant} size="sm">
-            {statusConfig.label}
+          <Badge variant={statusVariant} size="sm">
+            {jobStatusLabel(status)}
           </Badge>
           {jobTypeLabel && (
             <Badge variant="cleano" size="sm">
@@ -209,7 +217,7 @@ export default function CalendarJobActions() {
         {/* Equipment Warning */}
         {hasMissingEquipment && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-            <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <WarningIcon className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-[400] text-yellow-800">
                 Missing Equipment

@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import JobDetailView from "./JobDetailView";
 import AdminJobOpsPanel from "./AdminJobOpsPanel";
-import { computeJobBilling, getLabourRate } from "@/lib/billing";
+import { computeJobBilling, getBillingConfig } from "@/lib/billing";
 import { getEligibleProviderIdsFor } from "@/lib/eligibility";
 
 export default async function JobPage({
@@ -193,6 +193,13 @@ export default async function JobPage({
     // (materials deposit or the painting $119 charge), not a hardcoded $20.
     materialsType: job.materialsType,
     materialsAmount: job.materialsAmount,
+    // Service-specific intake (SOP v4.2 §4).
+    paintRepairArea: job.paintRepairArea,
+    paintRepairSurface: job.paintRepairSurface,
+    acType: job.acType,
+    acLocation: job.acLocation,
+    acMountType: job.acMountType,
+    clientHasAcUnit: job.clientHasAcUnit,
     addOns: job.addOns.map((a) => ({
       id: a.id,
       name: a.name,
@@ -236,8 +243,12 @@ export default async function JobPage({
     id: photo.id,
     url: photo.url,
     caption: photo.caption,
+    kind: photo.kind,
     createdAt: photo.createdAt.toISOString(),
-    employee: { id: photo.employee.id, name: photo.employee.name },
+    // INTAKE photos are customer-uploaded and have no employee.
+    employee: photo.employee
+      ? { id: photo.employee.id, name: photo.employee.name }
+      : null,
   }));
 
   // Admin ops panel (SOP §9/§10): charge-review breakdown, painting bid
@@ -245,8 +256,8 @@ export default async function JobPage({
   // the existing detail view.
   let opsPanel: React.ReactNode = null;
   if (isAdmin) {
-    const labourRate = await getLabourRate();
-    const billing = computeJobBilling(job, labourRate);
+    const billingCfg = await getBillingConfig();
+    const billing = computeJobBilling(job, billingCfg);
 
     let painting = null as null | {
       status: string | null;

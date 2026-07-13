@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import { bulkChargeJobs } from "../actions/bulkChargeJobs";
 
 interface RowBilling {
+  pricingModel: "hourly" | "fixed" | "quote";
   hoursWorked: number | null;
+  billableHours: number | null;
   labourRate: number;
   labourFromClock: number | null;
   materialsAmount: number;
@@ -17,8 +19,11 @@ interface RowBilling {
   gst: number;
   qst: number;
   total: number;
+  bookedTotal: number;
   refunded: number;
   amountDueNow: number;
+  clockMissing: boolean;
+  baseMissing: boolean;
 }
 
 interface BulkJob {
@@ -89,6 +94,10 @@ function centsEqual(a: number, b: number) {
  * credit don't already cover the balance. */
 function chargeability(j: BulkJob) {
   if (j.grossAmount <= 0) return { ok: false, reason: "Invalid amount" };
+  // SOP §10 (guard 1.5) — an hourly job can't be priced without a clock-out.
+  if (j.billing.pricingModel === "hourly" && j.billing.clockMissing) {
+    return { ok: false, reason: "Clock out required" };
+  }
   const afterGiftCard = Math.max(
     0,
     j.amountDue - Math.min(j.giftCardBalance, j.amountDue)
@@ -109,12 +118,9 @@ export default function BulkChargeClient({ jobs }: Props) {
     () => jobs.filter((j) => chargeability(j).ok),
     [jobs]
   );
-  // Select-all skips rows with missing clock data — those should be reviewed
-  // and fixed on the job page first (they can still be ticked individually).
-  const selectAllPool = useMemo(
-    () => chargeable.filter((j) => j.billing.hoursWorked != null),
-    [chargeable]
-  );
+  // Select-all covers every chargeable row. Hourly jobs with no clock-out are
+  // already excluded (chargeability blocks them); fixed/quote jobs need no clock.
+  const selectAllPool = chargeable;
   const allSelected =
     selectAllPool.length > 0 &&
     selectAllPool.every((j) => selected.has(j.id)) &&
@@ -277,7 +283,9 @@ export default function BulkChargeClient({ jobs }: Props) {
                 {jobs.map((j) => {
                   const eligibility = chargeability(j);
                   const disabled = !eligibility.ok;
-                  const missingClock = j.billing.hoursWorked == null;
+                  // Only hourly jobs need a clock record to be priced.
+                  const missingClock =
+                    j.billing.pricingModel === "hourly" && j.billing.clockMissing;
                   const reviewMismatch = !centsEqual(
                     j.billing.amountDueNow,
                     j.amountDue
@@ -393,6 +401,8 @@ function BulkRow({
         <td style={{ ...td, fontSize: 12 }}>
           {missingClock ? (
             <span style={warnBadge}>No clock record</span>
+          ) : j.billing.pricingModel !== "hourly" ? (
+            <span style={{ color: "var(--primary-50)" }}>—</span>
           ) : (
             <span style={{ color: "var(--primary-60)" }}>
               {j.billing.hoursWorked}h
@@ -462,14 +472,29 @@ function BulkRow({
 
               <div style={{ minWidth: 300, flex: "0 1 380px" }}>
                 <div style={detailHeading}>Charge review (SOP §10)</div>
-                {j.billing.labourFromClock != null ? (
-                  <DetailRow
-                    label={`Labour (${j.billing.hoursWorked}h × $${j.billing.labourRate}/hr)`}
-                    value={fmtAmount(j.billing.labourFromClock)}
-                  />
-                ) : (
-                  <DetailRow label="Labour (no clock record)" value="—" />
-                )}
+                {j.billing.pricingModel === "hourly" ? (
+                  j.billing.labourFromClock != null &&
+                  j.billing.billableHours != null &&
+                  !j.billing.baseMissing ? (
+                    <DetailRow
+                      label={
+                        Math.round(j.billing.labourFromClock * 100) ===
+                        Math.round(j.billing.billableHours * j.billing.labourRate * 100)
+                          ? `Billable labour (${j.billing.billableHours}h × $${j.billing.labourRate}/hr)`
+                          : `Billable labour (${j.billing.billableHours}h · flat package)`
+                      }
+                      value={fmtAmount(j.billing.labourFromClock)}
+                    />
+                  ) : (
+                    <DetailRow label="Billable labour (no clock record)" value="—" />
+                  )
+                ) : null}
+                {j.billing.baseMissing && !missingClock ? (
+                  <p style={warnNote}>
+                    Booked before hourly billing — no base price on file, so the
+                    booked total is used. Verify before charging.
+                  </p>
+                ) : null}
                 {j.billing.materialsAmount > 0 ? (
                   <DetailRow
                     label={
@@ -480,7 +505,7 @@ function BulkRow({
                     value={fmtAmount(j.billing.materialsAmount)}
                   />
                 ) : null}
-                <DetailRow label="Subtotal (booked)" value={fmtAmount(j.billing.subtotal)} />
+                <DetailRow label="Subtotal" value={fmtAmount(j.billing.subtotal)} />
                 {j.billing.discount > 0 ? (
                   <DetailRow label="Discount" value={`−${fmtAmount(j.billing.discount)}`} />
                 ) : null}
@@ -510,7 +535,11 @@ function BulkRow({
                     value={`−${fmtAmount(j.billing.refunded)}`}
                   />
                 ) : null}
-                <DetailRow label="Total (booked)" value={fmtAmount(j.billing.total)} />
+                <DetailRow label="Total" value={fmtAmount(j.billing.total)} />
+                {j.billing.pricingModel === "hourly" &&
+                !centsEqual(j.billing.bookedTotal, j.billing.total) ? (
+                  <DetailRow label="Booked estimate" value={fmtAmount(j.billing.bookedTotal)} />
+                ) : null}
                 <DetailRow label="Amount due now" value={fmtAmount(j.amountDue)} strong />
                 {giftCardApplied > 0 ? (
                   <p style={infoNote}>

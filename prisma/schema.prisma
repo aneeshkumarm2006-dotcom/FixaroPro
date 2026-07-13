@@ -9,39 +9,33 @@ datasource db {
 }
 
 model User {
-  id                           String                 @id @default(cuid())
+  id                           String                       @id @default(cuid())
   name                         String
-  email                        String                 @unique
+  email                        String                       @unique
   image                        String?
-  createdAt                    DateTime               @default(now())
-  updatedAt                    DateTime               @updatedAt
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
   phone                        String?
   // Least-privilege default. Staff accounts are created by an admin via
   // createEmployee (which sets `role` explicitly); the only other path that
   // reaches better-auth's public signUp endpoint is the customer portal, whose
   // accounts must be CLIENT anyway. Never default to a staff role — a public
   // signUp would otherwise mint an EMPLOYEE.
-  role                         Roles                  @default(CLIENT)
-  emailVerified                Boolean                @default(false)
-  payMultiplier                Float                  @default(1.0)
+  role                         Roles                        @default(CLIENT)
+  emailVerified                Boolean                      @default(false)
+  payMultiplier                Float                        @default(1.0)
   multiplierLastRecalculatedAt DateTime?
   lastSeenAt                   DateTime?
-  // Self-wash credit ledger — accumulates as jobs complete; drained when
-  // the cleaner claims a wash payout. See /lib/wash for the rules.
-  ragCredits                   Int                    @default(0)
-  padCredits                   Int                    @default(0)
-  washPayouts                  WashPayout[]
   accounts                     Account[]
   assignedProducts             EmployeeProduct[]
   inventoryRequests            InventoryRequest[]
-  jobs                         Job[]                  @relation("EmployeeJobs")
+  jobs                         Job[]                        @relation("EmployeeJobs")
   sessions                     Session[]
-  cleaningJobs                 Job[]                  @relation("JobCleaners")
+  cleaningJobs                 Job[]                        @relation("JobCleaners")
   jobInvites                   JobAssignmentInvite[]
-  jobLogs                      JobLog[]               @relation("UserJobLogs")
+  jobLogs                      JobLog[]                     @relation("UserJobLogs")
   payouts                      Payout[]
-  approvedPeriods              PayPeriod[]            @relation("PayPeriodApprover")
-  ragWashes                    RagWash[]
+  approvedPeriods              PayPeriod[]                  @relation("PayPeriodApprover")
   availabilities               EmployeeAvailability[]
   photos                       JobPhoto[]
   checklists                   JobChecklist[]
@@ -50,15 +44,15 @@ model User {
   ratings                      EmployeeRating[]
   withdrawals                  Withdrawal[]
   checkouts                    InventoryCheckout[]
-  chatConversation             ChatConversation?      @relation("EmployeeChatConversation")
-  sentChatMessages             ChatMessage[]          @relation("ChatMessageSender")
-  employeeComplaints           Complaint[]            @relation("EmployeeComplaints")
-  resolvedComplaints           Complaint[]            @relation("ResolvedComplaints")
-  receivedAlerts               Alert[]                @relation("RecipientAlerts")
-  strikes                      CleanerStrike[]        @relation("CleanerStrikes")
-  paintingBids                 PaintingBid[]          @relation("ProviderPaintingBids")
+  chatConversation             ChatConversation?            @relation("EmployeeChatConversation")
+  sentChatMessages             ChatMessage[]                @relation("ChatMessageSender")
+  employeeComplaints           Complaint[]                  @relation("EmployeeComplaints")
+  resolvedComplaints           Complaint[]                  @relation("ResolvedComplaints")
+  receivedAlerts               Alert[]                      @relation("RecipientAlerts")
+  strikes                      CleanerStrike[]              @relation("CleanerStrikes")
+  paintingBids                 PaintingBid[]                @relation("ProviderPaintingBids")
   serviceEligibilities         EmployeeServiceEligibility[] @relation("EmployeeEligibilities")
-  serviceEquipmentEdits        ServiceEquipment[]     @relation("ServiceEquipmentUpdatedBy")
+  serviceEquipmentEdits        ServiceEquipment[]           @relation("ServiceEquipmentUpdatedBy")
 }
 
 model Account {
@@ -127,6 +121,97 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@index([category])
+}
+
+// ── Exportable config layer (SOP §3, stage 8) ──────────────────────────────
+// SOP §3 phase 1 requires every setting and workflow in this document to be
+// "represented in the database/config layer and exportable/importable by
+// environment". The service catalog, its materials/equipment pricing and the
+// painting cost baselines used to ship as TypeScript constants, so adding or
+// retiring a service — or repricing one — needed a deploy.
+//
+// The TS constants (src/app/(book)/book/types.ts, src/lib/painting.ts) are
+// retained as SEED DEFAULTS: src/lib/config/service-config.ts seeds these tables
+// from them on first admin visit and falls back to them while the tables are
+// empty, so an unseeded environment behaves exactly as it did before.
+//
+// Policy values (fees, windows, rates) live in AppSetting under the `policy` /
+// `pricing` categories, declared once in src/lib/config/policy-registry.ts with
+// a label, default, help text and validation rule (SOP §2.3).
+
+/// How a service's LABOUR is priced (decision D0.7). Orthogonal to the
+/// materials/equipment axis below — the two compose freely.
+enum ServicePricingModel {
+  /// Billable clocked hours × labour rate (package-aware). The default.
+  HOURLY
+  /// A fixed price: `fixedPrice`, optionally × units (Silicone sealing / room).
+  FIXED
+  /// Bid- or quote-derived (Painting: accepted bid × surplus rate).
+  QUOTE
+}
+
+/// What the service's materials/equipment amount MEANS (SOP §5). Applies only
+/// when the customer checks the all-or-nothing Fixaro-materials box.
+enum MaterialsChargeType {
+  /// Refundable deposit. Captured upfront; "D" review indicator; apply/refund.
+  DEPOSIT
+  /// Flat line item billed on the final invoice. Nothing captured upfront.
+  COST
+  /// Flat line item captured upfront but NOT a deposit — painting's $119.
+  CHARGE
+}
+
+/// One bookable service. Seeded from SERVICE_CATALOG + MATERIALS_PRICING.
+model ServiceCatalogItem {
+  id       String @id @default(cuid())
+  /// Matches Job.jobType / ServiceEquipment.serviceType / eligibility rows.
+  value    String @unique
+  label    String
+  category String
+
+  pricing   ServicePricingModel @default(HOURLY)
+  priceNote String?
+
+  /// D0.2: ops can retire a service without a deploy. Inactive services stay
+  /// bookable-in-history and keep rendering their label everywhere, but are
+  /// hidden from the booking page, the quote form and new-job targeting.
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  /// pricing = FIXED only. `fixedPricePerUnit` multiplies by the booked hours
+  /// field, which the booking UI reuses as a unit count (Silicone: $209/room).
+  fixedPrice        Float?
+  fixedPricePerUnit Boolean @default(false)
+
+  /// Materials/equipment (SOP §5). NULL = this service has no materials amount
+  /// at all (AC installation), which is different from an amount of 0.
+  materialsAmount Float?
+  materialsType   MaterialsChargeType?
+  /// Customer-facing qualifier appended to the materials line, e.g. painting's
+  /// "paint not included" (D0.3). Copy ops should own, not a deploy.
+  materialsNote   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([active])
+}
+
+/// Internal painting cost baseline per scope (SOP §7). PRE-surplus: the
+/// customer-facing range is baseline × the `painting.surplusRate` policy value.
+model PaintingBaseline {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  label       String
+  baselineMin Float
+  baselineMax Float
+  note        String?
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Admin-editable equipment/products checklist per service type (SOP §4/§8:
@@ -214,7 +299,7 @@ model SupplierPrice {
 }
 
 model Client {
-  id                     String            @id @default(cuid())
+  id                     String                  @id @default(cuid())
   name                   String
   email                  String?
   secondaryEmail         String?
@@ -227,33 +312,33 @@ model Client {
   state                  String?
   zip                    String?
   notes                  String?
-  discountPercent        Float             @default(0)
-  clientType             ClientType        @default(RESIDENTIAL)
+  discountPercent        Float                   @default(0)
+  clientType             ClientType              @default(RESIDENTIAL)
   serviceFrequency       ServiceFrequency?
-  isActive               Boolean           @default(true)
-  stripeCustomerId       String?           @unique
+  isActive               Boolean                 @default(true)
+  stripeCustomerId       String?                 @unique
   defaultPaymentMethodId String?
-  referralCode           String?           @unique
-  referralCredit         Float             @default(0)
+  referralCode           String?                 @unique
+  referralCredit         Float                   @default(0)
   // Account credit from redeemed gift cards. Auto-applies at chargeJob time
   // (drains down to zero before the card-on-file is charged).
-  giftCardBalance        Float             @default(0)
+  giftCardBalance        Float                   @default(0)
   // No-show tracking: incremented on each admin-confirmed no-show. The
   // automatic 1-star is captured here (count + timestamp) rather than as
   // a Client-side rating row, because the existing review system only
   // models cleaner ratings.
-  noShowCount            Int               @default(0)
+  noShowCount            Int                     @default(0)
   lastNoShowAt           DateTime?
   referredByClientId     String?
-  userId                 String?           @unique
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  userId                 String?                 @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
   jobs                   Job[]
   invoices               Invoice[]
   complaints             Complaint[]
   waitlistEntries        Waitlist[]
-  referredBy             Client?           @relation("ClientReferrals", fields: [referredByClientId], references: [id], onDelete: SetNull)
-  referrals              Client[]          @relation("ClientReferrals")
+  referredBy             Client?                 @relation("ClientReferrals", fields: [referredByClientId], references: [id], onDelete: SetNull)
+  referrals              Client[]                @relation("ClientReferrals")
   recurringCancellations RecurringCancellation[]
   addresses              ClientAddress[]
   contact                Contact?
@@ -294,166 +379,179 @@ enum ServiceFrequency {
 }
 
 model Job {
-  id                      String            @id @default(cuid())
-  jobNumber               Int               @unique @default(autoincrement())
-  employeeId              String?
-  clientName              String
-  clientId                String?
-  location                String?
-  apartmentNumber         String?
-  description             String?
-  jobType                 String?
-  jobDate                 DateTime?
-  startTime               DateTime
-  endTime                 DateTime?
-  clockInTime             DateTime?
-  clockOutTime            DateTime?
-  status                  JobStatus         @default(CREATED)
-  price                   Float?
-  employeePay             Float?
-  totalTip                Float?
-  parking                 Float?
-  paymentReceived         Boolean           @default(false)
-  invoiceSent             Boolean           @default(false)
-  notes                   String?
-  paymentType             PaymentType?
-  discountAmount          Float?
-  bedCount                Int?
-  bathCount               Int?
-  payRateMultiplier       Float?            @default(1.0)
-  isFlexible              Boolean           @default(false)
-  requiredCleaners        Int               @default(1)
-  subtotalAmount          Float             @default(0)
-  gstAmount               Float             @default(0)
-  qstAmount               Float             @default(0)
-  tipAmount               Float             @default(0)
-  totalAmount             Float             @default(0)
-  stripeSetupIntentId     String?
-  stripePaymentIntentId   String?
-  depositPaymentIntentId  String?
-  depositPaid             Boolean           @default(false)
-  depositPaidAt           DateTime?
+  id                             String                @id @default(cuid())
+  jobNumber                      Int                   @unique @default(autoincrement())
+  employeeId                     String?
+  clientName                     String
+  clientId                       String?
+  location                       String?
+  apartmentNumber                String?
+  description                    String?
+  jobType                        String?
+  jobDate                        DateTime?
+  startTime                      DateTime
+  endTime                        DateTime?
+  clockInTime                    DateTime?
+  clockOutTime                   DateTime?
+  status                         JobStatus             @default(CREATED)
+  price                          Float?
+  employeePay                    Float?
+  totalTip                       Float?
+  parking                        Float?
+  paymentReceived                Boolean               @default(false)
+  invoiceSent                    Boolean               @default(false)
+  notes                          String?
+  // Provider-facing job completion (SOP §8 "Job completion tools: notes, photos,
+  // status updates, completed marker"). `notes` above is the CUSTOMER's brief;
+  // `completionNotes` is the handyman's write-up of what they actually did,
+  // captured at clock-out (which is what completes a job) or via the separate
+  // mark-complete step for jobs with no clock record. `completedAt`/`completedById`
+  // are the completed marker — who closed it and when, which is not recoverable
+  // from clockOutTime once an admin corrects the clock. The status transition
+  // itself is written to AuditLog.
+  completionNotes                String?
+  completedAt                    DateTime?
+  completedById                  String?
+  paymentType                    PaymentType?
+  discountAmount                 Float?
+  bedCount                       Int?
+  bathCount                      Int?
+  payRateMultiplier              Float?                @default(1.0)
+  isFlexible                     Boolean               @default(false)
+  requiredCleaners               Int                   @default(1)
+  subtotalAmount                 Float                 @default(0)
+  gstAmount                      Float                 @default(0)
+  qstAmount                      Float                 @default(0)
+  tipAmount                      Float                 @default(0)
+  totalAmount                    Float                 @default(0)
+  // Hourly billing (SOP §10). At clock-out / clock-correction the stored charge
+  // fields above (price, subtotalAmount, gstAmount, qstAmount) are overwritten
+  // for hourly jobs with the clocked amount so every consumer (receipts,
+  // invoices, portal, analytics, refunds) reads one authoritative figure.
+  // `bookedSubtotalAmount` + `basePriceAmount` are the IMMUTABLE booked baseline
+  // (subtotal, and the labour component within it) captured at booking, so
+  // computeChargeAmount() can recompute the swap idempotently no matter how many
+  // times the clock is corrected. `billableHours` / `computedLabourAmount` /
+  // `computedTotal` cache the recomputed values (null on fixed & quote jobs,
+  // which keep their booked price).
+  basePriceAmount                Float?
+  bookedSubtotalAmount           Float?
+  billableHours                  Float?
+  computedLabourAmount           Float?
+  computedTotal                  Float?
+  stripeSetupIntentId            String?
+  stripePaymentIntentId          String?
+  depositPaymentIntentId         String?
+  depositPaid                    Boolean               @default(false)
+  depositPaidAt                  DateTime?
   // Materials/equipment decision (SOP §4/§5). All-or-nothing: when true the
   // customer asked Fixaro to provide everything and a per-service amount applies.
   // `materialsType` is "deposit" (refundable / applied to final bill, tracked
   // separately) or "cost" (flat line item). Applied/refunded amounts are filled
   // in during admin charge review (see SOP §10).
-  customerRequestsMaterials Boolean         @default(false)
-  materialsAmount           Float?
-  materialsType             String?
-  materialsAppliedAmount    Float?
-  materialsRefundedAt       DateTime?
+  customerRequestsMaterials      Boolean               @default(false)
+  materialsAmount                Float?
+  materialsType                  String?
+  materialsAppliedAmount         Float?
+  materialsRefundedAt            DateTime?
   // Painting bid workflow (SOP §6/§7). Only set on PAINTING jobs.
   //   QUOTED → BIDDING → OFFER_SENT → ACCEPTED / REJECTED / CANCELLED
   // Immediate customer range = internal baseline × 1.35 surplus (§7).
   // Final amount = accepted (lowest valid) bid × surplus. Provider override is
   // independent of price: swapping the provider keeps the client's agreed price
   // unless an admin explicitly re-prices (see SOP §6 / tracker D3).
-  paintingStatus            PaintingStatus?
-  paintingScope             String?
-  quoteRangeMin             Float?
-  quoteRangeMax             Float?
-  acceptedBidId             String?
-  acceptedBidAmount         Float?
-  paintingSurplusRate       Float?            @default(1.35)
-  paintingFinalAmount       Float?
-  offerSentAt               DateTime?
-  offerRespondedAt          DateTime?
-  offerResponse             String?
-  offerLastReminderAt       DateTime?
-  followUpFlaggedAt         DateTime?
-  providerOverrideReason    String?
-  providerOverrideAt        DateTime?
-  providerOverrideBy        String?
+  paintingStatus                 PaintingStatus?
+  paintingScope                  String?
+  quoteRangeMin                  Float?
+  quoteRangeMax                  Float?
+  acceptedBidId                  String?
+  acceptedBidAmount              Float?
+  paintingSurplusRate            Float?                @default(1.35)
+  paintingFinalAmount            Float?
+  offerSentAt                    DateTime?
+  offerRespondedAt               DateTime?
+  offerResponse                  String?
+  offerLastReminderAt            DateTime?
+  followUpFlaggedAt              DateTime?
+  providerOverrideReason         String?
+  providerOverrideAt             DateTime?
+  providerOverrideBy             String?
   // Service-specific intake (SOP v4.2 §4). Photos reuse the JobPhoto relation and
   // free-text detail goes in `notes`; these capture the structured answers.
   // Small paint repair — client always supplies the paint (no paint-colour
   // procurement is collected, per v4.2).
-  paintRepairArea           String?
-  paintRepairSurface        String?
+  paintRepairArea                String?
+  paintRepairSurface             String?
   // AC installation — client supplies the unit/accessories unless an admin
   // approves a separate extra.
-  acType                    String?
-  acLocation                String?
-  acMountType               String?
-  clientHasAcUnit           Boolean?
-  paymentFailedAt         DateTime?
-  paymentFailureReason    String?
-  paidAt                  DateTime?
-  refundedAmount          Float             @default(0)
-  isCashJob               Boolean           @default(false)
-  appliedPromoCode        String?
-  promoDiscountAmount     Float?
-  cancellationRequestedAt DateTime?
-  rescheduleRequestedAt   DateTime?
-  parentJobId             String?
-  bookingSource           String?
-  squareFootage           Int?
-  halfBathCount           Int?
-  // Rag-wash projection — computed from job specs at completion.
-  // `washCreditsAwarded` flips to true once credits are written to
-  // the assigned cleaner ledger(s), making the award idempotent.
-  washProjectedRags       Int?
-  washProjectedPads       Int?
-  washCappedRags          Int?
-  washCappedPads          Int?
-  washActualRags          Int?
-  washActualPads          Int?
-  washCreditsAwarded      Boolean           @default(false)
+  acType                         String?
+  acLocation                     String?
+  acMountType                    String?
+  clientHasAcUnit                Boolean?
+  paymentFailedAt                DateTime?
+  paymentFailureReason           String?
+  paidAt                         DateTime?
+  refundedAmount                 Float                 @default(0)
+  isCashJob                      Boolean               @default(false)
+  appliedPromoCode               String?
+  promoDiscountAmount            Float?
+  cancellationRequestedAt        DateTime?
+  rescheduleRequestedAt          DateTime?
+  parentJobId                    String?
+  bookingSource                  String?
+  squareFootage                  Int?
+  halfBathCount                  Int?
   // No-show + late-arrival event timestamps (admin action + clock-in watcher).
-  noShowAt                DateTime?
-  lateArrivalAt           DateTime?
+  noShowAt                       DateTime?
+  lateArrivalAt                  DateTime?
   // Rating cap applied to the cleaner for this job because they were late.
   // 4 stars at +10 min; -0.5 stars per additional 5 min (see src/lib/policy.ts).
-  lateArrivalRatingCap    Float?
-  // Manager override for the Rag Wash review flag.
-  washReviewOverrideAt    DateTime?
-  washReviewOverrideBy    String?
+  lateArrivalRatingCap           Float?
   // After-photo consent (captured at booking). Cleaners may not upload
   // after-photos unless the customer consented OR an admin override is set.
   // Enforced server-side in uploadJobPhoto.ts.
-  afterPhotoConsent        Boolean   @default(false)
-  afterPhotoConsentAt      DateTime?
-  afterPhotoConsentVersion String?
-  afterPhotoOverrideAt     DateTime?
-  afterPhotoOverrideBy     String?
+  afterPhotoConsent              Boolean               @default(false)
+  afterPhotoConsentAt            DateTime?
+  afterPhotoConsentVersion       String?
+  afterPhotoOverrideAt           DateTime?
+  afterPhotoOverrideBy           String?
   // Late-cancellation fee charged to the saved card when the customer cancels
-  // within the 48h window (see CANCELLATION_FEE_USD in policy.ts).
+  // within the 24h window (see CANCELLATION_FEE_WINDOW_HOURS in policy.ts).
   // `cancellationFeeChargedAt` makes the charge idempotent.
   cancellationFeeChargedAt       DateTime?
   cancellationFeePaymentIntentId String?
   // Card hold lifecycle. `holdPaymentIntentId` is set when admin (or the
   // booking flow) places a manual-capture PI for the full job price.
-  holdPaymentIntentId     String?
-  holdPlacedAt            DateTime?
-  holdAmount              Float?
-  holdCapturedAt          DateTime?
-  holdReleasedAt          DateTime?
-  holdCaptureFailedAt     DateTime?
-  holdCaptureFailReason   String?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
-  employee                User?             @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: SetNull)
-  client                  Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  parentJob               Job?              @relation("JobRecurrence", fields: [parentJobId], references: [id], onDelete: SetNull)
-  childJobs               Job[]             @relation("JobRecurrence")
-  productUsage            JobProductUsage[]
-  cleaners                User[]            @relation("JobCleaners")
-  assignmentInvites       JobAssignmentInvite[]
-  logs                    JobLog[]
-  addOns                  JobAddOn[]
-  transactions            Transaction[]
-  invoices                Invoice[]
-  photos                  JobPhoto[]
-  checklists              JobChecklist[]
-  ratings                 EmployeeRating[]
-  complaints              Complaint[]
-  emailLogs               EmailLog[]
-  ratingTokens            JobRatingToken[]
-  strikes                 CleanerStrike[]
-  convertedFromLeads      Lead[]
-  convertedFromWaitlist   Waitlist[]
-  paintingBids            PaintingBid[]
+  holdPaymentIntentId            String?
+  holdPlacedAt                   DateTime?
+  holdAmount                     Float?
+  holdCapturedAt                 DateTime?
+  holdReleasedAt                 DateTime?
+  holdCaptureFailedAt            DateTime?
+  holdCaptureFailReason          String?
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
+  employee                       User?                 @relation("EmployeeJobs", fields: [employeeId], references: [id], onDelete: SetNull)
+  client                         Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  parentJob                      Job?                  @relation("JobRecurrence", fields: [parentJobId], references: [id], onDelete: SetNull)
+  childJobs                      Job[]                 @relation("JobRecurrence")
+  productUsage                   JobProductUsage[]
+  cleaners                       User[]                @relation("JobCleaners")
+  assignmentInvites              JobAssignmentInvite[]
+  logs                           JobLog[]
+  addOns                         JobAddOn[]
+  transactions                   Transaction[]
+  invoices                       Invoice[]
+  photos                         JobPhoto[]
+  checklists                     JobChecklist[]
+  ratings                        EmployeeRating[]
+  complaints                     Complaint[]
+  emailLogs                      EmailLog[]
+  ratingTokens                   JobRatingToken[]
+  strikes                        CleanerStrike[]
+  convertedFromLeads             Lead[]
+  convertedFromWaitlist          Waitlist[]
+  paintingBids                   PaintingBid[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -477,12 +575,12 @@ model JobAddOn {
 
 // Painting bid workflow status on a Job (SOP §6).
 enum PaintingStatus {
-  QUOTED      // booking created with an immediate range, bidding not yet open
-  BIDDING     // painting-eligible providers notified; accepting bids
-  OFFER_SENT  // lowest valid bid auto-accepted, 35% surplus applied, client notified
-  ACCEPTED    // client accepted the final amount
-  REJECTED    // client rejected → booking cancelled, $119 materials/equipment charge refunded
-  CANCELLED   // ops cancelled (e.g. no phone answer < 24h before job)
+  QUOTED // booking created with an immediate range, bidding not yet open
+  BIDDING // painting-eligible providers notified; accepting bids
+  OFFER_SENT // lowest valid bid auto-accepted, 35% surplus applied, client notified
+  ACCEPTED // client accepted the final amount
+  REJECTED // client rejected → booking cancelled, $119 materials/equipment charge refunded
+  CANCELLED // ops cancelled (e.g. no phone answer < 24h before job)
 }
 
 // A provider's bid on a painting job (SOP §6). One active bid per provider per
@@ -512,9 +610,9 @@ model PaintingBid {
 model EmployeeServiceEligibility {
   id          String   @id @default(cuid())
   employeeId  String
-  serviceType String   // matches Job.jobType / SERVICE_CATALOG value
+  serviceType String // matches Job.jobType / SERVICE_CATALOG value
   isActive    Boolean  @default(true)
-  approvedBy  String?  // admin user id who last changed it
+  approvedBy  String? // admin user id who last changed it
   approvedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -540,9 +638,9 @@ model WebhookEvent {
 // the job-scoped activity feed; this is the cross-entity admin audit log.
 model AuditLog {
   id          String   @id @default(cuid())
-  entityType  String   // "EmployeeEligibility" | "Job" | "Deposit" | ...
+  entityType  String // "EmployeeEligibility" | "Job" | "Deposit" | ...
   entityId    String
-  action      String   // "ELIGIBILITY_GRANTED" | "ELIGIBILITY_REVOKED" | ...
+  action      String // "ELIGIBILITY_GRANTED" | "ELIGIBILITY_REVOKED" | ...
   field       String?
   oldValue    String?
   newValue    String?
@@ -746,46 +844,6 @@ model Transaction {
   @@index([jobId])
 }
 
-model RagWash {
-  id         String   @id @default(cuid())
-  employeeId String
-  washDate   DateTime @default(now())
-  ragCount   Int      @default(0)
-  padCount   Int      @default(0)
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([employeeId])
-  @@index([washDate])
-}
-
-// Per-spec rag-wash credit-to-cash redemption. Records every payout drain.
-model WashPayout {
-  id              String             @id @default(cuid())
-  employeeId      String
-  ragCreditsUsed  Int                @default(0)
-  padCreditsUsed  Int                @default(0)
-  amount          Float
-  status          WashPayoutStatus   @default(PENDING)
-  stripeTransferId String?
-  notes           String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  employee        User               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([employeeId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum WashPayoutStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
-
 model Budget {
   id        String              @id @default(cuid())
   category  TransactionCategory
@@ -812,6 +870,13 @@ enum ProductCategory {
   LIQUID_SPRAY
   MOP_LIQUID
   DISPOSABLE
+  // Durable handyman tools. The ONLY category equipment readiness compares the
+  // per-service tool checklist against (SOP §8/§11.1) — see
+  // src/lib/equipment-readiness.ts. Consumables must never qualify: "Bucket" and
+  // "Gloves" are cleaning supplies that happen to share a noun with the tool
+  // checklist, and matching them would mark every handyman as missing a tool
+  // they were never issued.
+  TOOL
   OTHER
 }
 
@@ -831,18 +896,18 @@ enum NotificationChannel {
 // per-channel enabled flag. Seeded from the Notification Catalog spec; admin
 // can toggle any row from Settings → Notifications.
 model NotificationSetting {
-  id           String                @id @default(cuid())
-  recipient    NotificationRecipient
-  category     String
-  key          String
-  label        String
-  trigger      String
-  channel      NotificationChannel
-  enabled      Boolean               @default(false)
-  isProposed   Boolean               @default(false)
-  sortOrder    Int                   @default(0)
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  id         String                @id @default(cuid())
+  recipient  NotificationRecipient
+  category   String
+  key        String
+  label      String
+  trigger    String
+  channel    NotificationChannel
+  enabled    Boolean               @default(false)
+  isProposed Boolean               @default(false)
+  sortOrder  Int                   @default(0)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
 
   @@unique([recipient, key, channel])
   @@index([recipient])
@@ -1153,19 +1218,32 @@ model EmployeeAvailability {
   @@index([employeeId])
 }
 
+// A photo attached to a Job. Two kinds (SOP v4.2 §4):
+//   INTAKE — uploaded by the customer during booking / Get-a-Quote to show the
+//            work (e.g. AC location, paint-repair area). No `employee` (there is
+//            none at booking) and no after-photo consent gate — the customer
+//            uploaded them themselves.
+//   AFTER  — uploaded by the assigned handyman/admin after the visit. Requires
+//            after-photo consent (enforced in uploadJobPhoto.ts).
 model JobPhoto {
-  id         String   @id @default(cuid())
+  id         String       @id @default(cuid())
   jobId      String
-  employeeId String
+  employeeId String?
+  kind       JobPhotoKind @default(AFTER)
   url        String
   caption    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  job        Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employee   User?        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
   @@index([employeeId])
+}
+
+enum JobPhotoKind {
+  INTAKE
+  AFTER
 }
 
 model ChecklistTemplate {
@@ -1579,18 +1657,20 @@ enum GiftCardStatus {
   CANCELLED
 }
 
-/** One-time token a customer uses on the public /add-card/[token] page
- *  to save their card on file without needing a portal login. The link
- *  is emailed by admin via the job detail "Send Add card link" action. */
+/**
+ * One-time token a customer uses on the public /add-card/[token] page
+ * to save their card on file without needing a portal login. The link
+ * is emailed by admin via the job detail "Send Add card link" action.
+ */
 model ClientCardSetupToken {
-  id           String    @id @default(cuid())
-  clientId     String
-  token        String    @unique
-  expiresAt    DateTime
-  usedAt       DateTime?
-  jobId        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  clientId  String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  jobId     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([clientId])
   @@index([expiresAt])
@@ -1654,22 +1734,34 @@ model JobAssignmentInvite {
 }
 
 model QuoteRequest {
-  id            String             @id @default(cuid())
-  name          String
-  email         String
-  phone         String?
-  address       String?
-  serviceType   String?
-  bedCount      Int?
-  bathCount     Int?
-  squareFootage Int?
-  preferredDate DateTime?
-  message       String?
-  status        QuoteRequestStatus @default(NEW)
-  source        String?
-  notes         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id                 String             @id @default(cuid())
+  name               String
+  email              String
+  phone              String?
+  address            String?
+  // Catalog value (e.g. "AC_INSTALLATION"), same source as Book Now (SOP v4.2 §4).
+  // Legacy rows may still hold the old free-text label; display falls back to raw.
+  serviceType        String?
+  bedCount           Int?
+  bathCount          Int?
+  squareFootage      Int?
+  preferredDate      DateTime?
+  message            String?
+  // Service-specific intake (SOP v4.2 §4) — mirrors the Job columns. Only the
+  // fields for the selected service are set. Photos the customer attached are
+  // stored as Cloudinary secure URLs (no Job/JobPhoto exists until conversion).
+  paintRepairArea    String?
+  paintRepairSurface String?
+  acType             String?
+  acLocation         String?
+  acMountType        String?
+  clientHasAcUnit    Boolean?
+  photoUrls          String[]           @default([])
+  status             QuoteRequestStatus @default(NEW)
+  source             String?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([status])
   @@index([createdAt])
@@ -1706,43 +1798,43 @@ model JobApplication {
 }
 
 model ServiceArea {
-  id         String   @id @default(cuid())
-  prefix     String   @unique
-  zoneName   String
-  isActive   Boolean  @default(true)
-  travelFee  Float    @default(0)
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  prefix    String   @unique
+  zoneName  String
+  isActive  Boolean  @default(true)
+  travelFee Float    @default(0)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive])
 }
 
 model Lead {
-  id              String     @id @default(cuid())
-  email           String
-  name            String?
-  phone           String?
-  postalCode      String?
-  dropOffStep     Int?
-  serviceType     String?
-  bedCount        Int?
-  bathCount       Int?
-  halfBathCount   Int?
-  squareFootage   Int?
-  preferredDate   DateTime?
-  isFlexible      Boolean    @default(false)
-  preferredSlot   String?
-  payload         Json?
-  status          LeadStatus @default(NEW)
-  source          String?
-  convertedJobId  String?
-  convertedAt     DateTime?
-  lastActivityAt  DateTime   @default(now())
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  convertedJob    Job?       @relation(fields: [convertedJobId], references: [id], onDelete: SetNull)
-  contact         Contact?
+  id             String     @id @default(cuid())
+  email          String
+  name           String?
+  phone          String?
+  postalCode     String?
+  dropOffStep    Int?
+  serviceType    String?
+  bedCount       Int?
+  bathCount      Int?
+  halfBathCount  Int?
+  squareFootage  Int?
+  preferredDate  DateTime?
+  isFlexible     Boolean    @default(false)
+  preferredSlot  String?
+  payload        Json?
+  status         LeadStatus @default(NEW)
+  source         String?
+  convertedJobId String?
+  convertedAt    DateTime?
+  lastActivityAt DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  convertedJob   Job?       @relation(fields: [convertedJobId], references: [id], onDelete: SetNull)
+  contact        Contact?
 
   @@index([email])
   @@index([status])
@@ -1906,7 +1998,7 @@ model EmailLog {
   notificationKey String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  job         Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  job             Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   @@index([kind])
   @@index([status])
@@ -1942,17 +2034,17 @@ model JobRatingToken {
 }
 
 model PromoCode {
-  id           String    @id @default(cuid())
-  code         String    @unique
-  description  String?
-  discountType String    @default("FIXED") // FIXED | PERCENT
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String    @default("FIXED") // FIXED | PERCENT
   discountValue Float
-  maxUses      Int?
-  usesCount    Int       @default(0)
-  expiresAt    DateTime?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  maxUses       Int?
+  usesCount     Int       @default(0)
+  expiresAt     DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([code])
 }
@@ -1978,7 +2070,7 @@ model RecurringCancellation {
   cancelledAt   DateTime         @default(now())
   emailSentAt   DateTime?
   // Save offer snapshot (mirrors PromoCode discountType/value + the code minted).
-  offerType     String?          // FIXED | PERCENT
+  offerType     String? // FIXED | PERCENT
   offerValue    Float?
   offerCode     String?
   offerStatus   SaveOfferStatus  @default(PENDING)
@@ -2032,4 +2124,3 @@ model CleanerStrike {
   @@index([status])
   @@index([createdAt])
 }
-

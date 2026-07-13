@@ -7,8 +7,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Phone, MapPin, Sparkles, Home, CalendarClock, Clock, X, ArrowRight } from "lucide-react";
+import { Mail, Phone, MapPin, Sparkles, Home, CalendarClock, Clock, X, ArrowRight, Image as ImageIcon } from "lucide-react";
 import { updateQuoteStatus } from "../actions/updateQuoteStatus";
+import { useServiceLabel } from "@/lib/config/ServiceConfigProvider";
+import { buildIntakeRows } from "@/lib/intake";
 
 type Status = "NEW" | "CONTACTED" | "CONVERTED" | "ARCHIVED";
 
@@ -24,10 +26,21 @@ interface Quote {
   squareFootage: number | null;
   preferredDate: string | null;
   message: string | null;
+  paintRepairArea: string | null;
+  paintRepairSurface: string | null;
+  acType: string | null;
+  acLocation: string | null;
+  acMountType: string | null;
+  clientHasAcUnit: boolean | null;
+  photoUrls: string[];
   status: Status;
   notes: string | null;
   createdAt: string;
 }
+
+// serviceType stores the catalog value (e.g. "AC_INSTALLATION"); legacy rows may
+// hold the old free-text label. useServiceLabel() maps it against the LIVE
+// catalog, falling back to the raw value so nothing renders blank.
 
 const ORDER: Status[] = ["NEW", "CONTACTED", "CONVERTED", "ARCHIVED"];
 const STATUS_META: Record<Status, { label: string; dot: string; bg: string; fg: string }> = {
@@ -46,6 +59,7 @@ function StatusPill({ status }: { status: Status }) {
 }
 
 export default function QuotesInboxClient({ quotes }: { quotes: Quote[] }) {
+  const serviceLabel = useServiceLabel();
   const router = useRouter();
   const [tab, setTab] = useState<Status | "ALL">("ALL");
   const [open, setOpen] = useState<Quote | null>(null);
@@ -101,7 +115,7 @@ export default function QuotesInboxClient({ quotes }: { quotes: Quote[] }) {
                 <tr key={q.id} onClick={() => setOpen(q)} style={{ cursor: "pointer" }}>
                   <td className="col-client">{q.name}{q.address && <div className="col-client-sub">{q.address.split(",")[0]}</div>}</td>
                   <td style={{ whiteSpace: "normal" }}><div style={{ fontSize: 13 }}>{q.email}</div>{q.phone && <div style={{ fontSize: 12, color: "var(--primary-60)", marginTop: 2 }}>{q.phone}</div>}</td>
-                  <td style={{ whiteSpace: "normal", maxWidth: 200 }}><div style={{ fontWeight: 500 }}>{q.serviceType ?? "—"}</div>{(q.bedCount != null || q.bathCount != null || q.squareFootage) && <div style={{ fontSize: 12, color: "var(--primary-60)", marginTop: 2 }}>{[q.bedCount != null ? `${q.bedCount}bd` : null, q.bathCount != null ? `${q.bathCount}ba` : null, q.squareFootage ? `${q.squareFootage} ft²` : null].filter(Boolean).join(" · ")}</div>}</td>
+                  <td style={{ whiteSpace: "normal", maxWidth: 200 }}><div style={{ fontWeight: 500 }}>{serviceLabel(q.serviceType)}</div>{q.photoUrls.length > 0 && <div style={{ fontSize: 12, color: "var(--primary-60)", marginTop: 2, display: "inline-flex", alignItems: "center", gap: 4 }}><ImageIcon size={12} /> {q.photoUrls.length} photo{q.photoUrls.length === 1 ? "" : "s"}</div>}</td>
                   <td className="col-date"><div className="date-line">{dDay(q.createdAt)}</div><div className="time-line">{dTime(q.createdAt)}</div></td>
                   <td><StatusPill status={q.status} /></td>
                   <td className="col-actions" onClick={(e) => e.stopPropagation()}><button className="btn btn-secondary btn-sm" onClick={() => setOpen(q)}>Open</button></td>
@@ -121,7 +135,9 @@ export default function QuotesInboxClient({ quotes }: { quotes: Quote[] }) {
 function QuoteDrawer({ quote, pending, onClose, onSave, onConvert }: {
   quote: Quote; pending: boolean; onClose: () => void; onSave: (id: string, status: Status, notes: string) => void; onConvert: () => void;
 }) {
+  const serviceLabel = useServiceLabel();
   const [notes, setNotes] = useState(quote.notes ?? "");
+  const intakeRows = buildIntakeRows(quote);
   const property = [
     quote.bedCount != null ? `${quote.bedCount} bed` : null,
     quote.bathCount != null ? `${quote.bathCount} bath` : null,
@@ -145,11 +161,38 @@ function QuoteDrawer({ quote, pending, onClose, onSave, onConvert }: {
             <div className="q-row"><span className="q-k"><Mail size={15} /> Email</span><a className="q-v" href={`mailto:${quote.email}`}>{quote.email}</a></div>
             {quote.phone && <div className="q-row"><span className="q-k"><Phone size={15} /> Phone</span><a className="q-v" href={`tel:${quote.phone}`}>{quote.phone}</a></div>}
             {quote.address && <div className="q-row"><span className="q-k"><MapPin size={15} /> Address</span><span className="q-v">{quote.address}</span></div>}
-            <div className="q-row"><span className="q-k"><Sparkles size={15} /> Service</span><span className="q-v">{quote.serviceType ?? "—"}</span></div>
-            <div className="q-row"><span className="q-k"><Home size={15} /> Property</span><span className="q-v">{property}</span></div>
+            <div className="q-row"><span className="q-k"><Sparkles size={15} /> Service</span><span className="q-v">{serviceLabel(quote.serviceType)}</span></div>
+            {property !== "—" && <div className="q-row"><span className="q-k"><Home size={15} /> Property</span><span className="q-v">{property}</span></div>}
             {quote.preferredDate && <div className="q-row"><span className="q-k"><CalendarClock size={15} /> Preferred</span><span className="q-v">{new Date(quote.preferredDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span></div>}
             <div className="q-row"><span className="q-k"><Clock size={15} /> Received</span><span className="q-v">{dDay(quote.createdAt)} · {dTime(quote.createdAt)}</span></div>
           </div>
+
+          {/* Service-specific intake (SOP v4.2 §4). */}
+          {intakeRows.length > 0 && (
+            <>
+              <div className="q-section-label">Service intake</div>
+              <div className="q-rows">
+                {intakeRows.map((r) => (
+                  <div className="q-row" key={r.label}><span className="q-k">{r.label}</span><span className="q-v">{r.value}</span></div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Customer photos (SOP v4.2 §4). */}
+          {quote.photoUrls.length > 0 && (
+            <>
+              <div className="q-section-label">Customer photos · {quote.photoUrls.length}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {quote.photoUrls.map((url, i) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", width: 88, height: 88, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(0,0,0,0.1)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Customer photo ${i + 1}`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
 
           {quote.message && (
             <div className="q-message">

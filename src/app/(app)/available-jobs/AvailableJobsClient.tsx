@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { claimJob } from "./claimJob";
+import type { EquipmentReadinessMode } from "@/lib/equipment-readiness-constants";
 
 interface AvailableJob {
   id: string;
@@ -18,6 +20,7 @@ interface AvailableJob {
   notes: string | null;
   customerRequestsMaterials: boolean;
   requiredEquipment: string[];
+  missingEquipment: string[];
 }
 
 function fmtDate(iso: string) {
@@ -31,21 +34,43 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) {
+export default function AvailableJobsClient({
+  jobs,
+  readinessMode,
+}: {
+  jobs: AvailableJob[];
+  readinessMode: EquipmentReadinessMode;
+}) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [claimed, setClaimed] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Jobs whose missing-equipment warning the provider has been shown and must
+  // confirm past (SOP §3.3 warning flow). Server-side `claimJob` is the real
+  // gate — this only decides what the button says.
+  const [confirming, setConfirming] = useState<Record<string, string[]>>({});
 
-  async function handleClaim(jobId: string) {
+  async function handleClaim(jobId: string, acknowledgeMissingEquipment = false) {
     setBusyId(jobId);
     setErrors((e) => { const n = { ...e }; delete n[jobId]; return n; });
-    const res = await claimJob(jobId);
+
+    const res = await claimJob(jobId, { acknowledgeMissingEquipment });
     setBusyId(null);
+
     if (res.success) {
       setClaimed((s) => new Set(s).add(jobId));
-    } else {
-      setErrors((e) => ({ ...e, [jobId]: res.error ?? "Failed to claim" }));
+      setConfirming((c) => { const n = { ...c }; delete n[jobId]; return n; });
+      return;
     }
+
+    // Short of a tracked tool, warn mode: ask, then let them through. Reached
+    // either from a fresh click or from a stale page whose readiness has since
+    // changed — either way the server decides, we just render what it says.
+    if (res.requiresEquipmentAck) {
+      setConfirming((c) => ({ ...c, [jobId]: res.missingEquipment ?? [] }));
+      return;
+    }
+
+    setErrors((e) => ({ ...e, [jobId]: res.error ?? "Failed to claim" }));
   }
 
   const visible = jobs.filter((j) => !claimed.has(j.id));
@@ -69,6 +94,11 @@ export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) 
         const isBusy = busyId === job.id;
         const dateStr = fmtDate(job.startTime);
         const timeStr = !job.isFlexible ? fmtTime(job.startTime) : null;
+
+        // SOP §3.3 — "a clear blocking or warning flow as configured".
+        const missing = job.missingEquipment;
+        const isBlocked = readinessMode === "strict" && missing.length > 0;
+        const ackList = confirming[job.id];
 
         return (
           <article key={job.id} className="cl-job-card">
@@ -170,16 +200,65 @@ export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) 
               </p>
             )}
 
+            {/* Missing-equipment validation (SOP §8). Only ever lists tools we
+                can positively prove they hold none of — an item nobody tracks
+                is never held against anyone, so this stays silent rather than
+                crying wolf. */}
+            {missing.length > 0 && (
+              <div className={`cl-eq-warn${isBlocked ? " blocked" : ""}`}>
+                <strong>
+                  {isBlocked
+                    ? "You can't claim this job yet — missing equipment"
+                    : "You appear to be missing equipment"}
+                </strong>
+                <span>{missing.join(", ")}</span>
+                <span className="cl-eq-warn-fix">
+                  Pick these up from the{" "}
+                  <Link href="/my-inventory/checkout">locker</Link>, or buy them and send ops
+                  the receipt for reimbursement.
+                </span>
+              </div>
+            )}
+
             {errors[job.id] && (
               <p style={{ fontSize: 12, color: "#dc2626", margin: 0 }}>{errors[job.id]}</p>
             )}
 
-            <button
-              onClick={() => handleClaim(job.id)}
-              disabled={isBusy}
-              className="cl-claim-btn">
-              {isBusy ? "Claiming…" : "Claim this job"}
-            </button>
+            {isBlocked ? (
+              <button type="button" disabled className="cl-claim-btn" title={`Missing: ${missing.join(", ")}`}>
+                Equipment required
+              </button>
+            ) : ackList ? (
+              // warn mode, second step: they've seen the shortfall, now they own it.
+              <div className="cl-eq-confirm">
+                <p>Claim anyway? You&apos;re responsible for turning up with {ackList.join(", ")}.</p>
+                <div className="cl-eq-confirm-actions">
+                  <button
+                    type="button"
+                    onClick={() => handleClaim(job.id, true)}
+                    disabled={isBusy}
+                    className="cl-claim-btn">
+                    {isBusy ? "Claiming…" : "Claim anyway"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConfirming((c) => { const n = { ...c }; delete n[job.id]; return n; })
+                    }
+                    disabled={isBusy}
+                    className="cl-eq-confirm-cancel">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleClaim(job.id)}
+                disabled={isBusy}
+                className="cl-claim-btn">
+                {isBusy ? "Claiming…" : "Claim this job"}
+              </button>
+            )}
           </article>
         );
       })}

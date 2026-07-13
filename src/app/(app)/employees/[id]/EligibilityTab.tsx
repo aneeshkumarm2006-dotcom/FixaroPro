@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { Check, Loader2 } from "lucide-react";
 import {
-  SERVICE_CATALOG,
-  SERVICE_CATEGORIES,
-} from "@/app/(book)/book/types";
+  useServiceCatalog,
+  useServiceCategories,
+} from "@/lib/config/ServiceConfigProvider";
 import { setEmployeeServiceEligibility } from "../../actions/setEmployeeServiceEligibility";
 
 // Admin matrix of which services a provider is approved for (SOP §8). Read-only
@@ -17,6 +17,13 @@ export default function EligibilityTab({
   employeeId: string;
   initialEligible: string[];
 }) {
+  // The live catalog, so a service an admin ADDS can be granted immediately —
+  // this used to be the TS constant, which meant a new service was unassignable
+  // until someone shipped a deploy. Retired services are hidden from the matrix;
+  // any existing eligibility row on one is left alone server-side.
+  const catalog = useServiceCatalog();
+  const categories = useServiceCategories();
+
   const [eligible, setEligible] = useState<Set<string>>(new Set(initialEligible));
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -64,8 +71,8 @@ export default function EligibilityTab({
         {error ? <p className="text-sm text-red-600 mt-2">{error}</p> : null}
       </div>
 
-      {SERVICE_CATEGORIES.map((category) => {
-        const services = SERVICE_CATALOG.filter((s) => s.category === category);
+      {categories.map((category) => {
+        const services = catalog.filter((s) => s.category === category);
         if (services.length === 0) return null;
         return (
           <div key={category}>

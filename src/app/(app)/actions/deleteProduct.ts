@@ -1,6 +1,9 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { isAdminRole } from "@/lib/role-routing";
 import { revalidatePath } from "next/cache";
 
 export async function deleteProduct(productId: string): Promise<{
@@ -8,6 +11,12 @@ export async function deleteProduct(productId: string): Promise<{
   error?: string;
 }> {
   try {
+    // Inventory mutation is admin-only.
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session || !isAdminRole((session.user as { role?: string }).role)) {
+      return { success: false, error: "Not authorized." };
+    }
+
     // Check if product has any employee assignments or job usage
     const product = await db.product.findUnique({
       where: { id: productId },

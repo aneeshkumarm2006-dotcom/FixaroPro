@@ -1,9 +1,12 @@
 import { requireAdmin } from "@/lib/page-guards";
 import { db } from "@/db";
+import { depositCollected, getBillingConfig } from "@/lib/billing";
 import RequestsPageClient from "./RequestsPageClient";
 
 export default async function RequestsPage() {
   await requireAdmin();
+
+  const cfg = await getBillingConfig();
 
   const jobs = await db.job.findMany({
     where: {
@@ -23,27 +26,36 @@ export default async function RequestsPage() {
     take: 200,
   });
 
-  const serialized = jobs.map((j) => ({
-    id: j.id,
-    jobNumber: j.jobNumber,
-    status: j.status,
-    isFlexible: j.isFlexible,
-    startTime: j.startTime.toISOString(),
-    location: j.location,
-    jobType: j.jobType,
-    price: j.price,
-    cancellationRequestedAt: j.cancellationRequestedAt?.toISOString() ?? null,
-    rescheduleRequestedAt: j.rescheduleRequestedAt?.toISOString() ?? null,
-    client: j.client
-      ? {
-          id: j.client.id,
-          name: j.client.name,
-          email: j.client.email,
-          phone: j.client.phone,
-        }
-      : null,
-    cleaners: j.cleaners,
-  }));
+  const serialized = jobs.map((j) => {
+    // Amount collected at booking and how much of it is still refundable — drives
+    // the one-click "Refund deposit" action on cancellation cards (D0.6 / 4.1).
+    const collected = depositCollected(j, cfg);
+    const refunded = j.refundedAmount ?? 0;
+    return {
+      id: j.id,
+      jobNumber: j.jobNumber,
+      status: j.status,
+      isFlexible: j.isFlexible,
+      startTime: j.startTime.toISOString(),
+      location: j.location,
+      jobType: j.jobType,
+      price: j.price,
+      cancellationRequestedAt: j.cancellationRequestedAt?.toISOString() ?? null,
+      rescheduleRequestedAt: j.rescheduleRequestedAt?.toISOString() ?? null,
+      depositPaid: j.depositPaid,
+      depositAmount: collected,
+      depositRefundable: Math.max(0, collected - refunded),
+      client: j.client
+        ? {
+            id: j.client.id,
+            name: j.client.name,
+            email: j.client.email,
+            phone: j.client.phone,
+          }
+        : null,
+      cleaners: j.cleaners,
+    };
+  });
 
   return (
     <div className="h-full overflow-hidden overflow-y-auto p-8">

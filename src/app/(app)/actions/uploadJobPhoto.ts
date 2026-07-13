@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { cloudinary } from "@/lib/cloudinary";
+import { logAudit } from "@/lib/audit";
 import type { UploadApiResponse } from "cloudinary";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -128,7 +129,12 @@ export async function uploadJobPhoto(formData: FormData) {
       };
     }
 
-    const existingCount = await db.jobPhoto.count({ where: { jobId } });
+    // Count AFTER photos only — customer INTAKE photos live in the same table
+    // but must not consume the crew's after-photo budget (getJobPhotos + the
+    // uploader UI also count AFTER only).
+    const existingCount = await db.jobPhoto.count({
+      where: { jobId, kind: "AFTER" },
+    });
     if (existingCount >= MAX_PHOTOS_PER_JOB) {
       return {
         success: false,
@@ -152,6 +158,21 @@ export async function uploadJobPhoto(formData: FormData) {
         caption,
       },
     });
+
+    // SOP §8: "Audit job status changes and media uploads." After-photos are
+    // evidence in a billing dispute, so who added one and when has to be
+    // reconstructable — the JobPhoto row alone is deletable (deleteJobPhoto).
+    logAudit({
+      entityType: "Job",
+      entityId: jobId,
+      action: "JOB_PHOTO_UPLOADED",
+      field: "photos",
+      newValue: result.secure_url,
+      reason: caption,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `${session.user.name ?? "User"} uploaded an after-photo to job #${job.jobNumber}.`,
+    }).catch((e) => console.error("audit (uploadJobPhoto)", e));
 
     revalidatePath(`/my-jobs/${jobId}`);
 

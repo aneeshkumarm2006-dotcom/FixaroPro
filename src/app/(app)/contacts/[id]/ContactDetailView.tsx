@@ -12,6 +12,7 @@ import type { PropertyDef } from "@/lib/prop-engine-meta";
 import { EVENT_META, money, dateStr, timeStr, relativeTime, bindingFor } from "@/lib/crm-meta";
 import { GROUPS } from "@/lib/prop-engine-meta";
 import { Avatar, LifecyclePill, AStat, ScoreMeter } from "../_components";
+import { StatusPill } from "@/lib/status-icons";
 import {
   updateContactField, updateContactProp, logContactActivity, dismissContactDuplicates,
 } from "../../actions/contactActions";
@@ -21,15 +22,6 @@ type TabId = "overview" | "activity" | "bookings" | "comms" | "source" | "rating
 const EVENT_ICON: Record<ContactActivityType, typeof Mail> = {
   NOTE: PenLine, EMAIL: Mail, SMS: MessageSquare, CALL: Phone,
   BOOKING: CalendarClock, RATING: Star, CANCEL: XCircle, LIFECYCLE: Sparkles, CREATE: Plus,
-};
-
-const JOB_PILL: Record<string, { bg: string; fg: string }> = {
-  completed: { bg: "rgba(5,150,105,0.10)", fg: "#065f46" },
-  paid: { bg: "rgba(5,150,105,0.18)", fg: "#064e3b" },
-  scheduled: { bg: "rgba(2,132,199,0.10)", fg: "#075985" },
-  inprogress: { bg: "rgba(217,119,6,0.12)", fg: "#92400e" },
-  created: { bg: "rgba(100,116,139,0.12)", fg: "#334155" },
-  cancelled: { bg: "rgba(148,163,184,0.18)", fg: "#64748b" },
 };
 
 export default function ContactDetailView({ contact: c, propertyDefs }: { contact: ContactDetail; propertyDefs: PropertyDef[] }) {
@@ -358,13 +350,12 @@ function BookingsTab({ rows }: { rows: BookingRow[] }) {
           <thead><tr><th>Date</th><th>Service</th><th>Cleaner</th><th>Status</th><th className="num">Amount</th><th>Payment</th></tr></thead>
           <tbody>
             {rows.map((b) => {
-              const pill = JOB_PILL[b.status] ?? JOB_PILL.created;
               return (
                 <tr key={b.id}>
                   <td><div style={{ fontSize: 13, color: "var(--ink)" }}>{dateStr(b.date, { year: true })}</div><div className="col-client-sub">{timeStr(b.date)}</div></td>
                   <td style={{ fontSize: 13, color: "var(--ink)" }}>{b.service}</td>
                   <td style={{ fontSize: 13, color: "var(--primary-70)" }}>{b.cleaner}</td>
-                  <td><span className="pill" style={{ background: pill.bg, color: pill.fg }}>{b.status}</span></td>
+                  <td><StatusPill status={b.status} /></td>
                   <td className="num" style={{ fontWeight: 600 }}>{money(b.amount)}</td>
                   <td>{b.paid
                     ? <span className="pill" style={{ background: "rgba(5,150,105,0.12)", color: "#065f46" }}>Paid</span>

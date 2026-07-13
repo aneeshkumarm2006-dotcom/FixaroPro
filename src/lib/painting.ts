@@ -4,7 +4,15 @@
 // ranges add a 35% surplus before display. These ranges are for immediate
 // online quoting only — the authoritative final price is the accepted (lowest
 // valid) provider bid × the same surplus, sent to the client for approval.
+//
+// SEED DEFAULTS ONLY (SOP §3, stage 8). The live baselines are the
+// PaintingBaseline table and the live surplus is the `painting.surplusRate`
+// policy value; these seed both and are the fallback while the table is empty.
+// Feature code must resolve them through getRuntimeConfig() / useRuntimeConfig()
+// and the helpers in src/lib/config/types.ts, so that an admin repricing a scope
+// actually moves the customer's quote.
 
+/** Seed default for the `painting.surplusRate` policy value (SOP §6/§7 — 35%). */
 export const PAINTING_SURPLUS_RATE = 1.35;
 
 export interface PaintingScope {
@@ -34,31 +42,24 @@ export const PAINTING_SCOPES: PaintingScope[] = [
   { key: "apt_5_5", label: "5½ apartment", baselineMin: 3000, baselineMax: 3600, note: "2 coats, labour only. You provide the paint. Primer extra if required. Includes optional plaster/silicone add-on." },
 ];
 
+/**
+ * Look up a scope in the SEED DEFAULTS.
+ *
+ * @deprecated Reads the TS constants, not the admin-editable PaintingBaseline
+ * table. Use `findPaintingScope(cfg, key)` from src/lib/config/types.ts.
+ */
 export function getPaintingScope(key?: string | null): PaintingScope | null {
   if (!key) return null;
   return PAINTING_SCOPES.find((s) => s.key === key) ?? null;
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-// Immediate customer-facing quote range for a scope = baseline × surplus.
-export function paintingQuoteRange(
-  key?: string | null
-): { min: number; max: number } | null {
-  const scope = getPaintingScope(key);
-  if (!scope) return null;
-  return {
-    min: round2(scope.baselineMin * PAINTING_SURPLUS_RATE),
-    max: round2(scope.baselineMax * PAINTING_SURPLUS_RATE),
-  };
-}
-
-// Authoritative final amount sent to the client = accepted bid × surplus.
-export function paintingFinalAmount(
-  acceptedBid: number,
-  surplusRate: number = PAINTING_SURPLUS_RATE
-): number {
-  return round2(acceptedBid * surplusRate);
-}
+/**
+ * Authoritative final amount sent to the client = accepted bid × surplus.
+ *
+ * Re-exported from the shared config helpers so there is exactly one
+ * implementation. The surplus rate is REQUIRED here on purpose: a painting job
+ * stores the rate it was booked under (`Job.paintingSurplusRate`), and an admin
+ * changing the policy value must not silently reprice a job already mid-bid.
+ * Callers pass `job.paintingSurplusRate ?? cfg.policy.paintingSurplusRate`.
+ */
+export { paintingFinalAmount } from "@/lib/config/types";

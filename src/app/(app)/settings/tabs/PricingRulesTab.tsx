@@ -16,10 +16,10 @@ interface PricingRulesTabProps {
 interface PerUnitRates {
   hourlyRate: number;
   threeHourPackage: number;
-  siliconePerRoom: number;
-  weatherproofingMin: number;
-  weatherproofingMax: number;
-  // Legacy fields (kept for backward compat)
+  // Legacy fields (kept for backward compat with existing saved blobs)
+  siliconePerRoom?: number;
+  weatherproofingMin?: number;
+  weatherproofingMax?: number;
   baseServicePrice?: number;
   perBedroom?: number;
   perFullBath?: number;
@@ -54,6 +54,13 @@ interface AddOn {
 
 const PER_UNIT_KEY = "pricing.perUnit";
 const ADDONS_KEY = "pricing.addOns";
+// Canonical billing keys read by src/lib/billing.ts (getBillingConfig). The
+// labour rate is written here AND kept inside the perUnit blob so the two never
+// diverge (decision D1.1). Increment + minimum are the D0.8 billing knobs.
+const LABOUR_RATE_KEY = "pricing.labourRate";
+const THREE_HOUR_PACKAGE_KEY = "pricing.threeHourPackage";
+const BILLING_INCREMENT_KEY = "pricing.billingIncrementMinutes";
+const MIN_BILLABLE_HOURS_KEY = "pricing.minBillableHours";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -63,10 +70,17 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   const initialRates = getSetting<PerUnitRates>(settings, PER_UNIT_KEY, {
     hourlyRate: 79,
     threeHourPackage: 209,
-    siliconePerRoom: 209,
-    weatherproofingMin: 59,
-    weatherproofingMax: 90,
   });
+
+  // Canonical labour rate wins over the legacy perUnit.hourlyRate if it exists
+  // (getBillingConfig reads it first). Increment + minimum drive clocked billing.
+  const savedLabourRate = getSetting<number | null>(settings, LABOUR_RATE_KEY, null);
+  const initialHourlyRate =
+    typeof savedLabourRate === "number" && savedLabourRate > 0
+      ? savedLabourRate
+      : initialRates.hourlyRate ?? 79;
+  const initialIncrement = getSetting<number>(settings, BILLING_INCREMENT_KEY, 15);
+  const initialMinBillableHours = getSetting<number>(settings, MIN_BILLABLE_HOURS_KEY, 2);
 
   // Legacy key still used by add-ons fallback
   const legacyConfig = getSetting<{ addOns?: AddOn[] }>(settings, "pricing.rules", {});
@@ -80,12 +94,15 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
   );
 
   const [rates, setRates] = useState<PerUnitRates>({
-    hourlyRate: initialRates.hourlyRate ?? 79,
+    // Preserve any legacy keys already in the blob rather than dropping them on
+    // the next save — they are dead, but silently deleting an admin's saved data
+    // is not this tab's call to make.
+    ...initialRates,
+    hourlyRate: initialHourlyRate,
     threeHourPackage: initialRates.threeHourPackage ?? 209,
-    siliconePerRoom: initialRates.siliconePerRoom ?? 209,
-    weatherproofingMin: initialRates.weatherproofingMin ?? 59,
-    weatherproofingMax: initialRates.weatherproofingMax ?? 90,
   });
+  const [billingIncrement, setBillingIncrement] = useState<number>(initialIncrement);
+  const [minBillableHours, setMinBillableHours] = useState<number>(initialMinBillableHours);
   const [addOns, setAddOns] = useState<AddOn[]>(initialAddOns);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
@@ -106,25 +123,45 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
     setSaving(true);
     setMsg(null);
 
-    const [r1, r2] = await Promise.all([
+    const safeIncrement = billingIncrement > 0 ? billingIncrement : 15;
+    const safeMinHours = minBillableHours > 0 ? minBillableHours : 2;
+
+    const results = await Promise.all([
       updateAppSetting({ key: PER_UNIT_KEY, category: "pricing", value: rates }),
       updateAppSetting({ key: ADDONS_KEY, category: "pricing", value: addOns }),
+      // Canonical keys consumed by the config layer (policy-registry.ts). These
+      // MUST be written alongside the legacy `pricing.perUnit` blob: resolvePolicy
+      // prefers the canonical key, so writing only the blob would leave the
+      // canonical value stale and this tab would silently do nothing (D1.1).
+      updateAppSetting({ key: LABOUR_RATE_KEY, category: "pricing", value: rates.hourlyRate }),
+      updateAppSetting({ key: THREE_HOUR_PACKAGE_KEY, category: "pricing", value: rates.threeHourPackage }),
+      // Clocked-billing knobs (D0.8).
+      updateAppSetting({ key: BILLING_INCREMENT_KEY, category: "pricing", value: safeIncrement }),
+      updateAppSetting({ key: MIN_BILLABLE_HOURS_KEY, category: "pricing", value: safeMinHours }),
     ]);
 
-    if (r1.success && r2.success) {
+    const failed = results.find((r) => !r.success);
+    if (!failed) {
       setMsg({ type: "success", text: "Pricing rules saved." });
     } else {
-      setMsg({ type: "error", text: r1.error ?? r2.error ?? "Failed to save." });
+      setMsg({ type: "error", text: failed.error ?? "Failed to save." });
     }
     setSaving(false);
   }
 
   return (
     <div className="space-y-6">
-      {/* Hourly Rates */}
+      {/* Hourly Rates. As of Stage 8 the labour rate, 3-hour package, increment
+          and minimum all live in the policy registry and are edited on Service
+          Catalog → Policy. This tab keeps them for continuity and dual-writes
+          the canonical keys, so saving here can never silently revert a change
+          made there. The Silicone/Weatherproofing fields are GONE: they wrote
+          `pricing.perUnit.siliconePerRoom` / `weatherproofingMin` / `Max`, which
+          nothing ever read — booking-pricing.ts hardcoded 209 and 74.5. Both
+          prices are now real, editable fields on the service record itself. */}
       <SectionCard
         title="Hourly Pricing"
-        description="Standard rate: $79/hr · 2-hour minimum. 3-hour package is a flat discounted price."
+        description="Standard rate + clocked-billing knobs. These are the same values as Service Catalog → Policy — edit them in either place."
         icon={Clock}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Hourly rate ($/hr)">
@@ -139,6 +176,26 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
               }
             />
           </Field>
+          <Field label="Billing round-up increment (minutes)">
+            <Input
+              variant="form"
+              type="number"
+              min="1"
+              step="1"
+              value={billingIncrement}
+              onChange={(e) => setBillingIncrement(parseInt(e.target.value, 10) || 15)}
+            />
+          </Field>
+          <Field label="Minimum billable hours">
+            <Input
+              variant="form"
+              type="number"
+              min="0"
+              step="0.5"
+              value={minBillableHours}
+              onChange={(e) => setMinBillableHours(parseFloat(e.target.value) || 2)}
+            />
+          </Field>
           <Field label="3-hour package price ($)">
             <Input
               variant="form"
@@ -151,47 +208,13 @@ export default function PricingRulesTab({ settings }: PricingRulesTabProps) {
               }
             />
           </Field>
-          <Field label="Silicone Sealing — per room ($)">
-            <Input
-              variant="form"
-              type="number"
-              min="0"
-              step="1"
-              value={rates.siliconePerRoom}
-              onChange={(e) =>
-                setRates((r) => ({ ...r, siliconePerRoom: parseFloat(e.target.value) || 209 }))
-              }
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Weatherproofing min ($)">
-              <Input
-                variant="form"
-                type="number"
-                min="0"
-                step="1"
-                value={rates.weatherproofingMin}
-                onChange={(e) =>
-                  setRates((r) => ({ ...r, weatherproofingMin: parseFloat(e.target.value) || 59 }))
-                }
-              />
-            </Field>
-            <Field label="Max ($)">
-              <Input
-                variant="form"
-                type="number"
-                min="0"
-                step="1"
-                value={rates.weatherproofingMax}
-                onChange={(e) =>
-                  setRates((r) => ({ ...r, weatherproofingMax: parseFloat(e.target.value) || 90 }))
-                }
-              />
-            </Field>
-          </div>
         </div>
         <p className="text-sm text-[#1c1917]/60 mt-3">
           Example: 2h = <strong>${(rates.hourlyRate * 2).toFixed(0)}</strong> · 3h = <strong>${rates.threeHourPackage.toFixed(0)}</strong> · 4h = <strong>${(rates.hourlyRate * 4).toFixed(0)}</strong>
+        </p>
+        <p className="text-sm text-[#1c1917]/60 mt-2">
+          Fixed-price services (Silicone Sealing, Weatherproofing) are priced on their own
+          catalog record — <strong>Service Catalog → Services</strong>.
         </p>
       </SectionCard>
 

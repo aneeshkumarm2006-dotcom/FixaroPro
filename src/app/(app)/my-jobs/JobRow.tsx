@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, MapPin, Clock } from "lucide-react";
+import { MapPin, Clock } from "lucide-react";
 import PayBreakdownModal from "./PayBreakdownModal";
+import { WARNING_VISUAL, jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
+import { useJobTypeLabel } from "@/components/calendar/use-job-type-label";
 
-interface MissingEquipmentInfo {
+const WarningIcon = WARNING_VISUAL.Icon;
+
+interface MissingSupplyInfo {
   productId: string;
   productName: string;
   needed: number;
@@ -15,33 +19,24 @@ interface MissingEquipmentInfo {
 interface JobRowProps {
   job: any;
   isMainEmployee: boolean;
-  missingEquipment?: MissingEquipmentInfo[];
+  /** Tool-checklist items the provider holds none of (SOP §8). Locker/buy-and-expense. */
+  missingTools?: string[];
+  /** Kit consumables they're short of. Restockable from the locker. */
+  missingSupplies?: MissingSupplyInfo[];
 }
 
-function statusClass(status: string) {
-  switch (status) {
-    case "COMPLETED": return "completed";
-    case "SCHEDULED": return "scheduled";
-    case "IN_PROGRESS": return "inprogress";
-    case "CANCELLED": return "cancelled";
-    case "PAID": return "paid";
-    default: return "created";
-  }
-}
+// Label comes from the live catalog via useJobTypeLabel() — the local switch
+// this replaces returned the RAW ENUM CODE for every Fixaro service.
 
-function jobTypeLabel(type: string | null) {
-  if (!type) return null;
-  switch (type) {
-    case "R": return "Residential";
-    case "C": return "Commercial";
-    case "PC": return "Post-Construction";
-    case "F": return "Follow-up";
-    default: return type;
-  }
-}
 
-export function JobRow({ job, isMainEmployee, missingEquipment = [] }: JobRowProps) {
+export function JobRow({
+  job,
+  isMainEmployee,
+  missingTools = [],
+  missingSupplies = [],
+}: JobRowProps) {
   const router = useRouter();
+  const jobTypeLabel = useJobTypeLabel();
   const jobWithClock = job as any;
   const canClockIn = !jobWithClock.clockInTime && !["COMPLETED", "CANCELLED", "PAID"].includes(job.status);
   const canClockOut = jobWithClock.clockInTime && !jobWithClock.clockOutTime;
@@ -51,7 +46,7 @@ export function JobRow({ job, isMainEmployee, missingEquipment = [] }: JobRowPro
   const [payModalOpen, setPayModalOpen] = useState(false);
 
   const ctaLabel = canClockIn ? "Start job" : canClockOut ? "Complete job" : "View details";
-  const sc = statusClass(job.status);
+  const sc = jobStatusSlug(job.status);
 
   const date = job.jobDate ? new Date(job.jobDate) : null;
   const mo = date ? date.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : null;
@@ -75,7 +70,7 @@ export function JobRow({ job, isMainEmployee, missingEquipment = [] }: JobRowPro
         <div className="cl-jobs2-meta">
           <div className="cl-jobs2-meta-head">
             <span className="cl-jobs2-client">{job.clientName}</span>
-            <span className={`cl-pill ${sc}`}>{job.status.replace(/_/g, " ")}</span>
+            <span className={`cl-pill ${sc}`}>{jobStatusLabel(job.status)}</span>
             {jobTypeLabel(job.jobType) && (
               <span className="cl-pill" style={{ background: "var(--primary-5)", color: "var(--primary)" }}>
                 {jobTypeLabel(job.jobType)}
@@ -84,13 +79,28 @@ export function JobRow({ job, isMainEmployee, missingEquipment = [] }: JobRowPro
             {instantPayoutEligible && (
               <span className="cl-pill" style={{ background: "#fef3c7", color: "#b45309" }}>Instant payout</span>
             )}
-            {missingEquipment.length > 0 && (
+            {/* Tools you don't have (SOP §8) — fixed at the locker or by buying
+                them and expensing it. Deep-links to the job's equipment panel. */}
+            {missingTools.length > 0 && (
               <button
                 type="button"
                 className="cl-job-card-warn"
+                title={`Missing: ${missingTools.join(", ")}`}
+                onClick={(e) => { e.stopPropagation(); router.push(`/my-jobs/${job.id}#equipment`); }}>
+                <WarningIcon size={11} />
+                Missing tools
+              </button>
+            )}
+            {/* Consumables a kit says this job burns through — a different
+                problem with a different fix (restock), so a different chip. */}
+            {missingSupplies.length > 0 && (
+              <button
+                type="button"
+                className="cl-job-card-warn"
+                title={`Short of: ${missingSupplies.map((s) => s.productName).join(", ")}`}
                 onClick={(e) => { e.stopPropagation(); router.push(`/my-inventory/resolve?jobId=${job.id}`); }}>
-                <AlertTriangle size={11} />
-                Missing equipment
+                <WarningIcon size={11} />
+                Restock supplies
               </button>
             )}
           </div>

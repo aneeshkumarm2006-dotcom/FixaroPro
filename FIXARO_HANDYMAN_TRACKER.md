@@ -9,6 +9,33 @@
 
 ---
 
+## ✅ Stage 9 — QA, security & documentation (2026-07-14) — build is code-complete
+
+The §12 Developer QA Checklist was run against the whole build (Stages 1–8 in code). Full report:
+`_ai_context/Fixaro_v4.2_Stage9_QA_Report.md`.
+
+- ✅ **Test infrastructure** — added **Vitest** and a **91-test** pure money-math suite under
+  `site/test/` (`npm test`): tax, service-config pricing/materials, `computeChargeAmount` /
+  `computeJobBilling` / deposits (incl. the idempotent-after-clock-out-overwrite property), policy
+  (cancellation window, late-cap, `resolvePolicy`), and booking pricing (materials opt-in, AC = no
+  materials, the **$119 painting trace**). `tsc --noEmit` clean.
+- ✅ **§12 QA — all 10 areas.** Security **passes** the no-secrets bar on all 7 surfaces; Rag Wash
+  removal **verified clean**; painting E2E, handyman portal, customer booking, regression and service
+  additions all pass. Every finding was verified against the code before action.
+- 🔧 **Fixed (verified):** a **CRITICAL** — `saveJob` had no role guard, so any EMPLOYEE/CLIENT could
+  rewrite any job's `employeePay`/`price`/`status` by id; unauthenticated **product CRUD** (feeds
+  expense accounting); alert **IDOR** + unauthenticated `migrateClients`; the **`issueRefund`
+  hardcoded-`$20`** deposit cap (broke one-click refunds once the deposit was reconfigured); the
+  **monthly-statement double-discount**; a temp debug route; and a central **AuditLog** sweep filling
+  the payroll / provider-cash-out / role-change / card-charge / refund / deletion / deposit-adjust gaps.
+- 📋 **Documented, not fixed** (report §4): **F1 (HIGH)** partial materials-deposit refund is clawed
+  back on the card (needs a focused change to `computeChargeAmount`); **F2** single-job charge-modal
+  preview ≠ amount charged (display); **F3** Stripe idempotency keys; F4–F9 lower items.
+- ⏳ **Still needs a live environment:** the Stripe-sandbox walkthrough (report §5), a Cloudinary
+  upload pass, and `prisma migrate deploy`.
+
+---
+
 ## 🔺 v4.2 Delta (2026-07-10) — what changed vs the v4.0 build
 
 Verified against code (not the old tracker). Slices 1–6 are ~85% aligned but were built to v4.0.

@@ -1,5 +1,9 @@
 import { db } from "@/db";
 import { requireCleaner } from "@/lib/page-guards";
+import {
+  getEquipmentReadinessByService,
+  getEquipmentReadinessMode,
+} from "@/lib/equipment-readiness";
 import { Prisma } from "@prisma/client";
 import { JobsFilters } from "./JobsFilters";
 import { JobsPagination } from "./JobsPagination";
@@ -177,7 +181,25 @@ export default async function MyJobsPage({
     return job?.employeeId === session.user.id;
   };
 
-  // Compute missing equipment per upcoming job (for warning icon)
+  // ── Equipment signals per upcoming job ───────────────────────────────────
+  //
+  // Two DIFFERENT things, deliberately kept apart (SOP §8 vs the fork's
+  // inventory system). Collapsing them is what made the old warning useless:
+  //
+  //   1. TOOLS — the per-service tool checklist (EQUIPMENT_BY_SERVICE /
+  //      ServiceEquipment): "Stud finder", "Basin wrench". This is the SOP's
+  //      missing-equipment validation. Fixed by going to the locker or buying
+  //      the tool and claiming reimbursement.
+  //   2. SUPPLIES — consumables a KitTemplate says the job burns through.
+  //      Fixed by restocking from the locker (/my-inventory/resolve).
+  //
+  // The old code only ever compared (2), and when no kit matched the job type
+  // it fell back to EVERY InventoryRule — i.e. the cleaning-consumables catalog
+  // inherited from the fork. No KitTemplate is named TOILET_REPAIR, so every
+  // handyman job took that fallback and told the provider they were short of
+  // mop pads. That fallback is gone: a consumable is only ever required when an
+  // admin has actually put it in a kit for this job type or add-on, exactly as
+  // a tool is only ever required when an admin has categorised it TOOL (D6.1).
   const upcomingJobs = filteredJobs.filter(
     (j) =>
       j.status !== "COMPLETED" &&
@@ -185,26 +207,38 @@ export default async function MyJobsPage({
       !(j as any).clockOutTime
   );
 
-  const missingEquipmentByJob = new Map<
+  const missingToolsByJob = new Map<string, string[]>();
+  const missingSuppliesByJob = new Map<
     string,
     { productId: string; productName: string; needed: number; have: number }[]
   >();
 
   if (upcomingJobs.length > 0) {
-    const [employeeProducts, kitTemplates, inventoryRules] = await Promise.all([
-      db.employeeProduct.findMany({
-        where: { employeeId: session.user.id },
-        include: { product: true },
-      }),
-      db.kitTemplate.findMany({
-        where: { isActive: true },
-        include: { items: { include: { product: true } } },
-      }),
-      db.inventoryRule.findMany({
-        where: { usagePerJob: { gt: 0 } },
-        include: { product: true },
-      }),
-    ]);
+    const readinessMode = await getEquipmentReadinessMode();
+
+    const [readinessByType, employeeProducts, kitTemplates, jobsWithAddOns] =
+      await Promise.all([
+        // (1) Tool checklist vs this provider's TOOL-category holdings, batched
+        // over the distinct service types on the page.
+        readinessMode === "off"
+          ? Promise.resolve(new Map<string, { missing: string[] }>())
+          : getEquipmentReadinessByService(
+              upcomingJobs.map((j) => j.jobType),
+              session.user.id
+            ),
+        db.employeeProduct.findMany({
+          where: { employeeId: session.user.id },
+          include: { product: true },
+        }),
+        db.kitTemplate.findMany({
+          where: { isActive: true },
+          include: { items: { include: { product: true } } },
+        }),
+        db.job.findMany({
+          where: { id: { in: upcomingJobs.map((j) => j.id) } },
+          select: { id: true, addOns: { select: { name: true } } },
+        }),
+      ]);
 
     const employeeInventory = new Map<string, number>();
     for (const ep of employeeProducts) {
@@ -216,29 +250,29 @@ export default async function MyJobsPage({
       kitsByName.set(k.name.toLowerCase(), k);
     }
 
-    const jobsWithAddOns = await db.job.findMany({
-      where: { id: { in: upcomingJobs.map((j) => j.id) } },
-      include: { addOns: true },
-    });
     const addOnsByJobId = new Map<string, string[]>();
     for (const j of jobsWithAddOns) {
-      addOnsByJobId.set(
-        j.id,
-        j.addOns.map((a) => a.name)
-      );
+      addOnsByJobId.set(j.id, j.addOns.map((a) => a.name));
     }
 
     for (const job of upcomingJobs) {
-      const required = new Map<
-        string,
-        { needed: number; productName: string }
-      >();
+      // (1) Tools.
+      const missingTools = readinessByType.get(job.jobType ?? "*")?.missing ?? [];
+      if (missingTools.length > 0) missingToolsByJob.set(job.id, missingTools);
 
-      const jobTypeKit = job.jobType
-        ? kitsByName.get(job.jobType.toLowerCase())
-        : null;
-      if (jobTypeKit) {
-        for (const item of jobTypeKit.items) {
+      // (2) Supplies — kit-derived only. No kit for this job type and no
+      // add-on kit means this job has no consumable requirements on record,
+      // which is a true statement about handyman work, not a gap to paper over.
+      const required = new Map<string, { needed: number; productName: string }>();
+
+      const kitNames = [
+        ...(job.jobType ? [job.jobType] : []),
+        ...(addOnsByJobId.get(job.id) ?? []),
+      ];
+      for (const name of kitNames) {
+        const kit = kitsByName.get(name.toLowerCase());
+        if (!kit) continue;
+        for (const item of kit.items) {
           const existing = required.get(item.productId);
           if (existing) {
             existing.needed += item.quantity;
@@ -251,35 +285,7 @@ export default async function MyJobsPage({
         }
       }
 
-      const jobAddOns = addOnsByJobId.get(job.id) || [];
-      for (const addOn of jobAddOns) {
-        const addOnKit = kitsByName.get(addOn.toLowerCase());
-        if (addOnKit) {
-          for (const item of addOnKit.items) {
-            const existing = required.get(item.productId);
-            if (existing) {
-              existing.needed += item.quantity;
-            } else {
-              required.set(item.productId, {
-                needed: item.quantity,
-                productName: item.product.name,
-              });
-            }
-          }
-        }
-      }
-
-      // Fall back to inventory rules if no kit-derived requirements
-      if (required.size === 0) {
-        for (const rule of inventoryRules) {
-          required.set(rule.productId, {
-            needed: rule.usagePerJob,
-            productName: rule.product.name,
-          });
-        }
-      }
-
-      const missing: {
+      const missingSupplies: {
         productId: string;
         productName: string;
         needed: number;
@@ -288,7 +294,7 @@ export default async function MyJobsPage({
       for (const [productId, req] of required) {
         const have = employeeInventory.get(productId) ?? 0;
         if (have < req.needed) {
-          missing.push({
+          missingSupplies.push({
             productId,
             productName: req.productName,
             needed: req.needed,
@@ -296,8 +302,8 @@ export default async function MyJobsPage({
           });
         }
       }
-      if (missing.length > 0) {
-        missingEquipmentByJob.set(job.id, missing);
+      if (missingSupplies.length > 0) {
+        missingSuppliesByJob.set(job.id, missingSupplies);
       }
     }
   }
@@ -382,7 +388,8 @@ export default async function MyJobsPage({
                   key={job.id}
                   job={job}
                   isMainEmployee={isMainEmployee(job.id)}
-                  missingEquipment={missingEquipmentByJob.get(job.id) || []}
+                  missingTools={missingToolsByJob.get(job.id) || []}
+                  missingSupplies={missingSuppliesByJob.get(job.id) || []}
                 />
               ))}
             </div>

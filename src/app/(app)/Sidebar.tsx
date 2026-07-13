@@ -35,6 +35,7 @@ import {
   Boxes,
   Paintbrush,
   Wrench,
+  BookOpen,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -106,8 +107,7 @@ const ADMIN_NAV: NavSection[] = [
   {
     label: "Inventory & Supplies",
     items: [
-      { href: "/inventory", label: "Inventory", Icon: Package, exclude: ["/inventory/rag-wash", "/inventory/kits"] },
-      // Rag Wash removed from Fixaro dashboards (SOP §9).
+      { href: "/inventory", label: "Inventory", Icon: Package, exclude: ["/inventory/kits"] },
     ],
   },
   {
@@ -133,6 +133,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/activity", label: "Activity Log", Icon: ScrollText },
       { href: "/audit", label: "Audit Log", Icon: ScrollText },
       { href: "/logs", label: "System Logs", Icon: ScrollText },
+      { href: "/service-catalog", label: "Service Catalog", Icon: BookOpen },
       { href: "/equipment-checklists", label: "Equipment Checklists", Icon: Wrench },
       { href: "/announcements", label: "Announcements", Icon: ScrollText },
       { href: "/training-docs", label: "Training & Docs", Icon: GraduationCap },

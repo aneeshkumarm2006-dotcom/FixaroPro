@@ -1,4 +1,6 @@
 import QuoteFormClient from "./QuoteFormClient";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { ServiceConfigProvider } from "@/lib/config/ServiceConfigProvider";
 
 export const metadata = {
   title: "Request a Quote · Fixaro",
@@ -6,8 +8,20 @@ export const metadata = {
     "Tell us about your space and we'll send you a tailored service quote.",
 };
 
-export default function QuotePage() {
+/**
+ * MUST be dynamic. The service list comes from the DB catalog, and this page is
+ * otherwise statically prerenderable — Next would run the config read once at
+ * BUILD time and freeze that catalog into the HTML, so a service an admin added
+ * or retired would never appear here until the next deploy (SOP §4: quote intake
+ * and booking checkout must use the same catalog).
+ */
+export const dynamic = "force-dynamic";
+
+export default async function QuotePage() {
+  const config = await getRuntimeConfig();
+
   return (
+    <ServiceConfigProvider config={config}>
     <div
       style={{
         minHeight: "100vh",
@@ -39,7 +53,7 @@ export default function QuotePage() {
               color: "#3a5a62",
               lineHeight: 1.5,
             }}>
-            Tell us a few details about your space and we'll get back to you
+            Tell us a few details about your space and we&apos;ll get back to you
             within one business day with a tailored estimate.
           </p>
         </header>
@@ -47,5 +61,6 @@ export default function QuotePage() {
         <QuoteFormClient />
       </div>
     </div>
+    </ServiceConfigProvider>
   );
 }

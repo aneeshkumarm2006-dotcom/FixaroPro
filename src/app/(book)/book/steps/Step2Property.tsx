@@ -3,18 +3,24 @@
 import { useEffect, useState } from "react";
 import {
   BookingDraft,
-  SERVICE_CATEGORIES,
-  SERVICE_CATALOG,
   FREQUENCIES,
-  HOUR_OPTIONS,
-  computeHourlyPrice,
-  getMaterialsPricing,
-  ServiceItem,
+  HOUR_CHOICES,
   PAINT_REPAIR_SURFACES,
   AC_TYPES,
   AC_MOUNT_TYPES,
 } from "../types";
-import { PAINTING_SCOPES, paintingQuoteRange } from "@/lib/painting";
+import {
+  useServiceCatalog,
+  useServiceCategories,
+  useService,
+  useMaterialsPricing,
+  usePaintingScopes,
+  usePaintingQuoteRange,
+  useBasePrice,
+  useHourlyPrice,
+  usePolicy,
+} from "@/lib/config/ServiceConfigProvider";
+import { materialsLineLabel, type ServiceConfigItem } from "@/lib/config/types";
 import { getRequiredEquipment } from "@/lib/equipment";
 import { getServiceChecklist } from "../../actions/getServiceChecklist";
 import { Field, Input } from "@/components/customer/Field";
@@ -26,26 +32,41 @@ interface Props {
 }
 
 export default function Step2Property({ draft, onChange }: Props) {
+  // The catalog, prices and painting ranges all come from the admin-editable
+  // config (SOP §3, stage 8) — not from a TS constant baked in at build time.
+  const catalog = useServiceCatalog();
+  const categories = useServiceCategories();
+  const selectedService = useService(draft.serviceType);
+  const materials = useMaterialsPricing(draft.serviceType);
+  const paintingScopes = usePaintingScopes();
+  const quoteRangeFor = usePaintingQuoteRange();
+  const basePriceFor = useBasePrice();
+  const hourlyPrice = useHourlyPrice();
+  const policy = usePolicy();
+
   const [activeCategory, setActiveCategory] = useState<string>(
-    SERVICE_CATALOG.find((s) => s.value === draft.serviceType)?.category ??
-      SERVICE_CATEGORIES[0]
+    () => selectedService?.category ?? categories[0] ?? ""
   );
 
-  const selectedService = SERVICE_CATALOG.find((s) => s.value === draft.serviceType);
+  const servicesInCategory = catalog.filter((s) => s.category === activeCategory);
 
-  const servicesInCategory = SERVICE_CATALOG.filter(
-    (s) => s.category === activeCategory
-  );
+  // A "per-unit fixed price" service reuses the hours field as a unit count
+  // (Silicone sealing = rooms). Driven by the service's own config flag, so a
+  // NEW per-unit service gets the room picker without a code change — this used
+  // to be `draft.serviceType === "SILICONE_SEALING"` in four places.
+  const isPerUnit =
+    selectedService?.pricing === "fixed" && selectedService.fixedPricePerUnit;
+  const isQuoteOnly = selectedService?.pricing === "quote";
 
-  function selectService(item: ServiceItem) {
-    // Reset hours to 2 when switching service (unless Silicone Sealing where hours = rooms)
-    const resetHours = item.value === "SILICONE_SEALING" ? 1 : 2;
+  function selectService(item: ServiceConfigItem) {
+    // Per-unit services start at 1 unit; hourly services at the booking minimum.
+    const resetHours =
+      item.pricing === "fixed" && item.fixedPricePerUnit
+        ? 1
+        : policy.minBookingHours;
     onChange({ serviceType: item.value, hours: resetHours });
   }
 
-  const materials = getMaterialsPricing(draft.serviceType);
-
-  const isSiliconeSealing = draft.serviceType === "SILICONE_SEALING";
   const isPainting = draft.serviceType === "PAINTING";
   const isSmallPaintRepair = draft.serviceType === "SMALL_PAINT_REPAIR";
   const isAcInstallation = draft.serviceType === "AC_INSTALLATION";
@@ -70,11 +91,7 @@ export default function Step2Property({ draft, onChange }: Props) {
       cancelled = true;
     };
   }, [draft.serviceType]);
-  const paintingRange = isPainting ? paintingQuoteRange(draft.paintingScope) : null;
-  const isQuoteOnly =
-    draft.serviceType === "PAINTING" ||
-    draft.serviceType === "MOULDINGS" ||
-    (draft.serviceType === "TV_MOUNTING" && false); // TV mounting shows hours normally
+  const paintingRange = isPainting ? quoteRangeFor(draft.paintingScope) : null;
 
   return (
     <div className="cl-stack-32">
@@ -106,7 +123,7 @@ export default function Step2Property({ draft, onChange }: Props) {
       <div className="cl-stack-12">
         <span className="cl-label">Service category</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {SERVICE_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               type="button"
@@ -141,10 +158,10 @@ export default function Step2Property({ draft, onChange }: Props) {
               title={s.label}
               hint={
                 s.pricing === "fixed"
-                  ? s.priceNote
+                  ? s.priceNote ?? undefined
                   : s.pricing === "quote"
-                  ? "Custom quote"
-                  : "$79/hr"
+                  ? s.priceNote ?? "Custom quote"
+                  : s.priceNote ?? `$${policy.labourRate}/hr`
               }
               onClick={() => selectService(s)}
             />
@@ -152,11 +169,15 @@ export default function Step2Property({ draft, onChange }: Props) {
         </div>
       </div>
 
-      {/* Hours / rooms / quote */}
+      {/* Hours / units / quote. Every price shown here is derived from the
+          configured rate + the service's configured fixed price, so an admin
+          repricing a service moves what the customer sees at the point of sale.
+          These used to be `rooms * 209` and a HOUR_OPTIONS array whose prices
+          were baked in at module load from the seed rate. */}
       {draft.serviceType && !isQuoteOnly && (
         <div className="cl-stack-12">
           <span className="cl-label">
-            {isSiliconeSealing ? "Number of rooms" : "How many hours?"}
+            {isPerUnit ? "Number of rooms" : "How many hours?"}
           </span>
 
           {selectedService?.priceNote && (
@@ -165,28 +186,26 @@ export default function Step2Property({ draft, onChange }: Props) {
             </p>
           )}
 
-          {isSiliconeSealing ? (
-            // Room count for Silicone Sealing
+          {isPerUnit ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {[1, 2, 3, 4, 5].map((rooms) => (
                 <ChoiceButton
                   key={rooms}
                   active={draft.hours === rooms}
                   title={`${rooms} room${rooms > 1 ? "s" : ""}`}
-                  hint={`$${(rooms * 209).toFixed(0)}`}
+                  hint={`$${basePriceFor(rooms, draft.serviceType).toFixed(0)}`}
                   onClick={() => onChange({ hours: rooms })}
                 />
               ))}
             </div>
           ) : (
-            // Hour selection for standard services
             <div className="cl-grid-2">
-              {HOUR_OPTIONS.map((opt) => (
+              {HOUR_CHOICES.map((opt) => (
                 <ChoiceButton
                   key={opt.hours}
                   active={draft.hours === opt.hours}
                   title={opt.label}
-                  hint={`$${opt.price.toFixed(0)}${opt.badge ? ` · ${opt.badge}` : ""}`}
+                  hint={`$${hourlyPrice(opt.hours).toFixed(0)}${opt.badge ? ` · ${opt.badge}` : ""}`}
                   onClick={() => onChange({ hours: opt.hours })}
                 />
               ))}
@@ -195,20 +214,20 @@ export default function Step2Property({ draft, onChange }: Props) {
         </div>
       )}
 
-      {/* Painting scope + immediate quote range (SOP §6/§7).
-          Range is baseline × 1.35 and is an ESTIMATE — the final price is
-          confirmed after provider bids. */}
+      {/* Painting scope + immediate quote range (SOP §6/§7). Range is the
+          admin-editable internal baseline × the configured surplus rate, and is
+          an ESTIMATE — the final price is confirmed after provider bids. */}
       {isPainting && (
         <div className="cl-stack-12">
           <span className="cl-label">What are we painting?</span>
           <div className="cl-grid-2">
-            {PAINTING_SCOPES.map((s) => (
+            {paintingScopes.map((s) => (
               <ChoiceButton
                 key={s.key}
                 active={draft.paintingScope === s.key}
                 title={s.label}
                 hint={(() => {
-                  const r = paintingQuoteRange(s.key);
+                  const r = quoteRangeFor(s.key);
                   if (!r) return undefined;
                   return r.min === r.max
                     ? `~$${r.min.toFixed(0)}`
@@ -233,7 +252,9 @@ export default function Step2Property({ draft, onChange }: Props) {
               </p>
               <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.5 }}>
                 This is an estimate. We notify our painters, take bids, and send you a final
-                price to accept before any work begins. Primer, if required, may increase the price.
+                price to accept before any work begins. You supply the paint and primer — Fixaro
+                doesn&apos;t provide them by default, though an admin can approve materials as a
+                separate extra.
               </p>
             </div>
           )}
@@ -295,8 +316,10 @@ export default function Step2Property({ draft, onChange }: Props) {
               You provide the paint — Fixaro does not supply or pick up paint.
             </p>
             <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.5 }}>
-              Labour is $79/hr. Add photos and any extra detail in the notes step. The optional $49
-              materials charge covers repair supplies only, never paint.
+              Labour is ${policy.labourRate}/hr. Add photos and any extra detail in the notes step.
+              {materials
+                ? ` The optional $${materials.amount.toFixed(0)} materials charge covers repair supplies only, never paint.`
+                : ""}
             </p>
           </div>
         </div>
@@ -365,7 +388,7 @@ export default function Step2Property({ draft, onChange }: Props) {
               border: "1px solid rgba(28,25,23,0.10)",
             }}>
             <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>
-              Labour is billed at $79/hr — you provide the AC unit and accessories.
+              Labour is billed at ${policy.labourRate}/hr — you provide the AC unit and accessories.
             </p>
             <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.5 }}>
               There is no automatic materials charge for AC installation. Any extra parts, brackets
@@ -481,13 +504,19 @@ export default function Step2Property({ draft, onChange }: Props) {
                 : `+$${materials.amount.toFixed(2)}`}
             </span>
           </label>
+          {/* D0.3 — the materials line reads "Materials & equipment charge —
+              $119 (paint not included)" for painting. The qualifier is the
+              service's configured `materialsNote`, so ops own the wording. */}
+          <p style={{ fontSize: 13, color: "var(--ink)", margin: 0, fontWeight: 500 }}>
+            {materialsLineLabel(materials)}
+          </p>
           <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
             {draft.customerRequestsMaterials
               ? materials.type === "deposit"
                 ? `A $${materials.amount.toFixed(0)} materials deposit is collected now. Any unused balance is applied to your final bill or refunded.`
                 : materials.type === "charge"
-                ? `A flat $${materials.amount.toFixed(2)} materials & equipment charge is added${isPainting ? ". This does not include paint — you must provide the exact paint/colour before the handyman arrives. Fixaro does not supply or pick up paint." : "."}`
-                : `A $${materials.amount.toFixed(2)} materials & equipment charge is added to your booking.`
+                ? `A flat $${materials.amount.toFixed(2)} materials & equipment charge is collected now${isPainting ? ". This does not include paint — you must provide the exact paint/colour before the handyman arrives. Fixaro does not supply or pick up paint." : "."}`
+                : `A $${materials.amount.toFixed(2)} materials & equipment charge is added to your final bill.`
               : "Leave unchecked and you'll need to provide everything required before the handyman arrives."}
           </p>
         </div>

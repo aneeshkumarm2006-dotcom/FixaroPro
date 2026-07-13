@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { clockOut } from "../actions/clockOut";
 
-type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "TOOL" | "OTHER";
 
 interface InventoryRule {
   usagePerJob: number;
@@ -62,6 +62,9 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
   const [dispPick, setDispPick] = useState<Record<string, number>>({});
   // legacy "remaining" input for OTHER-category products
   const [remaining, setRemaining] = useState<Record<string, string>>({});
+  // Completion write-up (SOP §8). Clock-out is what completes the job, so the
+  // notes belong here rather than behind a second button nobody would press.
+  const [notes, setNotes] = useState("");
 
   const { sprays, mops, disposables, others } = useMemo(() => {
     return {
@@ -85,6 +88,7 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
     setMopPick(mp);
     setDispPick(dp);
     setRemaining(rem);
+    setNotes("");
     setError(null);
     setOpen(true);
   }
@@ -114,7 +118,7 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
           .filter((r) => !isNaN(r.inventoryAfter)),
       };
 
-      const result = await clockOut(jobId, usage);
+      const result = await clockOut(jobId, usage, notes.trim() || undefined);
       if (result.success) {
         setOpen(false);
       } else {
@@ -142,8 +146,8 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
               </svg>
             </span>
             <div>
-              <h2 className="co-title">Post-job inventory</h2>
-              <p className="co-subtitle">Log what you used. Stock and restock alerts update automatically.</p>
+              <h2 className="co-title">Complete this job</h2>
+              <p className="co-subtitle">Log what you used and write up what you did. Stock and restock alerts update automatically.</p>
             </div>
           </div>
           <button className="co-close" onClick={() => !loading && setOpen(false)} aria-label="Close">
@@ -157,7 +161,7 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
         <div className="co-body">
           {!hasAssignments ? (
             <div className="co-empty">
-              <p>No products assigned to you. You can still close the job.</p>
+              <p>No products assigned to you — nothing to log.</p>
             </div>
           ) : (
             <>
@@ -357,6 +361,36 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
               )}
             </>
           )}
+
+          {/* Completion notes (SOP §8 "Job completion tools: notes"). Optional —
+              a job is never blocked on paperwork — but this is the handyman's
+              record of what was actually done, and it lands on the admin job
+              card and the customer's booking. */}
+          <div className="pju-section">
+            <div className="pju-section-head">
+              <span className="pju-section-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="8" y1="13" x2="16" y2="13" />
+                  <line x1="8" y1="17" x2="13" y2="17" />
+                </svg>
+              </span>
+              <div>
+                <h3>Completion notes</h3>
+                <p>What did you do? Anything ops or the client should know?</p>
+              </div>
+            </div>
+            <textarea
+              className="co-textarea"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={4000}
+              rows={4}
+              placeholder="e.g. Replaced the fill valve and flapper. Tank was cracked at the base — flagged to the client, recommend a full replacement."
+            />
+            <div className="co-textarea-foot">Optional · {notes.length}/4000</div>
+          </div>
         </div>
 
         {error && (

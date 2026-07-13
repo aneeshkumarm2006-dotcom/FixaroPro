@@ -914,6 +914,87 @@ export async function sendCustomerPaintingRejected(opts: {
   });
 }
 
+/**
+ * Provider invite to bid on a new painting job (SOP §6, catalog
+ * `prov.painting.new_job` — EMAIL + APP_PUSH). The in-app Alert is raised
+ * alongside this by notifyPaintingProviders; this is the declared email half.
+ *
+ * `missingEquipment` is only ever populated for items we can positively prove
+ * the provider is short of (see equipment-readiness.ts) — it warns, it does not
+ * bar them from bidding.
+ */
+export async function sendProviderPaintingBidInvite(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  location: string | null;
+  paintingScope: string | null;
+  startTime: string | null;
+  missingEquipment?: string | null;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("New painting job — open for bids") +
+      p(`Hi ${opts.providerName.split(" ")[0]}, painting booking #${opts.jobNumber} is open for bids. The <strong>lowest valid bid wins</strong> automatically once bidding closes.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Where", opts.location ?? "—"],
+        ["Scope", opts.paintingScope ?? "—"],
+        ["When", opts.startTime ? `${fmtDate(opts.startTime)} · ${fmtTime(opts.startTime)}` : "Flexible"],
+      ]) +
+      p("Remember: the client supplies the paint. Bid your labour and materials accordingly.") +
+      (opts.missingEquipment
+        ? p(`<strong>Before you bid —</strong> your kit may be missing: ${opts.missingEquipment}. Visit the locker or send ops a receipt for reimbursement.`)
+        : "") +
+      btn("Place your bid", `${appUrl}/painting-bids`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `New painting job to bid — #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.painting.new_job" },
+  });
+}
+
+/**
+ * Ops phone-follow-up email when a painting final offer is still unanswered
+ * inside 24h of the job (SOP §11, catalog `admin.painting.followup_24h` —
+ * EMAIL + APP_PUSH). The cron raises the in-app Alert; this is the declared
+ * email half. Log the call outcome on the job (Stage 5.3) rather than
+ * cancelling straight away.
+ */
+export async function sendAdminPaintingFollowUp(opts: {
+  to: string;
+  jobId: string;
+  jobNumber: number;
+  clientName: string;
+  clientPhone: string | null;
+  startTime: string;
+  finalAmount: number | null;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const html = layout(
+    h1("Painting offer unanswered — call the client") +
+      p(`<strong>${opts.clientName}</strong> has not responded to the final offer on painting booking #${opts.jobNumber}, and the job starts in under 24 hours. Phone the client to confirm or cancel.`) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Client", opts.clientName],
+        ["Phone", opts.clientPhone ?? "— (no number on file)"],
+        ["Job starts", `${fmtDate(opts.startTime)} · ${fmtTime(opts.startTime)}`],
+        ["Final offer", opts.finalAmount != null ? fmt(opts.finalAmount) : "—"],
+      ]) +
+      p("Log the attempt and its outcome on the job so the next person on shift can see it. If the client cannot be reached, the no-answer path cancels the booking and refunds the $119 materials/equipment charge.") +
+      btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Call client — painting offer unanswered (#${opts.jobNumber})`,
+    html,
+    notification: { recipient: "ADMIN", key: "admin.painting.followup_24h" },
+  });
+}
+
 /** Customer email when their card is declined. */
 export async function sendCustomerCardDeclined(opts: {
   to: string;
@@ -1351,7 +1432,7 @@ const ACCOUNT_COPY: Record<AccountEvent, { subject: string; title: string; body:
       `Hi ${n.split(" ")[0]}, here's the rundown:<br><br>` +
       `<strong>1.</strong> Browse the Available jobs tab and accept ones that fit your schedule.<br>` +
       `<strong>2.</strong> Clock in when you arrive, complete the checklist, clock out when done.<br>` +
-      `<strong>3.</strong> Payments and wash credits land in your account automatically.<br><br>` +
+      `<strong>3.</strong> Payments land in your account automatically.<br><br>` +
       `Reach out anytime via the Messages tab — admin is one tap away.`,
   },
   email_verification: {
@@ -2143,46 +2224,6 @@ export async function sendProviderWeeklyPerformance(opts: {
     html,
     notification: { recipient: "PROVIDER", key: "prov.report.weekly_performance" },
   });
-}
-
-/**
- * Weekly Rag Wash dashboard email to all admin recipients. Summarises the
- * last 7 days: rags credited, payouts issued, and jobs flagged for review.
- */
-export async function sendAdminWeeklyRagWashDashboard(opts: {
-  weekLabel: string;
-  ragsCredited: number;
-  padsCredited: number;
-  payoutsCount: number;
-  payoutsTotal: number;
-  flaggedJobsCount: number;
-}) {
-  const admins = await fetchAdmins();
-  if (admins.length === 0) return;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const html = layout(
-    h1(`Weekly Rag Wash — ${opts.weekLabel}`) +
-      section([
-        ["Rags credited", String(opts.ragsCredited)],
-        ["Pads credited", String(opts.padsCredited)],
-        ["Payouts issued", String(opts.payoutsCount)],
-        ["Payout total", fmt(opts.payoutsTotal)],
-        ["Jobs flagged for review", String(opts.flaggedJobsCount)],
-      ]) +
-      btn("Open wash payouts", `${appUrl}/wash-payouts`)
-  );
-  for (const admin of admins) {
-    try {
-      await deliver({
-        to: admin.email,
-        subject: `Weekly Rag Wash dashboard — ${opts.weekLabel}`,
-        html,
-        notification: { recipient: "ADMIN", key: "admin.report.weekly_ragwash" },
-      });
-    } catch (e) {
-      console.error("Weekly Rag Wash email failed for", admin.email, e);
-    }
-  }
 }
 
 /** Admin email when a cleaner arrives late and the rating cap kicks in. */

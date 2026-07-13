@@ -6,12 +6,15 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createAssignmentInvites } from "@/lib/invites";
 import { sendProviderLastMinuteOpening } from "@/lib/email";
-import { LAST_MINUTE_CLAIM_BONUS_USD } from "@/lib/policy";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import { applyStrike } from "@/lib/strikes";
 
-const LATE_CANCEL_HOURS = 24;
-const LATE_CANCEL_FEE = 20;
-/** Inside this window the cleaner cancel triggers the last-minute repost. */
+// Provider late-cancel penalty shares the single SOP cancellation-fee source of
+// truth — now the admin-editable `policy.cancellationFee` /
+// `policy.cancellationWindowHours` config, so raising the fee in the admin UI
+// actually changes the payout deduction AND the copy the provider is shown
+// (§4/§10). Resolved per call below.
+/** Inside this window the cancel triggers the last-minute repost. */
 const LAST_MINUTE_HOURS = 24;
 
 export async function cancelShift(jobId: string): Promise<{ success: true; penaltyApplied: boolean } | { success: false; error: string }> {
@@ -44,6 +47,11 @@ export async function cancelShift(jobId: string): Promise<{ success: true; penal
     if (["COMPLETED", "CANCELLED"].includes(job.status)) {
       return { success: false, error: "Job is already completed or cancelled" };
     }
+
+    const { policy } = await getRuntimeConfig();
+    const LATE_CANCEL_HOURS = policy.cancellationWindowHours;
+    const LATE_CANCEL_FEE = policy.cancellationFee;
+    const LAST_MINUTE_CLAIM_BONUS_USD = policy.lastMinuteClaimBonus;
 
     const hoursUntilShift = (job.startTime.getTime() - Date.now()) / (1000 * 60 * 60);
     const isLateCancel = hoursUntilShift < LATE_CANCEL_HOURS && hoursUntilShift > 0;

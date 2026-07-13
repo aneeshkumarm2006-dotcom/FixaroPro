@@ -32,6 +32,9 @@ export async function loadReceiptData(jobId: string): Promise<ReceiptData | null
   });
   if (!job) return null;
 
+  // For hourly jobs the stored charge fields (subtotalAmount/gstAmount/qstAmount/
+  // price) are rewritten to the clocked amount at clock-out (SOP §10), so reading
+  // them here yields a self-consistent breakdown that matches what was charged.
   const addOnTotal = job.addOns.reduce((s, a) => s + a.price, 0);
   const basePrice = Math.max(0, job.subtotalAmount - addOnTotal);
 

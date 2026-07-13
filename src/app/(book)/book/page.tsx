@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
-import { BookingDraft, EMPTY_DRAFT, getMaterialsPricing } from "./types";
+import { BookingDraft, EMPTY_DRAFT } from "./types";
+import { useMaterialsPricing } from "@/lib/config/ServiceConfigProvider";
 import Step1PostalCode from "./steps/Step1PostalCode";
 import Step2Property from "./steps/Step2Property";
 import Step3Schedule from "./steps/Step3Schedule";
@@ -45,6 +46,7 @@ export default function BookPage() {
 
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BookingDraft>(EMPTY_DRAFT);
+  const configuredMaterials = useMaterialsPricing(draft.serviceType);
   const [basePrice, setBasePrice] = useState(0);
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -228,6 +230,7 @@ export default function BookPage() {
       phone: draft.phone,
       email: draft.email,
       notes: draft.notes,
+      photoUrls: draft.photoUrls,
       referralCode: draft.referralCode,
       afterPhotoConsent: draft.afterPhotoConsent,
       depositPaymentIntentId,
@@ -251,7 +254,7 @@ export default function BookPage() {
     .filter((a) => a.selected)
     .reduce((s, a) => s + a.price, 0);
   const materialsAmount = draft.customerRequestsMaterials
-    ? getMaterialsPricing(draft.serviceType)?.amount ?? 0
+    ? configuredMaterials?.amount ?? 0
     : 0;
   const subtotal = basePrice + addOnTotal + materialsAmount + draft.travelFee;
   const tax = calculateTax(subtotal);

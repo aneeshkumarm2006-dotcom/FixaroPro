@@ -1,9 +1,22 @@
+// Booking-time price (SOP §4/§5). Every number here — the labour rate, the
+// 3-hour package, the booking minimum, each service's fixed price and each
+// service's materials amount + type — is resolved from the runtime config
+// (src/lib/config), NOT from constants.
+//
+// Before Stage 8 this module hardcoded `SILICONE_SEALING → hours * 209` and
+// `WEATHERPROOFING → 74.5`, while the admin Pricing tab cheerfully saved
+// `siliconePerRoom` / `weatherproofingMin` / `weatherproofingMax` that nothing
+// read: repricing either service in the UI silently did nothing. Same class of
+// bug as the Stage-1 labour-rate key. Both now come from the service record.
+
 import { calculateTax, TaxBreakdown } from "./tax";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import {
-  computeHourlyPrice,
-  getMaterialsPricing,
+  materialsFor,
+  resolveBasePrice,
   type MaterialsType,
-} from "@/app/(book)/book/types";
+  type RuntimeConfig,
+} from "@/lib/config/types";
 
 export interface PricingInput {
   hours: number;
@@ -26,9 +39,15 @@ export interface PricingResult extends TaxBreakdown {
 }
 
 export async function computeBookingPrice(
-  input: PricingInput
+  input: PricingInput,
+  // Injectable so a caller pricing several jobs in one pass (submitBooking's
+  // recurring children) resolves the config once. getRuntimeConfig is
+  // request-cached anyway, so omitting it is cheap, not wrong.
+  config?: RuntimeConfig
 ): Promise<PricingResult> {
-  const basePrice = resolveBasePrice(input.hours, input.serviceType);
+  const cfg = config ?? (await getRuntimeConfig());
+
+  const basePrice = resolveBasePrice(cfg, input.hours, input.serviceType);
   const addOnTotal = input.addOns.reduce((s, a) => s + a.price, 0);
   const travelFee = input.travelFee ?? 0;
   const discountAmount = input.discountAmount ?? 0;
@@ -36,7 +55,7 @@ export async function computeBookingPrice(
   // Materials/equipment charge or deposit applies only when the customer
   // opts in (all-or-nothing). Deposits are still part of the amount due now.
   const materials = input.customerRequestsMaterials
-    ? getMaterialsPricing(input.serviceType)
+    ? materialsFor(cfg, input.serviceType)
     : null;
   const materialsAmount = materials?.amount ?? 0;
   const materialsType = materials?.type ?? null;
@@ -56,19 +75,6 @@ export async function computeBookingPrice(
     materialsType,
     ...tax,
   };
-}
-
-function resolveBasePrice(hours: number, serviceType?: string): number {
-  if (serviceType === "SILICONE_SEALING") {
-    return Math.max(1, hours) * 209;
-  }
-  if (serviceType === "WEATHERPROOFING") {
-    return 74.5;
-  }
-  if (serviceType === "PAINTING" || serviceType === "MOULDINGS") {
-    return 0;
-  }
-  return computeHourlyPrice(Math.max(2, hours));
 }
 
 // Returns the recurring discount percentage for the 2nd+ visit.

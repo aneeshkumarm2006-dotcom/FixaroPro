@@ -7,11 +7,14 @@ import { isUpfrontMaterials } from "@/app/(book)/book/types";
 import { sendPaintingOffer } from "../../actions/sendPaintingOffer";
 import { overridePaintingProvider } from "../../actions/overridePaintingProvider";
 import { cancelPaintingNoAnswer } from "../../actions/cancelPaintingNoAnswer";
+import { logPaintingCallAttempt, type CallOutcome } from "../../actions/logPaintingCallAttempt";
 import { adjustMaterialsDeposit } from "../../actions/adjustMaterialsDeposit";
 import { adjustClockTimes, getJobClockTimes } from "../../actions/adjustClockTimes";
 
 export interface OpsBilling {
+  pricingModel: "hourly" | "fixed" | "quote";
   hoursWorked: number | null;
+  billableHours: number | null;
   labourRate: number;
   labourFromClock: number | null;
   materialsAmount: number;
@@ -25,8 +28,11 @@ export interface OpsBilling {
   gst: number;
   qst: number;
   total: number;
+  bookedTotal: number;
   refunded: number;
   amountDueNow: number;
+  clockMissing: boolean;
+  baseMissing: boolean;
 }
 
 export interface OpsPainting {
@@ -107,6 +113,10 @@ function PaintingOps({
   // SOP §6 — "No phone answer → cancel appointment".
   const [noAnswerOpen, setNoAnswerOpen] = useState(false);
   const [callNote, setCallNote] = useState("");
+  // SOP §6/§11 — log a follow-up call attempt (outcome + notes) WITHOUT cancelling.
+  const [callLogOpen, setCallLogOpen] = useState(false);
+  const [callOutcome, setCallOutcome] = useState<CallOutcome>("NO_ANSWER");
+  const [callLogNote, setCallLogNote] = useState("");
 
   function send() {
     setMsg(null);
@@ -150,6 +160,27 @@ function PaintingOps({
           : { ok: false, text: res.error ?? "Failed" }
       );
       if (res.success) setNoAnswerOpen(false);
+    });
+  }
+
+  // Record a follow-up call outcome to the job log without cancelling (SOP §6/§11).
+  function doLogCall() {
+    setMsg(null);
+    start(async () => {
+      const res = await logPaintingCallAttempt({
+        jobId,
+        outcome: callOutcome,
+        notes: callLogNote,
+      });
+      setMsg(
+        res.success
+          ? { ok: true, text: "Call attempt logged." }
+          : { ok: false, text: res.error ?? "Failed" }
+      );
+      if (res.success) {
+        setCallLogOpen(false);
+        setCallLogNote("");
+      }
     });
   }
 
@@ -218,6 +249,16 @@ function PaintingOps({
             Override provider
           </button>
         ) : null}
+        {/* SOP §6/§11: log a follow-up call outcome (reached / no answer /
+            voicemail) without cancelling the appointment. */}
+        {painting.status === "OFFER_SENT" ? (
+          <button
+            type="button"
+            onClick={() => setCallLogOpen((v) => !v)}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium">
+            Log call attempt
+          </button>
+        ) : null}
         {/* SOP §6: the client never answered the follow-up call inside 24h. */}
         {painting.status === "OFFER_SENT" ? (
           <button
@@ -228,6 +269,37 @@ function PaintingOps({
           </button>
         ) : null}
       </div>
+
+      {callLogOpen ? (
+        <div className="mt-3 border-t border-neutral-100 pt-3 space-y-2">
+          <p className="text-xs text-neutral-500">
+            Records the follow-up call attempt (time, outcome and notes) to the
+            job log. Does not cancel the appointment.
+          </p>
+          <select
+            value={callOutcome}
+            onChange={(e) => setCallOutcome(e.target.value as CallOutcome)}
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm">
+            <option value="REACHED">Reached client</option>
+            <option value="NO_ANSWER">No answer</option>
+            <option value="VOICEMAIL">Left voicemail</option>
+          </select>
+          <input
+            value={callLogNote}
+            onChange={(e) => setCallLogNote(e.target.value)}
+            placeholder="Notes (optional) — e.g. called 09:10, will call back after 5pm"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={doLogCall}
+            className="rounded-lg bg-neutral-900 text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1 disabled:opacity-50">
+            {pending ? <Loader2 size={14} className="animate-spin" /> : null}
+            Log call attempt
+          </button>
+        </div>
+      ) : null}
 
       {noAnswerOpen ? (
         <div className="mt-3 border-t border-neutral-100 pt-3 space-y-2">
@@ -277,7 +349,7 @@ function PaintingOps({
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
           />
           <p className="text-xs text-neutral-400">
-            Leave the amount blank to keep the client's agreed price (no re-notification).
+            Leave the amount blank to keep the client&apos;s agreed price (no re-notification).
           </p>
           <button
             type="button"
@@ -400,18 +472,47 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
       <h3 className="font-semibold flex items-center gap-2 mb-3">
         <Receipt size={18} /> Charge review (SOP §10)
       </h3>
+      {/* SOP §10 (1.4) — hourly jobs are billed on clocked hours × rate; warn
+          when the clock record can't price the labour. */}
+      {billing.pricingModel === "hourly" && (billing.clockMissing || (billing.hoursWorked ?? 0) <= 0) ? (
+        <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          No usable clock-out on this hourly job — labour can’t be computed, so
+          the charge is blocked. Record or correct the clock times below first.
+        </p>
+      ) : null}
+      {billing.pricingModel === "hourly" && billing.baseMissing && !billing.clockMissing ? (
+        <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          This booking predates hourly billing (no base price on file), so the
+          booked total is shown. Verify the amount before charging.
+        </p>
+      ) : null}
       <div>
-        {billing.labourFromClock != null ? (
+        {billing.pricingModel === "hourly" ? (
+          <>
+            <Row label="Clocked hours" value={billing.hoursWorked != null ? `${billing.hoursWorked}h` : "—"} />
+            {billing.labourFromClock != null && billing.billableHours != null && !billing.baseMissing ? (
+              <Row
+                label={
+                  Math.round(billing.labourFromClock * 100) ===
+                  Math.round(billing.billableHours * billing.labourRate * 100)
+                    ? `Billable labour (${billing.billableHours}h × $${billing.labourRate}/hr)`
+                    : `Billable labour (${billing.billableHours}h · flat package)`
+                }
+                value={money(billing.labourFromClock)}
+              />
+            ) : (
+              <Row label="Billable labour" value="—" />
+            )}
+          </>
+        ) : billing.labourFromClock != null ? (
           <Row label={`Labour (${billing.hoursWorked}h × $${billing.labourRate}/hr)`} value={money(billing.labourFromClock)} />
-        ) : (
-          <Row label="Labour (no clock record)" value="—" />
-        )}
+        ) : null}
         {/* Only true deposits are labelled as such. A "charge" (painting's flat
             $119) is a materials/equipment line item, never a deposit — SOP §5. */}
         {billing.materialsAmount > 0 ? (
           <Row label={billing.materialsType === "deposit" ? "Materials deposit" : "Materials & equipment"} value={money(billing.materialsAmount)} />
         ) : null}
-        <Row label="Subtotal (booked)" value={money(billing.subtotal)} />
+        <Row label="Subtotal" value={money(billing.subtotal)} />
         {billing.discount > 0 ? <Row label="Discount" value={`−${money(billing.discount)}`} /> : null}
         <Row label="GST" value={money(billing.gst)} />
         <Row label="QST" value={money(billing.qst)} />
@@ -419,6 +520,11 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
         {billing.depositCollected > 0 ? <Row label="Deposit paid" value={`−${money(billing.depositCollected)}`} /> : null}
         {billing.refunded > 0 ? <Row label="Refunded" value={`−${money(billing.refunded)}`} /> : null}
         <Row label="Total" value={money(billing.total)} />
+        {/* Booked estimate shown alongside the clocked total for comparison. */}
+        {billing.pricingModel === "hourly" &&
+        Math.round(billing.bookedTotal * 100) !== Math.round(billing.total * 100) ? (
+          <Row label="Booked estimate" value={money(billing.bookedTotal)} />
+        ) : null}
         <Row label="Amount due now" value={money(billing.amountDueNow)} strong />
       </div>
 

@@ -1,3 +1,5 @@
+import { computeHourlyPrice as computeHourlyPriceShared } from "@/lib/config/types";
+
 export type Frequency =
   | "ONE_TIME"
   | "WEEKLY"
@@ -69,6 +71,10 @@ export interface BookingDraft {
   phone: string;
   email: string;
   notes: string;
+  // Intake photos (SOP v4.2 §4) — Cloudinary secure URLs. Persisted as INTAKE
+  // JobPhoto rows on the created job. Especially relevant for Small paint repair
+  // and AC installation.
+  photoUrls: string[];
   referralCode: string;
   // After-photo consent (opt-in checkbox, unchecked by default).
   afterPhotoConsent: boolean;
@@ -105,11 +111,20 @@ export const EMPTY_DRAFT: BookingDraft = {
   phone: "",
   email: "",
   notes: "",
+  photoUrls: [],
   referralCode: "",
   afterPhotoConsent: false,
 };
 
 // ── Service catalog ────────────────────────────────────────────────────────
+//
+// SEED DEFAULTS ONLY (SOP §3, stage 8). The live catalog is the
+// ServiceCatalogItem table: these rows seed it, and are the fallback while it is
+// empty. Feature code must resolve services through getRuntimeConfig() (server)
+// or useRuntimeConfig() (client) — see src/lib/config/ — never by importing
+// SERVICE_CATALOG or MATERIALS_PRICING directly, or an admin's edit will not be
+// honoured. Adding a service HERE moves the default; adding one in the admin
+// Service Catalog editor moves a running environment.
 
 export const SERVICE_CATEGORIES = [
   "Repairs",
@@ -157,7 +172,12 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "CABINET_HARDWARE", label: "Cabinet hardware replacement", category: "Home Improvement", pricing: "hourly" },
   { value: "WALL_PANELING", label: "Wall paneling", category: "Home Improvement", pricing: "hourly" },
   { value: "SMALL_CARPENTRY", label: "Small carpentry", category: "Home Improvement", pricing: "hourly" },
-  { value: "SILICONE_SEALING", label: "Silicone Sealing", category: "Home Improvement", pricing: "fixed", priceNote: "$209 per room — silicone included" },
+  // D0.1: the $209/room fixed labour price and the $69 materials cost BOTH
+  // apply, so "— silicone included" was a contradiction that would have
+  // double-charged whenever the customer checked the Fixaro-materials box (SOP
+  // §5 lists a $69 materials charge for this service). When the box is
+  // unchecked, the customer supplies the silicone.
+  { value: "SILICONE_SEALING", label: "Silicone Sealing", category: "Home Improvement", pricing: "fixed", priceNote: "$209 per room" },
   { value: "ACCENT_WALL", label: "Accent wall projects", category: "Home Improvement", pricing: "hourly" },
   { value: "GROUT_CLEANING", label: "Bathroom grout cleaning", category: "Home Improvement", pricing: "hourly" },
   { value: "CARPET_UPHOLSTERY", label: "Carpet & Upholstery Cleaning", category: "Home Improvement", pricing: "hourly" },
@@ -194,21 +214,17 @@ export const SERVICE_CATALOG: ServiceItem[] = [
 //
 //   "cost"    → flat materials/equipment line item billed on the final invoice;
 //               nothing is captured upfront.
-export type MaterialsType = "deposit" | "cost" | "charge";
+export type { MaterialsType } from "@/lib/config/types";
 
-/** Types whose amount is captured on the customer's card at booking time. */
-export function isUpfrontMaterials(type: string | null | undefined): boolean {
-  return type === "deposit" || type === "charge";
-}
-
-/** Only true deposits get the "D" review indicator and apply/refund controls. */
-export function isRefundableDeposit(type: string | null | undefined): boolean {
-  return type === "deposit";
-}
+// Pure predicates on the materials TYPE — they read a string, not the catalog,
+// so they are the same before and after Stage 8. Re-exported from the config
+// module so there is exactly one implementation of "is this captured upfront",
+// which the billing, refund and Stripe paths all agree on.
+export { isUpfrontMaterials, isRefundableDeposit } from "@/lib/config/types";
 
 export interface MaterialsPricing {
   amount: number;
-  type: MaterialsType;
+  type: import("@/lib/config/types").MaterialsType;
 }
 
 export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
@@ -297,32 +313,66 @@ export const AC_MOUNT_TYPES = [
   "Not sure",
 ] as const;
 
-// Returns the materials/equipment pricing for a service, or null if none configured.
+/**
+ * Materials/equipment pricing for a service from the SEED DEFAULTS, or null.
+ *
+ * @deprecated Reads the TS constants, not the admin-editable catalog. Use
+ * `materialsFor(cfg, serviceType)` from src/lib/config/types.ts against a
+ * RuntimeConfig instead. Retained only so the seeder has one accessor.
+ */
 export function getMaterialsPricing(serviceType?: string): MaterialsPricing | null {
   if (!serviceType) return null;
   return MATERIALS_PRICING[serviceType] ?? null;
 }
 
-// Hourly rate & package pricing
+// ── Default pricing knobs (seed values for the policy registry) ────────────
+// Live values come from AppSetting via src/lib/config/policy-registry.ts.
+
 export const HOURLY_RATE = 79;
 export const THREE_HOUR_PACKAGE = 209;
 export const MIN_HOURS = 2;
 
-export function computeHourlyPrice(hours: number): number {
-  if (hours === 3) return THREE_HOUR_PACKAGE;
-  return hours * HOURLY_RATE;
+/** Silicone sealing: fixed price PER ROOM (the booking UI reuses the hours field
+ *  as a room count). Seeds ServiceCatalogItem.fixedPrice + fixedPricePerUnit. */
+export const SILICONE_PRICE_PER_ROOM = 209;
+/** Weatherproofing: flat fixed price — the midpoint of the $59–$90 range shown
+ *  to the customer. Seeds ServiceCatalogItem.fixedPrice. */
+export const WEATHERPROOFING_FIXED_PRICE = 74.5;
+
+/**
+ * Hour → labour price, at the SEED rate + package. The single implementation
+ * lives in src/lib/config/types.ts and is shared with the billing layer, so a
+ * job clocked to exactly 3h gets the same package price the customer was quoted
+ * (D0.7). Callers that have a RuntimeConfig should pass the configured rate.
+ */
+export function computeHourlyPrice(
+  hours: number,
+  rate: number = HOURLY_RATE,
+  threeHourPackagePrice: number = THREE_HOUR_PACKAGE
+): number {
+  return computeHourlyPriceShared(hours, rate, threeHourPackagePrice);
 }
 
-// Hour options shown in booking UI
-export const HOUR_OPTIONS = [
-  { hours: 2, label: "2 hours", price: computeHourlyPrice(2) },
-  { hours: 3, label: "3 hours", price: computeHourlyPrice(3), badge: "Best value" },
-  { hours: 4, label: "4 hours", price: computeHourlyPrice(4) },
-  { hours: 5, label: "5 hours", price: computeHourlyPrice(5) },
-  { hours: 6, label: "6 hours", price: computeHourlyPrice(6) },
+/** Hour options offered in the booking UI. Prices are re-derived at render time
+ *  from the configured rate — these are the labels/steps, not the money. */
+export const HOUR_CHOICES: { hours: number; label: string; badge?: string }[] = [
+  { hours: 2, label: "2 hours" },
+  { hours: 3, label: "3 hours", badge: "Best value" },
+  { hours: 4, label: "4 hours" },
+  { hours: 5, label: "5 hours" },
+  { hours: 6, label: "6 hours" },
 ];
 
-// Keep SERVICE_TYPES as alias for backward compat with any admin UI
+/**
+ * @deprecated Prices baked in at module load from the SEED rate, so an admin's
+ * rate change never reached them. Use HOUR_CHOICES + the configured rate.
+ */
+export const HOUR_OPTIONS = HOUR_CHOICES.map((c) => ({
+  ...c,
+  price: computeHourlyPrice(c.hours),
+}));
+
+/** @deprecated Seed labels only — use `activeServices(cfg)`. */
 export const SERVICE_TYPES = SERVICE_CATALOG.map((s) => ({
   value: s.value,
   label: s.label,

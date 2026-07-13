@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 type State = {
   message: string;
@@ -61,6 +62,12 @@ export async function updateEmployee(
       };
     }
 
+    // Snapshot the prior role so a permission change is auditable.
+    const before = await db.user.findUnique({
+      where: { id: employeeId },
+      select: { role: true },
+    });
+
     // Update the user
     await db.user.update({
       where: { id: employeeId },
@@ -71,6 +78,22 @@ export async function updateEmployee(
         role: role as "OWNER" | "ADMIN" | "EMPLOYEE",
       },
     });
+
+    // Audit a ROLE/permission change (SOP §9/§12 — permission changes are
+    // high-impact). Only fired when the role actually changed, with old→new.
+    if (before && before.role !== role) {
+      logAudit({
+        entityType: "User",
+        entityId: employeeId,
+        action: "USER_ROLE_CHANGED",
+        field: "role",
+        oldValue: before.role ?? null,
+        newValue: role,
+        actorId: session!.user.id,
+        actorEmail: session!.user.email ?? null,
+        description: `Role for ${name} changed ${before.role} → ${role}.`,
+      });
+    }
 
     revalidatePath("/employees");
     return {

@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { stripe } from "@/lib/stripe";
 import { sendCustomerNoShowFee } from "@/lib/email";
-import { NO_SHOW_FEE_USD } from "@/lib/policy";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 
 /**
  * Admin action: customer was a no-show for the booking. Charges the
@@ -35,7 +35,10 @@ export async function markNoShow(jobId: string) {
   const client = job.client;
   if (!client) return { success: false, error: "No client on this job" };
 
-  const feeUsd = NO_SHOW_FEE_USD;
+  // Admin-editable `policy.noShowFee` — the amount charged and the amount shown
+  // in the notification/audit trail are the same number by construction.
+  const { policy } = await getRuntimeConfig();
+  const feeUsd = policy.noShowFee;
   const amountCents = Math.round(feeUsd * 100);
 
   let chargeOutcome: "charged" | "no_card_on_file" | "stripe_failed" = "charged";

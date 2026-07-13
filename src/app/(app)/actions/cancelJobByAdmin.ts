@@ -14,8 +14,8 @@ import {
 } from "@/lib/email";
 import { isNotificationEnabled } from "@/lib/notifications";
 import { logAudit } from "@/lib/audit";
-import { CANCELLATION_FEE_USD, CANCELLATION_FEE_WINDOW_HOURS } from "@/lib/policy";
-import { depositCollected } from "@/lib/billing";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { depositCollected, getBillingConfig } from "@/lib/billing";
 
 interface CancelJobInput {
   jobId: string;
@@ -70,6 +70,10 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
       return { success: false, error: "Cannot cancel a completed job" };
     }
 
+    // Fee + window are admin-editable policy values, so what we charge here is
+    // what the customer was shown at booking and in the cancel modal.
+    const { policy } = await getRuntimeConfig();
+
     await db.$transaction([
       db.job.update({
         where: { id: input.jobId },
@@ -92,7 +96,8 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
     // balance.
     let refund: { success: boolean; error?: string } | null = null;
     if (input.refundDeposit && job.depositPaid) {
-      const remaining = depositCollected(job) - (job.refundedAmount ?? 0);
+      const billingCfg = await getBillingConfig();
+      const remaining = depositCollected(job, billingCfg) - (job.refundedAmount ?? 0);
       if (remaining > 0.001) {
         refund = await issueRefund({
           jobId: input.jobId,
@@ -107,7 +112,7 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
     // to the saved card; idempotent via cancellationFeeChargedAt.
     let cancellationFee: { charged: boolean; amount?: number; error?: string } | null = null;
     const hoursUntilStart = (job.startTime.getTime() - Date.now()) / 3600_000;
-    const isLateCancel = hoursUntilStart < CANCELLATION_FEE_WINDOW_HOURS;
+    const isLateCancel = hoursUntilStart < policy.cancellationWindowHours;
     if (
       isLateCancel &&
       !input.waiveCancellationFee &&
@@ -118,7 +123,7 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
     ) {
       try {
         const pi = await stripe.paymentIntents.create({
-          amount: Math.round(CANCELLATION_FEE_USD * 100),
+          amount: Math.round(policy.cancellationFee * 100),
           currency: "cad",
           customer: job.client.stripeCustomerId,
           payment_method: job.client.defaultPaymentMethodId,
@@ -139,7 +144,7 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
             data: {
               date: new Date(),
               category: "REVENUE",
-              amount: CANCELLATION_FEE_USD,
+              amount: policy.cancellationFee,
               description: `Late-cancellation fee — job #${job.jobNumber} (PI: ${pi.id})`,
               jobId: job.id,
               source: "CREDIT_CARD",
@@ -152,21 +157,21 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
               userId: session.user.id,
               action: "PAYMENT_RECEIVED",
               field: "cancellationFee",
-              newValue: String(CANCELLATION_FEE_USD),
-              description: `Charged $${CANCELLATION_FEE_USD.toFixed(2)} late-cancellation fee (PI: ${pi.id}).`,
+              newValue: String(policy.cancellationFee),
+              description: `Charged $${policy.cancellationFee.toFixed(2)} late-cancellation fee (PI: ${pi.id}).`,
             },
           }),
         ]);
-        cancellationFee = { charged: true, amount: CANCELLATION_FEE_USD };
+        cancellationFee = { charged: true, amount: policy.cancellationFee };
         logAudit({
           entityType: "Job",
           entityId: job.id,
           action: "CANCELLATION_FEE_CHARGED",
-          newValue: String(CANCELLATION_FEE_USD),
+          newValue: String(policy.cancellationFee),
           reason: input.reason ?? null,
           actorId: session.user.id,
           actorEmail: session.user.email ?? null,
-          description: `Late-cancellation fee $${CANCELLATION_FEE_USD} charged on job #${job.jobNumber}.`,
+          description: `Late-cancellation fee $${policy.cancellationFee} charged on job #${job.jobNumber}.`,
         });
         if (job.client.email) {
           sendCustomerFeesCharged({
@@ -175,7 +180,7 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
             jobId: job.id,
             jobNumber: job.jobNumber,
             feeType: "cancellation",
-            amount: CANCELLATION_FEE_USD,
+            amount: policy.cancellationFee,
           }).catch((e) => console.error("cancellation fee email", e));
         }
       } catch (err: any) {

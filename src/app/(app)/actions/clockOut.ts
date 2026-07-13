@@ -5,11 +5,13 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
-import { projectWashables, CREDIT_PER_RAG, CREDIT_PER_PAD } from "@/lib/wash";
 import { sendAdminClockedOut } from "@/lib/email";
 import { ensureRatingRequest } from "@/lib/rating";
+import { getBillingConfig, computeChargeAmount } from "@/lib/billing";
+import { logAudit } from "@/lib/audit";
 
 const ML_PER_SPRAY = 1.25;
+const MAX_COMPLETION_NOTES = 4000;
 
 export interface PostJobUsage {
   sprays: Array<{ productId: string; sprayCount: number }>;
@@ -109,7 +111,17 @@ async function updatePayoutsForCompletedJob(
   }
 }
 
-export async function clockOut(jobId: string, usage: PostJobUsage) {
+/**
+ * Clock out — the PRIMARY job-completion path (SOP §8). It closes the clock,
+ * bills the hours, sets COMPLETED, and (7.2) carries the handyman's completion
+ * write-up, so the provider documents and completes the job in one step rather
+ * than clocking out and then hunting for a separate "mark complete" button.
+ */
+export async function clockOut(
+  jobId: string,
+  usage: PostJobUsage,
+  completionNotes?: string
+) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { success: false, error: "Not authenticated" };
 
@@ -120,7 +132,6 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
         employee: true,
         cleaners: true,
         productUsage: { include: { product: true } },
-        addOns: true,
       },
     });
 
@@ -134,7 +145,39 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
     if (!job.clockInTime) return { success: false, error: "Not clocked in" };
     if (job.clockOutTime) return { success: false, error: "Already clocked out" };
 
+    const notes = completionNotes?.trim();
+    if (notes && notes.length > MAX_COMPLETION_NOTES) {
+      return {
+        success: false,
+        error: `Completion notes are limited to ${MAX_COMPLETION_NOTES} characters.`,
+      };
+    }
+
     const now = new Date();
+
+    // Recompute the labour charge from the now-complete clock record and write
+    // it into the stored charge fields so EVERY consumer (receipts, invoices,
+    // portal, analytics, refunds) reads one authoritative figure (SOP §10.1.3).
+    // Only hourly jobs are clock-derived and only while unpaid; fixed/quote keep
+    // their price. The immutable booked baseline (bookedSubtotalAmount /
+    // basePriceAmount) is untouched, so a later clock correction recomputes cleanly.
+    const billingCfg = await getBillingConfig();
+    const charge = computeChargeAmount({ ...job, clockOutTime: now }, billingCfg);
+    const computedBilling =
+      charge.pricingModel === "hourly" &&
+      !charge.clockMissing &&
+      !charge.baseMissing &&
+      !job.paymentReceived
+        ? {
+            price: charge.total,
+            subtotalAmount: charge.subtotal,
+            gstAmount: charge.gst,
+            qstAmount: charge.qst,
+            billableHours: charge.billableHours,
+            computedLabourAmount: charge.labourAmount,
+            computedTotal: charge.total,
+          }
+        : {};
 
     const employeeProducts = await db.employeeProduct.findMany({
       where: { employeeId: session.user.id },
@@ -237,67 +280,32 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
       }
     }
 
-    // Rag-wash projection per the Self-Wash spec. Capped credits are awarded
-    // once per job (washCreditsAwarded flag) and divided across assigned
-    // cleaners so two cleaners on one job split the rag/pad pool fairly.
-    const projection = projectWashables({
-      bedCount: job.bedCount,
-      bathCount: job.bathCount,
-      jobType: job.jobType,
-      addOnNames: job.addOns.map((a) => a.name),
-    });
-
-    const cleanerIdsForCredit = (() => {
+    // Assigned crew (assignee + any co-cleaners), deduped. Used to distribute
+    // payout contributions across everyone who worked the job.
+    const assignedCleanerIds = (() => {
       const ids = new Set<string>();
       if (job.employeeId) ids.add(job.employeeId);
       for (const c of job.cleaners) ids.add(c.id);
       return Array.from(ids);
     })();
 
-    // Close the job + write projection fields.
+    // Close the job.
     ops.push(
       db.job.update({
         where: { id: jobId },
         data: {
           clockOutTime: now,
           status: "COMPLETED",
-          washProjectedRags: projection.projectedRags,
-          washProjectedPads: projection.projectedPads,
-          washCappedRags: projection.cappedRags,
-          washCappedPads: projection.cappedPads,
-          // Note: actuals aren't reported at clock-out; cleaner logs them via
-          // /my-inventory/rag-wash. We mark the *award* as done so we don't
-          // double-credit on repeated clock-outs.
-          washCreditsAwarded: !job.washCreditsAwarded && cleanerIdsForCredit.length > 0
-            ? true
-            : job.washCreditsAwarded,
+          // Completed marker + the handyman's write-up (SOP §8). Kept distinct
+          // from clockOutTime, which an admin can later correct.
+          completedAt: now,
+          completedById: session.user.id,
+          ...(notes ? { completionNotes: notes } : {}),
+          // Persisted recomputed labour/total for hourly jobs (SOP §10.1.3).
+          ...computedBilling,
         },
       })
     );
-
-    // Award rag + pad credits to each assigned cleaner, idempotent on the
-    // washCreditsAwarded flag.
-    if (!job.washCreditsAwarded && cleanerIdsForCredit.length > 0) {
-      const ragShare = Math.floor(
-        (projection.cappedRags * CREDIT_PER_RAG) / cleanerIdsForCredit.length
-      );
-      const padShare = Math.floor(
-        (projection.cappedPads * CREDIT_PER_PAD) / cleanerIdsForCredit.length
-      );
-      if (ragShare > 0 || padShare > 0) {
-        for (const cleanerId of cleanerIdsForCredit) {
-          ops.push(
-            db.user.update({
-              where: { id: cleanerId },
-              data: {
-                ragCredits: { increment: ragShare },
-                padCredits: { increment: padShare },
-              },
-            })
-          );
-        }
-      }
-    }
 
     ops.push(
       db.jobLog.create({
@@ -322,6 +330,20 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
         },
       })
     );
+
+    if (notes) {
+      ops.push(
+        db.jobLog.create({
+          data: {
+            jobId,
+            userId: session.user.id,
+            action: "NOTE_ADDED",
+            field: "completionNotes",
+            description: `${session.user.name} added completion notes`,
+          },
+        })
+      );
+    }
 
     if (suppliesCost > 0) {
       ops.push(
@@ -370,6 +392,22 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
 
     await db.$transaction(ops);
 
+    // SOP §8: "Audit job status changes." The JobLog entry above is the job
+    // timeline; this is the central, cross-entity audit trail (§9) that the
+    // Audit page reads. Fire-and-forget — logAudit never throws.
+    logAudit({
+      entityType: "Job",
+      entityId: jobId,
+      action: "JOB_COMPLETED",
+      field: "status",
+      oldValue: job.status,
+      newValue: "COMPLETED",
+      reason: "Clocked out",
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `${session.user.name} clocked out of job #${job.jobNumber}, completing it.`,
+    }).catch((e) => console.error("audit (clockOut)", e));
+
     // Admin email — gated by `admin.clock.clocked_out`.
     const clockInTime = job.clockInTime ? new Date(job.clockInTime) : null;
     const durationMinutes = clockInTime
@@ -384,7 +422,7 @@ export async function clockOut(jobId: string, usage: PostJobUsage) {
     }).catch((e) => console.error("admin clocked-out email", e));
 
     // Auto-update payout records in any active pay period covering this job.
-    updatePayoutsForCompletedJob(job, cleanerIdsForCredit, now).catch((e) =>
+    updatePayoutsForCompletedJob(job, assignedCleanerIds, now).catch((e) =>
       console.error("payout update after clock-out", e)
     );
 

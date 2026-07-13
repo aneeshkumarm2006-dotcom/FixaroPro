@@ -2,12 +2,15 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/db";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import Link from "next/link";
 import { ArrowLeft, Download, MapPin, Users, CreditCard } from "lucide-react";
 import { StatusBadge, DateBadge } from "@/components/customer/atoms";
 import { Banner } from "@/components/customer/Field";
 import RequestActions from "./RequestActions";
 import PaintingOfferActions from "./PaintingOfferActions";
+import {
+} from "@/lib/policy";
 
 function formatPrice(n: number | null | undefined) {
   return `$${(n ?? 0).toFixed(2)}`;
@@ -35,6 +38,10 @@ export default async function BookingDetailPage({
   const { id } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/portal/login");
+
+  // Cancellation fee + window shown in the cancel modal are the admin-editable
+  // policy values the server actually charges (4.1/D0.6).
+  const { policy } = await getRuntimeConfig();
 
   const email = session.user.email?.toLowerCase();
   const client = email
@@ -65,12 +72,16 @@ export default async function BookingDetailPage({
   const isUpcoming = new Date(job.startTime) >= new Date();
   const isCompletedOrPaid = job.status === "COMPLETED" || job.status === "PAID";
   // Amount actually collected at booking (a refundable materials deposit, the
-  // painting $119 materials charge, or the $20 base booking deposit).
+  // painting $119 materials charge, or the base booking deposit). The base
+  // deposit is the CONFIGURED value — the same one /api/stripe/charge-deposit
+  // captured. It was a hardcoded 20, so raising the deposit would have told the
+  // customer we took $20 when we took more, on the price row, the "collected at
+  // booking" line, and the cancellation-refund disclosure.
   const depositCollected =
     (job.materialsType === "deposit" || job.materialsType === "charge") &&
     job.materialsAmount
       ? job.materialsAmount
-      : 20;
+      : policy.baseBookingDeposit;
   const hasCancelRequest = !!job.cancellationRequestedAt;
   const hasRescheduleRequest = !!job.rescheduleRequestedAt;
   const hasRequest = hasCancelRequest || hasRescheduleRequest;
@@ -161,6 +172,16 @@ export default async function BookingDetailPage({
                   job.cleaners.length
                     ? job.cleaners.map((c) => c.name).join(", ")
                     : "Being assigned…"
+                }
+              />
+              {/* Materials/equipment transparency (D0.9) — mirrors the flag shown
+                  on the admin/provider job cards, in customer-facing wording. */}
+              <DetailRow
+                dt="Materials"
+                dd={
+                  job.customerRequestsMaterials
+                    ? "Fixaro-provided materials & equipment"
+                    : "You provide materials & equipment"
                 }
               />
               {job.notes ? (
@@ -355,7 +376,13 @@ export default async function BookingDetailPage({
           </section>
 
           {isUpcoming && !hasRequest ? (
-            <RequestActions jobId={job.id} />
+            <RequestActions
+              jobId={job.id}
+              startTime={job.startTime.toISOString()}
+              feeUsd={policy.cancellationFee}
+              feeWindowHours={policy.cancellationWindowHours}
+              depositUsd={job.depositPaid ? depositCollected : 0}
+            />
           ) : null}
 
           <section className="cl-tile cl-tile-pad-sm">

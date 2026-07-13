@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 import { isNotificationEnabled } from "@/lib/notifications";
 import type { NotificationGate } from "@/lib/email";
 import { Resend } from "resend";
@@ -97,6 +98,21 @@ export async function completePayPeriod(payPeriodId: string) {
           },
         });
       }
+    });
+
+    // Audit the payroll disbursement (SOP §9/§12) — records WHICH admin released
+    // payroll, the period, and the total paid. Previously this highest-value
+    // money-out event recorded no actor at all.
+    logAudit({
+      entityType: "PayPeriod",
+      entityId: payPeriodId,
+      action: "PAY_PERIOD_COMPLETED",
+      field: "status",
+      oldValue: "APPROVED",
+      newValue: "PAID",
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `Released payroll for ${periodLabel}: $${totalLabour.toFixed(2)} across ${period.payouts.length} payout(s).`,
     });
 
     // Notify each cleaner who received a payout — gated by `prov.payments.received` EMAIL.

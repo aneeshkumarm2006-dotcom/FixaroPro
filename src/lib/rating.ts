@@ -6,7 +6,7 @@ import {
   sendAdminNewReview,
   sendProviderNewReview,
 } from "@/lib/email";
-import { POOR_RATING_FOLLOWUP_STARS } from "@/lib/policy";
+import { getRuntimeConfig } from "@/lib/config/service-config";
 import { maybeApplyLowRatingStrike } from "@/lib/strikes";
 
 /**
@@ -198,7 +198,8 @@ export async function recordRatingFromToken(opts: {
   const job = tokenRow.job;
 
   // 1-star follow-up: email the customer + raise a CRITICAL admin alert.
-  if (stars <= POOR_RATING_FOLLOWUP_STARS) {
+  const { policy } = await getRuntimeConfig();
+  if (stars <= policy.poorRatingFollowupStars) {
     const clientEmail = job.client?.email ?? null;
     const clientName = job.client?.name ?? job.clientName ?? "the customer";
     if (clientEmail) {

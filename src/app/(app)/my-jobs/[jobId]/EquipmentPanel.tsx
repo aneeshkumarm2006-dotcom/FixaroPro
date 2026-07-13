@@ -2,17 +2,25 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Wrench, Loader2 } from "lucide-react";
+import { Wrench, Loader2, AlertTriangle, Check } from "lucide-react";
 import { requestEquipmentReimbursement } from "../../actions/requestEquipmentReimbursement";
 
-// Handyman equipment for a job (SOP §8): required-equipment list, a link to the
-// locker for pickup, and a "I bought equipment → request reimbursement" flow.
+// Handyman equipment for a job (SOP §8): the required-equipment list, which of
+// those items this provider is short of, a link to the locker for pickup, and a
+// "I bought equipment → request reimbursement" flow.
+//
+// `missing` only ever contains items we can positively prove they hold none of
+// (see src/lib/equipment-readiness.ts). Everything else renders as a plain chip
+// — an item nobody tracks is never held against anyone, so the panel stays
+// quiet rather than nagging about tools it knows nothing about.
 export default function EquipmentPanel({
   jobId,
   equipment,
+  missing = [],
 }: {
   jobId: string;
   equipment: string[];
+  missing?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState("");
@@ -20,6 +28,15 @@ export default function EquipmentPanel({
   const [receiptUrl, setReceiptUrl] = useState("");
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const missingSet = new Set(missing);
+
+  function openForm() {
+    // Pre-fill with what they're short of — the reimbursement request is almost
+    // always for exactly these items.
+    if (!description && missing.length > 0) setDescription(missing.join(", "));
+    setOpen(true);
+  }
 
   function submit() {
     const value = parseFloat(amount);
@@ -46,19 +63,46 @@ export default function EquipmentPanel({
   }
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 mt-4">
+    <div id="equipment" className="rounded-xl border border-neutral-200 bg-white p-4 mt-4" style={{ scrollMarginTop: 80 }}>
       <h3 className="font-semibold flex items-center gap-2 mb-2">
         <Wrench size={18} /> Required equipment
       </h3>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {equipment.map((item) => (
-          <span key={item} className="text-sm rounded-full bg-neutral-100 px-3 py-1 text-neutral-700">
-            {item}
+
+      {missing.length > 0 && (
+        <div className="cl-eq-warn" style={{ marginBottom: 12 }}>
+          <strong>
+            <AlertTriangle size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "-2px" }} />
+            You appear to be missing {missing.length} item{missing.length === 1 ? "" : "s"}
+          </strong>
+          <span>{missing.join(", ")}</span>
+          <span className="cl-eq-warn-fix">
+            Visit the locker before this job, or buy the item{missing.length === 1 ? "" : "s"} and request
+            reimbursement below.
           </span>
-        ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        {equipment.map((item) => {
+          const isMissing = missingSet.has(item);
+          return (
+            <span
+              key={item}
+              title={isMissing ? "You don't have this — pick it up or expense it" : undefined}
+              className={`text-sm rounded-full px-3 py-1 inline-flex items-center gap-1 ${
+                isMissing
+                  ? "bg-amber-100 text-amber-800 font-semibold"
+                  : "bg-neutral-100 text-neutral-700"
+              }`}>
+              {isMissing ? <AlertTriangle size={12} /> : <Check size={12} className="text-neutral-400" />}
+              {item}
+            </span>
+          );
+        })}
       </div>
+
       <p className="text-sm text-neutral-500 mb-3">
-        Don't have an item? Pick it up from the{" "}
+        Don&apos;t have an item? Pick it up from the{" "}
         <Link href="/my-inventory/checkout" className="underline">locker</Link>, or buy it and request
         reimbursement below.
       </p>
@@ -66,7 +110,7 @@ export default function EquipmentPanel({
       {!open ? (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={openForm}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium">
           I bought equipment — request reimbursement
         </button>

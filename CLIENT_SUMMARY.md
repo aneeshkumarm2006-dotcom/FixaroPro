@@ -4,6 +4,40 @@ This document summarises the work completed for **Notifications**, **Rag Wash cr
 
 ---
 
+## 0. Fixaro v4.2 — Quality, security & testing pass (14 Jul 2026)
+
+This is the final stage of the Fixaro Handyman build. We put the whole system through the quality-
+assurance checklist in your requirements document (Section 12) and added automated tests so the money
+calculations stay correct as the software changes.
+
+**What we did**
+
+- **Added automated tests for the money math.** The pricing, hourly-billing, deposit and painting
+  calculations now have 91 automated checks that run in seconds. This locks in the correct numbers
+  (labour at $79/hour, the 3-hour package, the 2-hour minimum, the $119 painting charge, the 35%
+  painting surplus, the $25 cancellation fee) so a future change can't quietly break them.
+- **Reviewed every part of the system against the QA checklist** — security, permissions, customer
+  booking, the painting workflow, the handyman portal, the admin dashboard, payments, audit logs, and
+  the two new services (Small paint repair and AC installation). Most areas passed as built.
+- **Fixed the important issues we found.** The most significant: an internal screen for editing a
+  booking wasn't restricted to administrators, which in theory could have let a non-admin change pay or
+  payment figures — this is now locked to admins only. We also fixed a deposit-refund limit that was
+  frozen at $20 (so refunds now follow whatever deposit amount you've set), a customer statement that
+  subtracted a discount twice, and we made sure every high-impact change (payouts, refunds, charges,
+  role changes) is recorded in the audit log with who did it and what changed.
+- **Confirmed no passwords, card numbers, or secret keys** are exposed anywhere in the app, its
+  responses, its logs, or its exports.
+
+**What still needs a live environment (not something we can do from the code alone)**
+
+- A **test run of real card payments** in Stripe's sandbox, following the step-by-step script we
+  prepared, to confirm each charge and refund amount on screen.
+- A short list of **improvements we've documented for a follow-up** — the most important is a
+  refinement to how a *partially used* materials deposit is refunded, so the customer is billed only
+  for the materials actually used. Details are in the technical QA report.
+
+---
+
 ## 1. Notifications
 
 ### What is done

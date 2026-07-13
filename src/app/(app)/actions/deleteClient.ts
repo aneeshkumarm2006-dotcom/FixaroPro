@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 export async function deleteClient(clientId: string) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -26,7 +27,21 @@ export async function deleteClient(clientId: string) {
       };
     }
 
+    const client = await db.client.findUnique({
+      where: { id: clientId },
+      select: { name: true, email: true },
+    });
     await db.client.delete({ where: { id: clientId } });
+    logAudit({
+      entityType: "Client",
+      entityId: clientId,
+      action: "CLIENT_DELETED",
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      oldValue: client ? `${client.name} <${client.email}>` : clientId,
+      newValue: null,
+      description: `Deleted client ${client?.name ?? clientId}.`,
+    });
     revalidatePath("/clients");
     return { success: true };
   } catch (error) {

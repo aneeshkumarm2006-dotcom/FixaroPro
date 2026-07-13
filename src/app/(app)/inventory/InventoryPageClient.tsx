@@ -9,7 +9,7 @@ import ForecastView from "./ForecastView";
 import Button from "@/components/ui/Button";
 import { Package, DollarSign, TrendingDown } from "lucide-react";
 
-type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "OTHER";
+type ProductCategory = "LIQUID_SPRAY" | "MOP_LIQUID" | "DISPOSABLE" | "TOOL" | "OTHER";
 
 interface Product {
   id: string;

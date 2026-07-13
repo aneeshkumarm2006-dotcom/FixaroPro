@@ -123,7 +123,12 @@ export async function GET(req: NextRequest) {
       jobNumber: j.jobNumber,
       jobDate: (j.jobDate ?? j.startTime).toISOString(),
       serviceType: j.jobType,
-      amount: Math.max(0, (j.price ?? 0) - (j.discountAmount ?? 0)),
+      // `price` is already the amount billed — the booking flow subtracts the
+      // discount into the taxable subtotal before storing it, and the charge
+      // path (computeChargeAmount) treats price as the authoritative total. The
+      // old `price − discountAmount` subtracted the discount a SECOND time,
+      // under-reporting every discounted booking on the customer statement.
+      amount: Math.max(0, j.price ?? 0),
       paid: j.paymentReceived,
     }));
 

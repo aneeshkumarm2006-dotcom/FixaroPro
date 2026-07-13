@@ -1,11 +1,23 @@
 "use server";
 
 import { db } from "@/db";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { isAdminRole } from "@/lib/role-routing";
 import type { AlertType, AlertSeverity, Prisma } from "@prisma/client";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type NotificationPrefs,
 } from "./notificationPrefsConstants";
+
+// Alerts are the admin operations inbox. These three mutations are reachable as
+// POST server actions, so a signed-out caller could otherwise create noise
+// alerts or dismiss/read (hide) real ones (CLIENT_COMPLAINT, OVERDUE_PAYMENT…)
+// by id — an IDOR on the ops inbox. Require an admin-app session.
+async function requireAdminApp(): Promise<boolean> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  return !!session && isAdminRole((session.user as { role?: string }).role);
+}
 
 interface CreateAlertInput {
   type: AlertType;
@@ -19,6 +31,9 @@ interface CreateAlertInput {
 
 export async function createAlert(input: CreateAlertInput) {
   try {
+    if (!(await requireAdminApp())) {
+      return { success: false, error: "Not authorized" };
+    }
     const alert = await db.alert.create({
       data: {
         type: input.type,
@@ -39,6 +54,9 @@ export async function createAlert(input: CreateAlertInput) {
 
 export async function dismissAlert(alertId: string) {
   try {
+    if (!(await requireAdminApp())) {
+      return { success: false, error: "Not authorized" };
+    }
     await db.alert.update({
       where: { id: alertId },
       data: { isDismissed: true },
@@ -52,6 +70,9 @@ export async function dismissAlert(alertId: string) {
 
 export async function markAlertRead(alertId: string) {
   try {
+    if (!(await requireAdminApp())) {
+      return { success: false, error: "Not authorized" };
+    }
     await db.alert.update({
       where: { id: alertId },
       data: { isRead: true },

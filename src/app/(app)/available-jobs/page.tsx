@@ -1,6 +1,7 @@
 import { requireCleaner } from "@/lib/page-guards";
 import { db } from "@/db";
 import { getEligibleServiceTypes } from "@/lib/eligibility";
+import { getRequiredEquipmentFor } from "@/lib/equipment-server";
 import AvailableJobsClient from "./AvailableJobsClient";
 
 export default async function AvailableJobsPage() {
@@ -34,6 +35,15 @@ export default async function AvailableJobsPage() {
   // Filter to only jobs that still need cleaners
   const openJobs = jobs.filter((j) => j.cleaners.length < j.requiredCleaners);
 
+  // Required equipment per job type (SOP §8.4: providers must see the kit
+  // before claiming). Resolved server-side via the admin-overridable checklist
+  // (equipment-server), deduped by type so we hit the DB once per type.
+  const uniqueTypes = [...new Set(openJobs.map((j) => j.jobType ?? "*"))];
+  const equipmentEntries = await Promise.all(
+    uniqueTypes.map(async (t) => [t, await getRequiredEquipmentFor(t === "*" ? null : t)] as const)
+  );
+  const equipmentByType = Object.fromEntries(equipmentEntries);
+
   const serialized = openJobs.map((j) => ({
     id: j.id,
     jobNumber: j.jobNumber,
@@ -47,6 +57,9 @@ export default async function AvailableJobsPage() {
     requiredCleaners: j.requiredCleaners,
     claimedCount: j.cleaners.length,
     notes: j.notes,
+    // SOP §8.4: material status must be visible before claiming.
+    customerRequestsMaterials: j.customerRequestsMaterials,
+    requiredEquipment: equipmentByType[j.jobType ?? "*"] ?? [],
   }));
 
   return (

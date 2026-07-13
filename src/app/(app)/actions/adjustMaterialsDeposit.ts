@@ -15,7 +15,8 @@ interface AdjustInput {
   appliedAmount: number;
   // How much of the unused deposit to refund now (optional).
   refundAmount?: number;
-  reason?: string;
+  // Mandatory — every deposit adjustment must say why (SOP §10.5).
+  reason: string;
 }
 
 // Admin reconciles a materials deposit before final charge (SOP §10): apply
@@ -27,6 +28,11 @@ export async function adjustMaterialsDeposit(input: AdjustInput) {
     const role = (session.user as { role?: string }).role;
     if (!role || !ADMIN_ROLES.includes(role)) {
       return { success: false, error: "Not authorized" };
+    }
+
+    const reason = input.reason?.trim();
+    if (!reason) {
+      return { success: false, error: "A reason is required for deposit adjustments" };
     }
 
     const job = await db.job.findUnique({
@@ -65,7 +71,7 @@ export async function adjustMaterialsDeposit(input: AdjustInput) {
       refund = await issueRefund({
         jobId: job.id,
         amount: refundAmount,
-        reason: input.reason ?? "Unused materials deposit refunded",
+        reason,
       });
       if (refund.success) {
         await db.job.update({
@@ -81,7 +87,7 @@ export async function adjustMaterialsDeposit(input: AdjustInput) {
       action: "MATERIALS_DEPOSIT_ADJUSTED",
       field: "materialsAppliedAmount",
       newValue: String(applied),
-      reason: input.reason ?? null,
+      reason,
       actorId: session.user.id,
       actorEmail: session.user.email ?? null,
       description: `Materials deposit on job #${job.jobNumber}: $${applied.toFixed(2)} applied to bill${refundAmount > 0 ? `, $${refundAmount.toFixed(2)} refunded` : ""}.`,

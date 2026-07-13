@@ -481,7 +481,7 @@ enum PaintingStatus {
   BIDDING     // painting-eligible providers notified; accepting bids
   OFFER_SENT  // lowest valid bid auto-accepted, 35% surplus applied, client notified
   ACCEPTED    // client accepted the final amount
-  REJECTED    // client rejected → booking cancelled, $799 deposit refunded
+  REJECTED    // client rejected → booking cancelled, $119 materials/equipment charge refunded
   CANCELLED   // ops cancelled (e.g. no phone answer < 24h before job)
 }
 

@@ -2,7 +2,6 @@
  * Weekly cron — runs every Monday morning at 09:00 server time.
  *
  *  - Provider performance email to each active cleaner (hours, jobs, rating, tips)
- *  - Rag Wash dashboard email to admin (rags credited, payouts, flagged jobs)
  *
  * Idempotent: each provider's weekly email is logged with a unique
  * `notificationKey` of `weekly_perf:<YYYY-MM-DD>` so re-runs in the same
@@ -13,10 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import {
-  sendProviderWeeklyPerformance,
-  sendAdminWeeklyRagWashDashboard,
-} from "@/lib/email";
+import { sendProviderWeeklyPerformance } from "@/lib/email";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -144,74 +140,6 @@ async function runProviderPerformance(weekStart: Date, weekEnd: Date, label: str
   return { sent, skipped, total: providers.length };
 }
 
-async function runRagWashDashboard(weekStart: Date, weekEnd: Date, label: string) {
-  const notificationKey = `weekly_ragwash:${isoDay(weekStart)}`;
-
-  // We log per "ADMIN" recipient bucket. fetchAdmins inside the helper sends
-  // to each individual admin; the dedup is on the dashboard's identity.
-  const log = await ensureNotSent(notificationKey, "ADMIN_DASHBOARD");
-  if (!log) return { sent: false };
-
-  // Jobs completed this week → sum cappedRags/cappedPads credits
-  const jobs = await db.job.findMany({
-    where: {
-      clockOutTime: { gte: weekStart, lt: weekEnd },
-      washCreditsAwarded: true,
-    },
-    select: {
-      washCappedRags: true,
-      washCappedPads: true,
-    },
-  });
-
-  const ragsCredited = jobs.reduce((s, j) => s + (j.washCappedRags ?? 0), 0);
-  const padsCredited = jobs.reduce((s, j) => s + (j.washCappedPads ?? 0), 0);
-
-  // Payouts this week
-  const payouts = await db.washPayout.findMany({
-    where: { createdAt: { gte: weekStart, lt: weekEnd } },
-    select: { amount: true },
-  });
-  const payoutsCount = payouts.length;
-  const payoutsTotal = payouts.reduce((s, p) => s + (p.amount ?? 0), 0);
-
-  // Jobs flagged for review. We treat anything where the projected count
-  // exceeded the typical category envelope as flagged (since the hard cap
-  // was removed, the projection now flows straight through to credits and
-  // we want to surface oversize ones). The numbers below mirror the loosest
-  // per-category range in `src/lib/wash/index.ts` (3+BR / MOVE_IN).
-  const FLAG_RAGS = 35;
-  const FLAG_PADS = 4;
-  const flaggedJobsCount = await db.job.count({
-    where: {
-      clockOutTime: { gte: weekStart, lt: weekEnd },
-      OR: [
-        { washCappedRags: { gt: FLAG_RAGS } },
-        { washCappedPads: { gt: FLAG_PADS } },
-      ],
-    },
-  });
-
-  try {
-    await sendAdminWeeklyRagWashDashboard({
-      weekLabel: label,
-      ragsCredited,
-      padsCredited,
-      payoutsCount,
-      payoutsTotal,
-      flaggedJobsCount,
-    });
-    await db.emailLog.update({
-      where: { id: log.id },
-      data: { status: "SENT" },
-    });
-    return { sent: true, ragsCredited, padsCredited, payoutsCount, flaggedJobsCount };
-  } catch (e) {
-    console.error("weekly ragwash dashboard failed", e);
-    return { sent: false };
-  }
-}
-
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization");
   if (
@@ -224,10 +152,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const { start, end, label } = weekRange(now);
 
-  const [perf, dashboard] = await Promise.all([
-    runProviderPerformance(start, end, label),
-    runRagWashDashboard(start, end, label),
-  ]);
+  const perf = await runProviderPerformance(start, end, label);
 
-  return NextResponse.json({ ok: true, weekLabel: label, perf, dashboard });
+  return NextResponse.json({ ok: true, weekLabel: label, perf });
 }

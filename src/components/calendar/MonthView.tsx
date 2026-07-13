@@ -13,6 +13,8 @@ import {
   eventOverlapsDay,
 } from "@/components/calendar/utils";
 import { CalendarEvent } from "./types";
+import { jobTypeLabel } from "./job-type-label";
+import { DEPOSIT_VISUAL } from "@/lib/status-icons";
 import {
   getEventStyleInfo,
   getEventBackgroundColor,
@@ -212,15 +214,33 @@ export const MonthView = () => {
                                       backgroundColor: styleInfo.color + "20",
                                       color: styleInfo.color,
                                     }}>
-                                    {event.metadata.jobType === "R"
-                                      ? "Res"
-                                      : event.metadata.jobType === "C"
-                                      ? "Com"
-                                      : event.metadata.jobType === "PC"
-                                      ? "Post-C"
-                                      : event.metadata.jobType === "F"
-                                      ? "F/Up"
-                                      : event.metadata.jobType}
+                                    {jobTypeLabel(
+                                      event.metadata.jobType,
+                                      "compact"
+                                    )}
+                                  </span>
+                                )}
+                                {/* SOP §9.6: material status + "D" deposit-review
+                                    flag. D = refundable materials deposit not yet
+                                    applied/refunded (painting's flat $119 charge
+                                    is not a deposit and never shows D). */}
+                                {event.metadata?.needsDepositReview && (
+                                  <span
+                                    title={`${DEPOSIT_VISUAL.label} — apply or refund the materials deposit`}
+                                    className="app-subtitle !text-[9px] px-1 py-0 rounded font-[700]"
+                                    style={{
+                                      backgroundColor: DEPOSIT_VISUAL.color,
+                                      color: "#fff",
+                                    }}>
+                                    D
+                                  </span>
+                                )}
+                                {event.metadata?.materialStatus ===
+                                  "FIXARO_PROVIDED" && (
+                                  <span
+                                    title="Fixaro supplies the materials and equipment for this job"
+                                    className="!text-[9px]">
+                                    📦
                                   </span>
                                 )}
                                 {event.metadata?.employeePay != null && (

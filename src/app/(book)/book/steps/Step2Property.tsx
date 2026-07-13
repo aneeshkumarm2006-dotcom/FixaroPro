@@ -209,7 +209,10 @@ export default function Step2Property({ draft, onChange }: Props) {
                 title={s.label}
                 hint={(() => {
                   const r = paintingQuoteRange(s.key);
-                  return r ? `~$${r.min.toFixed(0)}–$${r.max.toFixed(0)}` : undefined;
+                  if (!r) return undefined;
+                  return r.min === r.max
+                    ? `~$${r.min.toFixed(0)}`
+                    : `~$${r.min.toFixed(0)}–$${r.max.toFixed(0)}`;
                 })()}
                 onClick={() => onChange({ paintingScope: s.key })}
               />
@@ -224,7 +227,9 @@ export default function Step2Property({ draft, onChange }: Props) {
                 border: "1px solid rgba(28,25,23,0.10)",
               }}>
               <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>
-                Estimated range: ${paintingRange.min.toFixed(0)}–${paintingRange.max.toFixed(0)}
+                {paintingRange.min === paintingRange.max
+                  ? `Estimated price: $${paintingRange.min.toFixed(0)}`
+                  : `Estimated range: $${paintingRange.min.toFixed(0)}–$${paintingRange.max.toFixed(0)}`}
               </p>
               <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.5 }}>
                 This is an estimate. We notify our painters, take bids, and send you a final

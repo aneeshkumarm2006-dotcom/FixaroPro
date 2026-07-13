@@ -3,14 +3,39 @@
 import { useMemo, useState, useTransition } from "react";
 import { bulkChargeJobs } from "../actions/bulkChargeJobs";
 
+interface RowBilling {
+  hoursWorked: number | null;
+  labourRate: number;
+  labourFromClock: number | null;
+  materialsAmount: number;
+  materialsType: string | null;
+  materialsRefunded: boolean;
+  depositCollected: number;
+  cancellationFee: number;
+  discount: number;
+  subtotal: number;
+  gst: number;
+  qst: number;
+  total: number;
+  refunded: number;
+  amountDueNow: number;
+}
+
 interface BulkJob {
   id: string;
   jobNumber: number;
   clientName: string;
   jobType: string | null;
-  amount: number;
   completedAt: string | null;
   hasCardOnFile: boolean;
+  giftCardBalance: number;
+  clockInAt: string | null;
+  clockOutAt: string | null;
+  billing: RowBilling;
+  grossAmount: number;
+  depositCredit: number;
+  // Amount chargeJob will actually collect (card + gift card credit).
+  amountDue: number;
 }
 
 interface Props {
@@ -45,18 +70,60 @@ function fmtDate(iso: string | null) {
   });
 }
 
+function fmtDateTime(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function centsEqual(a: number, b: number) {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+/** Can chargeJob actually settle this row? Mirrors its guards: gross must be
+ * positive, and a saved card is only required if the deposit + gift card
+ * credit don't already cover the balance. */
+function chargeability(j: BulkJob) {
+  if (j.grossAmount <= 0) return { ok: false, reason: "Invalid amount" };
+  const afterGiftCard = Math.max(
+    0,
+    j.amountDue - Math.min(j.giftCardBalance, j.amountDue)
+  );
+  if (afterGiftCard > 0 && !j.hasCardOnFile) {
+    return { ok: false, reason: "No card on file" };
+  }
+  return { ok: true as const, reason: null };
+}
+
 export default function BulkChargeClient({ jobs }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [batch, setBatch] = useState<BatchResult | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const eligible = useMemo(() => jobs.filter((j) => j.hasCardOnFile), [jobs]);
-  const allSelected = eligible.length > 0 && selected.size === eligible.length;
+  const chargeable = useMemo(
+    () => jobs.filter((j) => chargeability(j).ok),
+    [jobs]
+  );
+  // Select-all skips rows with missing clock data — those should be reviewed
+  // and fixed on the job page first (they can still be ticked individually).
+  const selectAllPool = useMemo(
+    () => chargeable.filter((j) => j.billing.hoursWorked != null),
+    [chargeable]
+  );
+  const allSelected =
+    selectAllPool.length > 0 &&
+    selectAllPool.every((j) => selected.has(j.id)) &&
+    selected.size === selectAllPool.length;
   const selectedTotal = useMemo(
     () =>
       jobs
         .filter((j) => selected.has(j.id))
-        .reduce((sum, j) => sum + j.amount, 0),
+        .reduce((sum, j) => sum + j.amountDue, 0),
     [jobs, selected]
   );
 
@@ -69,9 +136,18 @@ export default function BulkChargeClient({ jobs }: Props) {
     });
   }
 
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function toggleAll() {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(eligible.map((j) => j.id)));
+    else setSelected(new Set(selectAllPool.map((j) => j.id)));
   }
 
   function runBatch() {
@@ -99,8 +175,9 @@ export default function BulkChargeClient({ jobs }: Props) {
         <div>
           <h1 className="cl-page-title">Bulk charge</h1>
           <p className="cl-page-sub">
-            All completed jobs that are unpaid and have a card on file. Select
-            the rows you want to bill and run them in one batch.
+            All completed jobs that are unpaid and have a card on file. Review
+            each job&apos;s itemized breakdown (SOP §10.3), select the rows you
+            want to bill and run them in one batch.
           </p>
         </div>
       </div>
@@ -155,8 +232,13 @@ export default function BulkChargeClient({ jobs }: Props) {
                 cursor:
                   selected.size === 0 || pending ? "default" : "pointer",
               }}>
-              {pending ? "Charging…" : `Charge ${selected.size} job${selected.size === 1 ? "" : "s"}`}
+              {pending
+                ? "Charging…"
+                : `Charge ${selected.size} job${selected.size === 1 ? "" : "s"} · ${fmtAmount(selectedTotal)}`}
             </button>
+            <div style={{ fontSize: 12, color: "var(--primary-50)" }}>
+              Select-all skips jobs with missing clock data.
+            </div>
           </div>
 
           <div
@@ -186,49 +268,34 @@ export default function BulkChargeClient({ jobs }: Props) {
                   <th style={th}>Client</th>
                   <th style={th}>Service</th>
                   <th style={th}>Completed</th>
-                  <th style={{ ...th, textAlign: "right" }}>Amount</th>
+                  <th style={th}>Hours</th>
+                  <th style={{ ...th, textAlign: "right" }}>Amount due</th>
                   <th style={th}></th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map((j) => {
-                  const disabled = !j.hasCardOnFile;
+                  const eligibility = chargeability(j);
+                  const disabled = !eligibility.ok;
+                  const missingClock = j.billing.hoursWorked == null;
+                  const reviewMismatch = !centsEqual(
+                    j.billing.amountDueNow,
+                    j.amountDue
+                  );
+                  const isOpen = expanded.has(j.id);
                   return (
-                    <tr
+                    <BulkRow
                       key={j.id}
-                      style={{
-                        borderTop: "1px solid var(--primary-10)",
-                        opacity: disabled ? 0.55 : 1,
-                      }}>
-                      <td style={td}>
-                        <input
-                          type="checkbox"
-                          disabled={disabled}
-                          checked={selected.has(j.id)}
-                          onChange={() => toggle(j.id)}
-                        />
-                      </td>
-                      <td style={td}>#{j.jobNumber}</td>
-                      <td style={td}>{j.clientName}</td>
-                      <td style={{ ...td, fontSize: 12, color: "var(--primary-60)" }}>
-                        {j.jobType ?? "—"}
-                      </td>
-                      <td style={{ ...td, fontSize: 12, color: "var(--primary-60)" }}>
-                        {fmtDate(j.completedAt)}
-                      </td>
-                      <td
-                        style={{
-                          ...td,
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
-                          fontWeight: 700,
-                        }}>
-                        {fmtAmount(j.amount)}
-                      </td>
-                      <td style={{ ...td, fontSize: 11, color: "var(--primary-50)" }}>
-                        {disabled ? "No card on file" : ""}
-                      </td>
-                    </tr>
+                      job={j}
+                      disabled={disabled}
+                      disabledReason={eligibility.reason}
+                      missingClock={missingClock}
+                      reviewMismatch={reviewMismatch}
+                      isOpen={isOpen}
+                      isSelected={selected.has(j.id)}
+                      onToggle={() => toggle(j.id)}
+                      onToggleExpanded={() => toggleExpanded(j.id)}
+                    />
                   );
                 })}
               </tbody>
@@ -278,6 +345,231 @@ export default function BulkChargeClient({ jobs }: Props) {
   );
 }
 
+function BulkRow({
+  job: j,
+  disabled,
+  disabledReason,
+  missingClock,
+  reviewMismatch,
+  isOpen,
+  isSelected,
+  onToggle,
+  onToggleExpanded,
+}: {
+  job: BulkJob;
+  disabled: boolean;
+  disabledReason: string | null;
+  missingClock: boolean;
+  reviewMismatch: boolean;
+  isOpen: boolean;
+  isSelected: boolean;
+  onToggle: () => void;
+  onToggleExpanded: () => void;
+}) {
+  const giftCardApplied = Math.min(j.giftCardBalance, j.amountDue);
+  return (
+    <>
+      <tr
+        style={{
+          borderTop: "1px solid var(--primary-10)",
+          opacity: disabled ? 0.55 : 1,
+        }}>
+        <td style={td}>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={isSelected}
+            onChange={onToggle}
+          />
+        </td>
+        <td style={td}>#{j.jobNumber}</td>
+        <td style={td}>{j.clientName}</td>
+        <td style={{ ...td, fontSize: 12, color: "var(--primary-60)" }}>
+          {j.jobType ?? "—"}
+        </td>
+        <td style={{ ...td, fontSize: 12, color: "var(--primary-60)" }}>
+          {fmtDate(j.completedAt)}
+        </td>
+        <td style={{ ...td, fontSize: 12 }}>
+          {missingClock ? (
+            <span style={warnBadge}>No clock record</span>
+          ) : (
+            <span style={{ color: "var(--primary-60)" }}>
+              {j.billing.hoursWorked}h
+            </span>
+          )}
+        </td>
+        <td
+          style={{
+            ...td,
+            textAlign: "right",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 700,
+          }}>
+          {fmtAmount(j.amountDue)}
+          {reviewMismatch ? (
+            <span style={{ ...warnBadge, marginLeft: 6 }} title={`SOP review figure is ${fmtAmount(j.billing.amountDueNow)} — expand to compare`}>
+              Review
+            </span>
+          ) : null}
+        </td>
+        <td style={{ ...td, fontSize: 11, color: "var(--primary-50)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+            {disabledReason ? <span>{disabledReason}</span> : null}
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              aria-expanded={isOpen}
+              aria-label={`${isOpen ? "Hide" : "Review"} breakdown for job #${j.jobNumber}`}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 700,
+                background: isOpen ? "var(--primary)" : "transparent",
+                color: isOpen ? "#fff" : "var(--primary-70)",
+                border: "1px solid var(--primary-20)",
+                borderRadius: 6,
+                cursor: "pointer",
+              }}>
+              {isOpen ? "Hide" : "Review"}
+            </button>
+          </div>
+        </td>
+      </tr>
+      {isOpen ? (
+        <tr style={{ borderTop: "1px solid var(--primary-10)" }}>
+          <td colSpan={8} style={{ padding: "14px 18px", background: "var(--primary-5)" }}>
+            <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ minWidth: 220 }}>
+                <div style={detailHeading}>Time on site</div>
+                <DetailRow label="Clock in" value={fmtDateTime(j.clockInAt)} />
+                <DetailRow label="Clock out" value={fmtDateTime(j.clockOutAt)} />
+                <DetailRow
+                  label="Hours worked"
+                  value={
+                    j.billing.hoursWorked != null
+                      ? `${j.billing.hoursWorked}h`
+                      : "—"
+                  }
+                />
+                {missingClock ? (
+                  <p style={warnNote}>
+                    Missing clock-in/out. Fix the clock record on the job page
+                    before charging so labour can be verified.
+                  </p>
+                ) : null}
+              </div>
+
+              <div style={{ minWidth: 300, flex: "0 1 380px" }}>
+                <div style={detailHeading}>Charge review (SOP §10)</div>
+                {j.billing.labourFromClock != null ? (
+                  <DetailRow
+                    label={`Labour (${j.billing.hoursWorked}h × $${j.billing.labourRate}/hr)`}
+                    value={fmtAmount(j.billing.labourFromClock)}
+                  />
+                ) : (
+                  <DetailRow label="Labour (no clock record)" value="—" />
+                )}
+                {j.billing.materialsAmount > 0 ? (
+                  <DetailRow
+                    label={
+                      j.billing.materialsType === "deposit"
+                        ? "Materials deposit"
+                        : "Materials & equipment"
+                    }
+                    value={fmtAmount(j.billing.materialsAmount)}
+                  />
+                ) : null}
+                <DetailRow label="Subtotal (booked)" value={fmtAmount(j.billing.subtotal)} />
+                {j.billing.discount > 0 ? (
+                  <DetailRow label="Discount" value={`−${fmtAmount(j.billing.discount)}`} />
+                ) : null}
+                <DetailRow label="GST" value={fmtAmount(j.billing.gst)} />
+                <DetailRow label="QST" value={fmtAmount(j.billing.qst)} />
+                {j.billing.cancellationFee > 0 ? (
+                  <DetailRow label="Cancellation fee" value={fmtAmount(j.billing.cancellationFee)} />
+                ) : null}
+                {j.depositCredit > 0 ? (
+                  <DetailRow
+                    label={
+                      j.billing.materialsType === "deposit" &&
+                      !centsEqual(j.depositCredit, j.billing.depositCollected)
+                        ? `Deposit credit applied (of ${fmtAmount(j.billing.depositCollected)} collected)`
+                        : "Deposit credit applied"
+                    }
+                    value={`−${fmtAmount(j.depositCredit)}`}
+                  />
+                ) : null}
+                {j.billing.refunded > 0 ? (
+                  <DetailRow
+                    label={
+                      j.billing.materialsRefunded
+                        ? "Deposit balance refunded"
+                        : "Refunded"
+                    }
+                    value={`−${fmtAmount(j.billing.refunded)}`}
+                  />
+                ) : null}
+                <DetailRow label="Total (booked)" value={fmtAmount(j.billing.total)} />
+                <DetailRow label="Amount due now" value={fmtAmount(j.amountDue)} strong />
+                {giftCardApplied > 0 ? (
+                  <p style={infoNote}>
+                    {fmtAmount(giftCardApplied)} gift card credit will be
+                    applied automatically; the card is charged the remaining{" "}
+                    {fmtAmount(j.amountDue - giftCardApplied)}.
+                  </p>
+                ) : null}
+                {reviewMismatch ? (
+                  <p style={warnNote}>
+                    SOP review figure ({fmtAmount(j.billing.amountDueNow)})
+                    differs from the amount the charge will actually collect (
+                    {fmtAmount(j.amountDue)}). Check the discount and deposit
+                    reconciliation on the job page before charging.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 16,
+        padding: "3px 0",
+        fontSize: 13,
+        ...(strong
+          ? {
+              fontWeight: 700,
+              borderTop: "1px solid var(--primary-10)",
+              marginTop: 4,
+              paddingTop: 7,
+            }
+          : {}),
+      }}>
+      <span style={{ color: "var(--primary-60)" }}>{label}</span>
+      <span style={{ color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 const th: React.CSSProperties = {
   padding: "10px 14px",
   fontSize: 11,
@@ -291,4 +583,41 @@ const td: React.CSSProperties = {
   padding: "12px 14px",
   fontSize: 13,
   color: "var(--ink)",
+};
+
+const warnBadge: React.CSSProperties = {
+  display: "inline-block",
+  padding: "2px 8px",
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#92400e",
+  background: "#fef3c7",
+  border: "1px solid #fcd34d",
+  borderRadius: 999,
+  whiteSpace: "nowrap",
+};
+
+const warnNote: React.CSSProperties = {
+  marginTop: 8,
+  padding: "8px 10px",
+  fontSize: 12,
+  color: "#92400e",
+  background: "#fef3c7",
+  border: "1px solid #fcd34d",
+  borderRadius: 8,
+};
+
+const infoNote: React.CSSProperties = {
+  marginTop: 8,
+  fontSize: 12,
+  color: "var(--primary-60)",
+};
+
+const detailHeading: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: "var(--primary-50)",
+  marginBottom: 6,
 };

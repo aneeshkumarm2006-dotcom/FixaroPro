@@ -159,7 +159,7 @@ export async function closeBiddingAndSendOffer(
 }
 
 /**
- * Refund the painting materials deposit and cancel the booking (SOP §6 — client
+ * Refund the painting $119 materials/equipment charge and cancel the booking (SOP §6 — client
  * rejects the final offer, or ops cancels when the client can't be reached).
  * System-initiated (no admin session). Idempotent via `materialsRefundedAt`.
  */
@@ -176,8 +176,8 @@ export async function rejectPaintingAndRefund(
     return { success: true, refunded: 0 }; // already refunded
   }
 
-  // Amount collected at booking: the painting $119 flat materials charge (or a
-  // refundable materials deposit) when one applied, otherwise the $20 base deposit.
+  // Amount collected at booking: the painting $119 flat materials/equipment
+  // charge when one applied, otherwise the $20 base deposit.
   const depositAmount =
     isUpfrontMaterials(job.materialsType) && job.materialsAmount
       ? job.materialsAmount
@@ -220,7 +220,7 @@ export async function rejectPaintingAndRefund(
               date: new Date(),
               category: "REVENUE" as const,
               amount: -depositAmount,
-              description: `Painting deposit refund — Job #${job.jobNumber}${stripeRefundId ? ` (Stripe: ${stripeRefundId})` : ""}`,
+              description: `Painting materials/equipment charge refund — Job #${job.jobNumber}${stripeRefundId ? ` (Stripe: ${stripeRefundId})` : ""}`,
               notes: opts.reason,
               jobId: job.id,
               source: "refund",
@@ -236,7 +236,7 @@ export async function rejectPaintingAndRefund(
         action: "STATUS_CHANGED",
         field: "paintingStatus",
         newValue: "REJECTED",
-        description: `Painting offer rejected — booking cancelled, $${depositAmount.toFixed(2)} deposit refunded. ${opts.reason}`,
+        description: `Painting offer rejected — booking cancelled, $${depositAmount.toFixed(2)} materials/equipment charge refunded. ${opts.reason}`,
       },
     }),
   ]);

@@ -22,13 +22,8 @@ import {
 } from "lucide-react";
 import { markArrived } from "@/app/(app)/actions/markArrived";
 import { addJobNote } from "@/app/(app)/actions/addJobNote";
-
-const JOB_TYPE_LABELS: Record<string, string> = {
-  R: "Residential",
-  C: "Commercial",
-  PC: "Post-Construction",
-  F: "Follow-up",
-};
+// SOP §9.10: shared label helper so new services never render as raw codes.
+import { jobTypeLabel as getJobTypeLabel } from "./job-type-label";
 
 const STATUS_CONFIG: Record<
   string,
@@ -148,9 +143,7 @@ export default function CalendarJobActions() {
   const meta = event.metadata!;
   const status = meta.status as string;
   const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.CREATED;
-  const jobTypeLabel = meta.jobType
-    ? JOB_TYPE_LABELS[meta.jobType] || meta.jobType
-    : null;
+  const jobTypeLabel = meta.jobType ? getJobTypeLabel(meta.jobType) : null;
   const hasMissingEquipment =
     meta.missingEquipment && meta.missingEquipment.length > 0;
 

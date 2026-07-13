@@ -49,6 +49,33 @@ charge." Refund logic is data-driven off `job.materialsAmount`, so $799→$119 p
 
 ---
 
+## 🔍 Full-codebase SOP v4.2 audit + gap-fix pass (2026-07-11)
+
+Six parallel audit agents verified every SOP section against actual code; ~44/51 requirements were
+fully DONE, 6 PARTIAL, 1 MISSING. All actionable gaps then fixed (5 parallel fix agents + follow-ups);
+`tsc --noEmit` and `next build` pass clean after the combined diff (22 files changed, 2 added).
+
+| Gap (SOP ref) | Fix |
+|---|---|
+| §10.2 manual clock correction — was MISSING | New `actions/adjustClockTimes.ts` (admin-only, required reason, validation, `CLOCK_TIME_ADJUSTED` audit + jobLog, payout `totalHours` delta for open periods) + "Clock correction" UI in AdminJobOpsPanel |
+| §10.3/§9.4 Bulk Charge had no review step | bulk-charge now shows per-job expandable SOP §10 itemization via `computeJobBilling` + `chargeJob` math mirror; "No clock record" amber flag (excluded from select-all); charge button shows reviewed total |
+| §9.8 residual Rag Wash | my-pay `db.ragWash` query + Rag Wash Credits UI removed; "Kit + rag washes" tile reworded; `weekly_ragwash` catalog entry + weekly-cron sender removed. Dormant on purpose: RagWash/WashPayout models, clockOut wash-credit award, dead `sendAdminWeeklyRagWashDashboard` in email.ts, redirecting routes |
+| §9.6 calendar missing material status + D flags | `getJobsForDay` now carries materials fields + `needsDepositReview` (same logic as JobsView); EventCard/MonthView render `DEPOSIT_VISUAL` D badge + 📦 |
+| §9.10 new services rendered as raw codes on calendar | shared `components/calendar/job-type-label.ts` (short-code map + SERVICE_CATALOG fallback), used by EventCard/MonthView/CalendarJobActions |
+| §8.4 pre-claim job card thin | available-jobs card shows 📦/🧰 materials pill + required-equipment summary (server-resolved, admin overrides honoured) |
+| §7 studio baseline coded 700–900 | `painting.ts` studio = flat $700 (→$945); all min===max range displays collapse to single price (Step2, portal, painting-bids, AdminJobOpsPanel) |
+| §7 scope-note copy | bathroom/studio/apartment notes now all say 2 coats · labour only · you provide paint · primer extra |
+| §10.5 deposit-adjust reason optional | `adjustMaterialsDeposit` reason now required server-side + required input in panel UI |
+| §6.6 offer breakdown missing $119 collected | AdminJobOpsPanel painting section shows "Materials & equipment $X already collected at booking" |
+| Stale copy | schema `REJECTED` comment ($799→$119), placeBid eligibility comment, painting-workflow "deposit"→"materials/equipment charge" in admin-visible logs |
+
+**Deliberately deferred (product decisions):** hiring-checklist-seeded eligibility (§8.1/§9.1 — no
+checklist→eligibility link exists; needs a defined onboarding model); dedicated photo uploader in
+Small-paint-repair/AC booking intake (§4 — currently deferred to notes step; needs upload infra in
+public flow). Also still pending: 4 prisma migrations + eligibility backfill (see above).
+
+---
+
 ## 🧠 Mindmap (high-level)
 
 ```

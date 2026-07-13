@@ -38,8 +38,8 @@ export async function placeBid(input: PlaceBidInput) {
       return { success: false, error: "Bidding is closed for this job" };
     }
 
-    // Provider must be eligible to bid (admin-controlled; Slice 3 will enforce
-    // the per-provider PAINTING eligibility — for now all field providers).
+    // Provider must be eligible to bid: admin-approved for PAINTING (per-provider
+    // eligibility, SOP §8) and a field role (EMPLOYEE / FIELD_LEAD).
     const eligible = await getPaintingEligibleProviderIds();
     if (!eligible.includes(session.user.id)) {
       return { success: false, error: "You are not eligible to bid on painting jobs" };

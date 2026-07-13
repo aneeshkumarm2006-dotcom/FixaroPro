@@ -16,6 +16,8 @@ interface AvailableJob {
   requiredCleaners: number;
   claimedCount: number;
   notes: string | null;
+  customerRequestsMaterials: boolean;
+  requiredEquipment: string[];
 }
 
 function fmtDate(iso: string) {
@@ -81,9 +83,23 @@ export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) 
                     </span>
                   )}
                 </h3>
-                {job.isFlexible && (
-                  <span className="cl-pill flex" style={{ marginTop: 8 }}>Flexible time</span>
-                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {job.isFlexible && (
+                    <span className="cl-pill flex">Flexible time</span>
+                  )}
+                  {/* Material status (SOP §8.4): the provider must know before
+                      claiming whether they bring everything or the client has
+                      it on site. Same pill pattern as the job detail page. */}
+                  {job.customerRequestsMaterials ? (
+                    <span className="cl-pill" title="Fixaro supplies the materials and equipment for this job">
+                      📦 Fixaro-provided materials
+                    </span>
+                  ) : (
+                    <span className="cl-pill warn" title="The client provides all materials and equipment">
+                      🧰 Customer-provided materials
+                    </span>
+                  )}
+                </div>
               </div>
               {job.price != null && (
                 <div className="cl-job-card-pay">
@@ -131,6 +147,21 @@ export default function AvailableJobsClient({ jobs }: { jobs: AvailableJob[] }) 
                 </span>
                 <span><strong>{spotsLeft}</strong> spot{spotsLeft !== 1 ? "s" : ""} remaining</span>
               </div>
+              {/* Required equipment for this job type (SOP §8.4), compact:
+                  first few items + count. Full list is on the job detail page. */}
+              {job.requiredEquipment.length > 0 && (
+                <div className="row" style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span className="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
+                  </span>
+                  <span>
+                    <strong>Equipment:</strong> {job.requiredEquipment.slice(0, 3).join(", ")}
+                    {job.requiredEquipment.length > 3 && (
+                      <span style={{ color: "var(--primary-50)" }}> +{job.requiredEquipment.length - 3} more</span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
 
             {job.notes && (

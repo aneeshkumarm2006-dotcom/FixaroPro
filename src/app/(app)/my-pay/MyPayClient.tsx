@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Calendar,
-  ArrowUpRight,
-  Star,
-  Droplets,
-  ExternalLink,
-} from "lucide-react";
+import { Calendar, ArrowUpRight, Star } from "lucide-react";
 import WithdrawModal from "./WithdrawModal";
 import PaymentHistory from "./PaymentHistory";
 import ProviderInvoiceView from "./ProviderInvoiceView";
@@ -41,22 +35,6 @@ type Withdrawal = {
   notes: string | null;
 };
 
-interface RagWashEntry {
-  id: string;
-  washDate: string;
-  ragCount: number;
-  notes: string | null;
-}
-
-interface RagData {
-  allTimeRags: number;
-  allTimeCredit: number;
-  periodRags: number;
-  periodCredit: number;
-  creditRate: number;
-  recentWashes: RagWashEntry[];
-}
-
 interface MyPayClientProps {
   payouts: Payout[];
   withdrawals: Withdrawal[];
@@ -68,7 +46,6 @@ interface MyPayClientProps {
   currentPayout: Payout | null;
   year: number;
   starRating?: number | null;
-  ragData?: RagData;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -99,7 +76,6 @@ export default function MyPayClient({
   currentPayout,
   year,
   starRating,
-  ragData,
 }: MyPayClientProps) {
   const [tab, setTab] = useState<Tab>("current");
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -242,79 +218,6 @@ export default function MyPayClient({
                   <Calendar size={28} />
                 </div>
                 <p style={{ margin: 0, color: "var(--ink-soft)" }}>No active pay period</p>
-              </div>
-            )}
-
-            {/* Rag Wash Credits removed from Fixaro (SOP §9) — ragData is no
-                longer supplied, so this never renders. */}
-            {ragData && (
-              <div className="cl-block">
-                <div className="cl-block-head">
-                  <h2 className="cl-block-title">
-                    <Droplets className="w-5 h-5" style={{ color: "var(--primary)" }} />
-                    Rag Wash Credits
-                  </h2>
-                  <a
-                    href="/my-inventory/rag-wash"
-                    className="cl-action-btn">
-                    Log washes
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-
-                <div className="cl-block-stats">
-                  <div>
-                    <div className="cl-block-stat-label">Rags this period</div>
-                    <div className="cl-block-stat-val">{ragData.periodRags}</div>
-                  </div>
-                  <div>
-                    <div className="cl-block-stat-label">Credits this period</div>
-                    <div className="cl-block-stat-val pos">+${ragData.periodCredit.toFixed(2)}</div>
-                  </div>
-                  <div>
-                    <div className="cl-block-stat-label">All-time rags</div>
-                    <div className="cl-block-stat-val">{ragData.allTimeRags}</div>
-                  </div>
-                  <div>
-                    <div className="cl-block-stat-label">All-time credits</div>
-                    <div className="cl-block-stat-val pos">+${ragData.allTimeCredit.toFixed(2)}</div>
-                  </div>
-                </div>
-
-                {ragData.recentWashes.length > 0 ? (
-                  <div style={{ borderTop: "1px solid rgba(232,93,4,0.07)", paddingTop: 12 }}>
-                    <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--primary-50)", marginBottom: 8 }}>
-                      Recent Washes
-                    </p>
-                    {ragData.recentWashes.map((w) => (
-                      <div key={w.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
-                        <span style={{ color: "var(--ink-soft)" }}>
-                          {new Date(w.washDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          {w.notes ? ` · ${w.notes}` : ""}
-                        </span>
-                        <span style={{ color: "var(--primary-60)" }}>
-                          {w.ragCount} rag{w.ragCount !== 1 ? "s" : ""} ·{" "}
-                          <span style={{ color: "#059669", fontWeight: 600 }}>
-                            +${(w.ragCount * ragData.creditRate).toFixed(2)}
-                          </span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ borderTop: "1px solid rgba(232,93,4,0.07)", paddingTop: 12, textAlign: "center" }}>
-                    <p style={{ fontSize: 13, color: "var(--primary-50)" }}>
-                      No washes logged yet.{" "}
-                      <a href="/my-inventory/rag-wash" style={{ textDecoration: "underline", color: "var(--primary)" }}>
-                        Log your first wash →
-                      </a>
-                    </p>
-                  </div>
-                )}
-
-                <div style={{ borderTop: "1px solid rgba(232,93,4,0.07)", paddingTop: 10, fontSize: 11, color: "var(--primary-50)" }}>
-                  Rate: ${ragData.creditRate.toFixed(2)} per rag · Credits are added as adjustments by admin at period close
-                </div>
               </div>
             )}
 

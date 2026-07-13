@@ -7,6 +7,8 @@ import {
   getEventBoxShadow,
 } from "./event-styles";
 import { CalendarEvent } from "./types";
+import { jobTypeLabel } from "./job-type-label";
+import { DEPOSIT_VISUAL } from "@/lib/status-icons";
 
 export interface EventCardProps {
   event: CalendarEvent;
@@ -90,15 +92,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         <div
           className="app-subtitle truncate text-[10px]"
           style={{ color: styleInfo.color, opacity: 0.85 }}>
-          {event.metadata.jobType === "R"
-            ? "Residential"
-            : event.metadata.jobType === "C"
-            ? "Commercial"
-            : event.metadata.jobType === "PC"
-            ? "Post-Construction"
-            : event.metadata.jobType === "F"
-            ? "Follow-up"
-            : event.metadata.jobType}
+          {jobTypeLabel(event.metadata.jobType)}
         </div>
       )}
 
@@ -155,10 +149,10 @@ export const EventCard: React.FC<EventCardProps> = ({
           <div className="app-subtitle flex items-center gap-1 text-[10px]">
             {event.metadata?.needsDepositReview && (
               <span
-                title="Deposit review required — apply or refund the materials deposit"
+                title={`${DEPOSIT_VISUAL.label} — apply or refund the materials deposit`}
                 style={{
-                  color: "#B45309",
-                  background: "rgba(217,119,6,0.14)",
+                  color: "#fff",
+                  background: DEPOSIT_VISUAL.color,
                   borderRadius: 4,
                   padding: "0 4px",
                   fontWeight: 700,
@@ -167,7 +161,9 @@ export const EventCard: React.FC<EventCardProps> = ({
               </span>
             )}
             {event.metadata?.materialStatus === "FIXARO_PROVIDED" && (
-              <span title="Fixaro provides the materials and equipment">📦</span>
+              <span title="Fixaro supplies the materials and equipment for this job">
+                📦
+              </span>
             )}
           </div>
         )}

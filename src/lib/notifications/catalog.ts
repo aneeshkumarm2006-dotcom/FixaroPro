@@ -725,7 +725,6 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "ADMIN", category: "Provider reporting (proposed)", key: "admin.report.monthly_generated", label: "Monthly provider breakdown generated", trigger: "Monthly provider breakdowns have been generated and sent.", channels: { EMAIL: true }, isProposed: true },
   // Weekly reports
   { recipient: "PROVIDER", category: "Provider reporting (proposed)", key: "prov.report.weekly_performance", label: "Weekly performance report", trigger: "Weekly summary of hours, jobs, and ratings for each provider.", channels: { EMAIL: true } },
-  { recipient: "ADMIN", category: "Provider reporting (proposed)", key: "admin.report.weekly_ragwash", label: "Weekly Rag Wash dashboard", trigger: "Weekly summary of total rags used, payouts issued, and flagged jobs.", channels: { EMAIL: true } },
   // Monthly customer statement
   { recipient: "CUSTOMER", category: "Reports", key: "cust.reports.monthly_statement", label: "Monthly statement", trigger: "1st of every month: HTML email + PDF attachment of the previous month's bookings and payments.", channels: { EMAIL: true } },
   // Quote requests (public landing page)

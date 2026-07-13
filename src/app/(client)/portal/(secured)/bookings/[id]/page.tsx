@@ -263,7 +263,9 @@ export default async function BookingDetailPage({
             <section className="cl-tile cl-tile-pad-lg">
               <h2 className="cl-title-md" style={{ marginBottom: 8 }}>Painting quote in progress</h2>
               <p style={{ fontSize: 14, color: "var(--primary-70)", margin: 0, lineHeight: 1.55 }}>
-                Your estimated range is ${formatPrice(job.quoteRangeMin)}–{formatPrice(job.quoteRangeMax)}.
+                Your estimated {job.quoteRangeMax != null && job.quoteRangeMax !== job.quoteRangeMin
+                  ? <>range is ${formatPrice(job.quoteRangeMin)}–{formatPrice(job.quoteRangeMax)}</>
+                  : <>price is ${formatPrice(job.quoteRangeMin)}</>}.
                 We're collecting bids from our painters and will send you a final price to accept shortly.
               </p>
             </section>

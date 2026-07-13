@@ -26,11 +26,12 @@ export const PAINTING_SCOPES: PaintingScope[] = [
   { key: "small_room", label: "Small room", baselineMin: 700, baselineMax: 900, note: "2 coats, labour only. You provide the paint. Primer extra if required." },
   { key: "medium_room", label: "Medium room", baselineMin: 900, baselineMax: 1100, note: "2 coats, labour only. You provide the paint. Primer extra if required." },
   { key: "large_room", label: "Large room", baselineMin: 1200, baselineMax: 1400, note: "2 coats, labour only. You provide the paint. Primer extra if required." },
-  { key: "bathroom", label: "Average bathroom", baselineMin: 500, baselineMax: 700, note: "2 coats, labour only. You provide the paint." },
-  { key: "studio", label: "Studio / small apartment", baselineMin: 700, baselineMax: 900, note: "Labour only. You provide the paint. Primer extra if required." },
-  { key: "apt_3_5", label: "3½ apartment", baselineMin: 2000, baselineMax: 2350, note: "Labour only. You provide the paint. Includes optional plaster/silicone add-on." },
-  { key: "apt_4_5", label: "4½ apartment", baselineMin: 2500, baselineMax: 2900, note: "Labour only. You provide the paint. Includes optional plaster/silicone add-on." },
-  { key: "apt_5_5", label: "5½ apartment", baselineMin: 3000, baselineMax: 3600, note: "Labour only. You provide the paint. Includes optional plaster/silicone add-on." },
+  { key: "bathroom", label: "Average bathroom", baselineMin: 500, baselineMax: 700, note: "2 coats, labour only. You provide the paint. Primer extra if required." },
+  // §7: studio / small apartment is a single $700 baseline (displays $945), not a range.
+  { key: "studio", label: "Studio / small apartment", baselineMin: 700, baselineMax: 700, note: "2 coats, labour only. You provide the paint. Primer extra if required." },
+  { key: "apt_3_5", label: "3½ apartment", baselineMin: 2000, baselineMax: 2350, note: "2 coats, labour only. You provide the paint. Primer extra if required. Includes optional plaster/silicone add-on." },
+  { key: "apt_4_5", label: "4½ apartment", baselineMin: 2500, baselineMax: 2900, note: "2 coats, labour only. You provide the paint. Primer extra if required. Includes optional plaster/silicone add-on." },
+  { key: "apt_5_5", label: "5½ apartment", baselineMin: 3000, baselineMax: 3600, note: "2 coats, labour only. You provide the paint. Primer extra if required. Includes optional plaster/silicone add-on." },
 ];
 
 export function getPaintingScope(key?: string | null): PaintingScope | null {

@@ -97,7 +97,8 @@ function BidCard({ job }: { job: PaintingJob }) {
           </p>
           {job.quoteRangeMin != null && job.quoteRangeMax != null ? (
             <p className="text-xs text-neutral-400 mt-1">
-              Customer estimate: ${job.quoteRangeMin.toFixed(0)}–${job.quoteRangeMax.toFixed(0)}
+              Customer estimate: ${job.quoteRangeMin.toFixed(0)}
+              {job.quoteRangeMax > job.quoteRangeMin ? `–$${job.quoteRangeMax.toFixed(0)}` : ""}
             </p>
           ) : null}
         </div>

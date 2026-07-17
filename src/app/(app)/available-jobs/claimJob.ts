@@ -10,6 +10,10 @@ import {
   getEquipmentReadinessMode,
 } from "@/lib/equipment-readiness";
 import { logAudit } from "@/lib/audit";
+import {
+  businessDateKey,
+  dateKeyToStoredDate,
+} from "@/lib/availability-exceptions";
 
 export interface ClaimJobResult {
   success: boolean;
@@ -84,6 +88,27 @@ export async function claimJob(
   const currentCount = job.cleaners.length;
   if (currentCount >= job.requiredCleaners) {
     return { success: false, error: "This job is already fully staffed" };
+  }
+
+  // One-off time off (AvailabilityException) beats the recurring weekly rule: a
+  // provider cannot claim a job that lands on a day they've blocked off.
+  // Enforced server-side so a crafted request can't bypass the board filter.
+  // Fails closed — anything but a clean "no block found" refuses the claim.
+  const storedDate = dateKeyToStoredDate(businessDateKey(job.startTime));
+  if (storedDate) {
+    const blockedDate = await db.availabilityException.findUnique({
+      where: {
+        employeeId_date: { employeeId: session.user.id, date: storedDate },
+      },
+      select: { id: true },
+    });
+    if (blockedDate) {
+      return {
+        success: false,
+        error:
+          "You've marked this date as time off. Remove it from your availability before claiming this job.",
+      };
+    }
   }
 
   // SOP §8 "Missing equipment validation". Checked AFTER eligibility and

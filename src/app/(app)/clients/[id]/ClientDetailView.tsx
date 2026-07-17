@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ClientModal from "../ClientModal";
 import ClientAddressManager from "../ClientAddressManager";
+import ClientPaymentMethods from "./ClientPaymentMethods";
 import { StatusPill } from "@/lib/status-icons";
 
 type TabKey = "history" | "payments" | "ratings";
@@ -264,6 +265,13 @@ export default function ClientDetailView({
         </div>
         <ClientAddressManager clientId={client.id} addresses={client.addresses ?? []} />
       </div>
+
+      {/* Saved cards on file (Stripe) */}
+      <ClientPaymentMethods
+        clientId={client.id}
+        clientName={client.name}
+        clientEmail={client.email}
+      />
 
       {/* Tabs */}
       <div className="dtabs">

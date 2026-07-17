@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isAdminRole } from "@/lib/role-routing";
 import { syncDefaultLocationStock } from "@/lib/inventory";
+import { recordInventoryChanges } from "@/lib/inventory-change";
 import { revalidatePath } from "next/cache";
 import type { ProductCategory } from "@prisma/client";
 
@@ -99,10 +100,24 @@ export async function updateProduct(
     });
 
     // Keep the cleaner-facing per-location stock in sync with the admin edit.
-    await syncDefaultLocationStock(
-      productId,
-      stockLevel - (previous?.stockLevel ?? 0)
-    );
+    const stockDelta = stockLevel - (previous?.stockLevel ?? 0);
+    await syncDefaultLocationStock(productId, stockDelta);
+
+    // Best-effort warehouse audit row (skipped when the count didn't move).
+    const actor = session.user as { id: string; name?: string };
+    await recordInventoryChanges([
+      {
+        productId,
+        employeeId: null,
+        employeeName: null,
+        quantityChange: stockDelta,
+        newQuantity: stockLevel,
+        unit,
+        reason: "Stock level edited by admin",
+        changedById: actor.id,
+        changedByName: actor.name ?? null,
+      },
+    ]);
 
     revalidatePath("/inventory");
     return {

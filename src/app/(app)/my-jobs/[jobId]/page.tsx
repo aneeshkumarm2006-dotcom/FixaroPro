@@ -11,6 +11,7 @@ import ClockOutButton from "../ClockOutButton";
 import CancelShiftButton from "../CancelShiftButton";
 import WhyThisPriceLink from "../WhyThisPriceLink";
 import PhotoGallery from "./PhotoGallery";
+import JobChatPanel from "@/app/(app)/jobs/[id]/JobChatPanel";
 import JobChecklistPanel from "./JobChecklistPanel";
 import MapLinks from "./MapLinksClient";
 import EquipmentPanel from "./EquipmentPanel";
@@ -626,6 +627,18 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
           </div>
         </>
       )}
+
+      {/* Per-job chat (SOP §8 — message the office & client). Sender identity is
+          resolved server-side from the session, so this Pro can only ever post
+          as CLEANER on a job they're assigned to. */}
+      <h2 className="cl-jd-section-title">Messages</h2>
+      <div style={{ marginBottom: 28 }}>
+        <JobChatPanel
+          jobId={job.id}
+          viewerName={session.user.name}
+          audienceLabel="Fixaro & the client"
+        />
+      </div>
     </div>
   );
 }

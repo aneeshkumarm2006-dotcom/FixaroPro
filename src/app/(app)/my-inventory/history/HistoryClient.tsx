@@ -6,6 +6,9 @@ import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
   History,
   MapPin,
   Package,
@@ -15,11 +18,22 @@ import Button from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
 import type { CheckoutHistoryEntry } from "../../actions/getCheckoutHistory.types";
 
+interface KitChange {
+  id: string;
+  productName: string;
+  quantityChange: number;
+  newQuantity: number;
+  unit: string;
+  reason: string | null;
+  createdAt: string;
+}
+
 interface HistoryClientProps {
   checkouts: CheckoutHistoryEntry[];
   error: string | null;
   initialStart: string;
   initialEnd: string;
+  changes: KitChange[];
 }
 
 type SortDir = "desc" | "asc";
@@ -29,6 +43,7 @@ export default function HistoryClient({
   error,
   initialStart,
   initialEnd,
+  changes,
 }: HistoryClientProps) {
   const router = useRouter();
   const [start, setStart] = useState(initialStart);
@@ -115,6 +130,63 @@ export default function HistoryClient({
           </p>
         </Card>
       </div>
+
+      {/* Kit stock changes — the Pro's own audit trail (prev → new): pickups,
+          admin adjustments, damage/loss, and job usage. */}
+      {changes.length > 0 && (
+        <Card variant="default" className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-5 h-5 text-[#1c1917]" />
+            <h2 className="font-[400] text-[#1c1917]">Kit stock changes</h2>
+          </div>
+          <div className="space-y-2">
+            {changes.map((c) => {
+              const up = c.quantityChange >= 0;
+              const previous = c.newQuantity - c.quantityChange;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-start justify-between gap-3 p-3 rounded-xl bg-[#e85d04]/5">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className={`p-1.5 rounded-lg shrink-0 ${
+                        up ? "bg-green-100" : "bg-red-100"
+                      }`}>
+                      {up ? (
+                        <ArrowUpRight className="w-4 h-4 text-green-700" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-[400] text-[#1c1917]">
+                        {c.productName}
+                        <span className="text-[#1c1917]/60">
+                          {" "}
+                          · {previous} → {c.newQuantity} {c.unit}
+                          {" ("}
+                          {up ? "+" : ""}
+                          {c.quantityChange})
+                        </span>
+                      </p>
+                      <p className="text-xs text-[#1c1917]/60 truncate">
+                        {new Date(c.createdAt).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                        {c.reason ? ` · ${c.reason}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <Card variant="default" className="p-5">
         <div className="flex items-end gap-3 flex-wrap">

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { recordInventoryChanges } from "@/lib/inventory-change";
 
 /**
  * Cleaner reports a damaged or lost item from their personal kit.
@@ -33,7 +34,7 @@ export async function reportDamagedItem(input: {
         productId: input.productId,
       },
     },
-    include: { product: { select: { name: true, stockLevel: true } } },
+    include: { product: { select: { name: true, unit: true, stockLevel: true } } },
   });
   if (!kit) {
     return { success: false, error: "This item is not in your kit" };
@@ -44,6 +45,9 @@ export async function reportDamagedItem(input: {
       error: `You only have ${kit.quantity} of this item in your kit`,
     };
   }
+
+  const newKitQty = kit.quantity - qty;
+  const newStockLevel = kit.product.stockLevel - qty;
 
   await db.$transaction([
     // Reduce the cleaner's personal kit count.
@@ -69,6 +73,38 @@ export async function reportDamagedItem(input: {
         relatedType: "Product",
       },
     }),
+  ]);
+
+  // Best-effort audit — both stock movements above already committed. A cleaner
+  // can't move their own numbers (or master stock) silently: it lands in the
+  // product's Stock History and their own kit history.
+  const actor = session.user as { id: string; name?: string };
+  const auditReason = `${kind === "damaged" ? "Damaged" : "Lost"} — reported by Pro${
+    input.reason?.trim() ? `: ${input.reason.trim()}` : ""
+  }`;
+  await recordInventoryChanges([
+    {
+      productId: input.productId,
+      employeeId: actor.id,
+      employeeName: actor.name ?? null,
+      quantityChange: -qty,
+      newQuantity: newKitQty,
+      unit: kit.product.unit,
+      reason: auditReason,
+      changedById: actor.id,
+      changedByName: actor.name ?? null,
+    },
+    {
+      productId: input.productId,
+      employeeId: null,
+      employeeName: null,
+      quantityChange: -qty,
+      newQuantity: newStockLevel,
+      unit: kit.product.unit,
+      reason: auditReason,
+      changedById: actor.id,
+      changedByName: actor.name ?? null,
+    },
   ]);
 
   revalidatePath("/my-inventory");

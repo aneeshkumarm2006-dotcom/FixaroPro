@@ -53,6 +53,7 @@ model User {
   paintingBids                 PaintingBid[]                @relation("ProviderPaintingBids")
   serviceEligibilities         EmployeeServiceEligibility[] @relation("EmployeeEligibilities")
   serviceEquipmentEdits        ServiceEquipment[]           @relation("ServiceEquipmentUpdatedBy")
+  availabilityExceptions       AvailabilityException[]
 }
 
 model Account {
@@ -110,6 +111,8 @@ model Product {
   supplierPrices    SupplierPrice[]
   locationStock     InventoryLocationStock[]
   checkoutItems     InventoryCheckoutItem[]
+  inventoryChanges  InventoryChange[]
+  links             ProductLink[]
 }
 
 model AppSetting {
@@ -342,6 +345,7 @@ model Client {
   recurringCancellations RecurringCancellation[]
   addresses              ClientAddress[]
   contact                Contact?
+  paymentMethods         ClientPaymentMethod[]
 
   @@index([clientType])
   @@index([isActive])
@@ -552,6 +556,8 @@ model Job {
   convertedFromLeads             Lead[]
   convertedFromWaitlist          Waitlist[]
   paintingBids                   PaintingBid[]
+  reviewPhotos                   ReviewPhoto[]
+  chatMessages                   JobChatMessage[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -2180,4 +2186,159 @@ model AnnouncementAck {
   @@unique([announcementId, userId])
   @@index([announcementId])
   @@index([userId])
+}
+
+// ============================================================
+// Cleano feature-parity port (2026-07-18) — handyman-adapted.
+// New tables only (additive). Internal enum value CLEANER is kept
+// to match ported code + the existing `cleaners` relation; UI shows "Pro".
+// ============================================================
+
+// --- Team group chat (channels + membership + read state + messages) ---
+model GroupChannel {
+  id          String               @id @default(cuid())
+  name        String
+  isDefault   Boolean              @default(false)
+  isActive    Boolean              @default(true)
+  // Direct (1:1) Pro-to-Pro conversation — exactly two member rows.
+  isDirect    Boolean              @default(false)
+  createdById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  messages    GroupMessage[]
+  members     GroupChannelMember[]
+}
+
+model GroupChannelMember {
+  id        String       @id @default(cuid())
+  channelId String
+  userId    String
+  createdAt DateTime     @default(now())
+  channel   GroupChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+}
+
+model GroupChannelRead {
+  id         String   @id @default(cuid())
+  channelId  String
+  userId     String
+  lastReadAt DateTime @default(now())
+
+  @@unique([channelId, userId])
+  @@index([userId])
+}
+
+model GroupMessage {
+  id         String       @id @default(cuid())
+  channelId  String
+  senderId   String
+  senderName String
+  body       String       @db.Text
+  deletedAt  DateTime?
+  createdAt  DateTime     @default(now())
+  channel    GroupChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+}
+
+// --- Per-job chat thread (office <-> Pro <-> client) ---
+model JobChatMessage {
+  id              String            @id @default(cuid())
+  jobId           String
+  senderId        String?
+  senderRole      JobChatSenderRole
+  senderName      String
+  body            String            @db.Text
+  readByAdminAt   DateTime?
+  readByClientAt  DateTime?
+  readByCleanerAt DateTime?
+  createdAt       DateTime          @default(now())
+  job             Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}
+
+enum JobChatSenderRole {
+  CLEANER
+  CLIENT
+  ADMIN
+}
+
+// --- Inventory change audit trail (prev -> new quantity, reason, actor) ---
+model InventoryChange {
+  id             String   @id @default(cuid())
+  productId      String
+  // Set when the change is to a specific Pro's inventory; null = warehouse.
+  employeeId     String?
+  employeeName   String?
+  quantityChange Float
+  newQuantity    Float
+  unit           String?
+  reason         String?
+  changedById    String?
+  changedByName  String?
+  createdAt      DateTime @default(now())
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([employeeId])
+}
+
+// --- One-off availability exception (blocked day / time-off) ---
+model AvailabilityException {
+  id         String   @id @default(cuid())
+  employeeId String
+  // Date-only (midnight, business timezone) — the blocked day.
+  date       DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+}
+
+// --- Saved client payment methods (Stripe) ---
+model ClientPaymentMethod {
+  id                    String   @id @default(cuid())
+  clientId              String
+  stripePaymentMethodId String   @unique
+  brand                 String?
+  last4                 String?
+  expMonth              Int?
+  expYear               Int?
+  isDefault             Boolean  @default(false)
+  label                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+// --- External links attached to an inventory product ---
+model ProductLink {
+  id        String   @id @default(cuid())
+  productId String
+  label     String?
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// --- Photos attached to a completed job's review ---
+model ReviewPhoto {
+  id        String   @id @default(cuid())
+  jobId     String
+  url       String
+  rating    Int?
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
 }

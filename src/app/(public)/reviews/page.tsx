@@ -48,6 +48,27 @@ export default async function ReviewsPage() {
 
   const reviews = ratings.filter((r) => (r.notes ?? "").trim().length > 0);
 
+  // Customer-attached review photos for the shown jobs, keyed by jobId. Only
+  // our own Cloudinary uploads reach the DB (validated on submit), so these are
+  // safe to render directly. EmployeeRating.jobId is nullable, so drop nulls.
+  const jobIds = Array.from(
+    new Set(reviews.map((r) => r.jobId).filter((id): id is string => !!id))
+  );
+  const photoRows =
+    jobIds.length > 0
+      ? await db.reviewPhoto.findMany({
+          where: { jobId: { in: jobIds } },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, jobId: true, url: true },
+        })
+      : [];
+  const photosByJob = new Map<string, { id: string; url: string }[]>();
+  for (const p of photoRows) {
+    const list = photosByJob.get(p.jobId) ?? [];
+    list.push({ id: p.id, url: p.url });
+    photosByJob.set(p.jobId, list);
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#faf7f2", padding: "48px 16px" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -66,7 +87,9 @@ export default async function ReviewsPage() {
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {reviews.map((r) => (
+            {reviews.map((r) => {
+              const photos = r.jobId ? photosByJob.get(r.jobId) ?? [] : [];
+              return (
               <div key={r.id} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 14, padding: "16px 20px" }}>
                 <div style={{ color: "#f59e0b", fontSize: 15, letterSpacing: 1, marginBottom: 6 }}>
                   {"★".repeat(Math.round(r.rating))}
@@ -75,11 +98,46 @@ export default async function ReviewsPage() {
                 <p style={{ fontSize: 14, lineHeight: 1.6, color: "#1c1917", marginBottom: 8, whiteSpace: "pre-wrap" }}>
                   {r.notes}
                 </p>
+                {photos.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      margin: "0 0 10px",
+                    }}>
+                    {photos.map((p, i) => (
+                      <a
+                        key={p.id}
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Review photo ${i + 1}`}
+                        style={{
+                          display: "block",
+                          width: 72,
+                          height: 72,
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          border: "1px solid #e7e5e4",
+                        }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.url}
+                          alt={`Review photo ${i + 1}`}
+                          loading="lazy"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
                 <p style={{ fontSize: 13, color: "#78716c", fontWeight: 600 }}>
                   — {shortName(r.job?.client?.name)}
                 </p>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

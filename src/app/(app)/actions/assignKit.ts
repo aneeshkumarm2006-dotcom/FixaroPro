@@ -4,6 +4,10 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import {
+  recordInventoryChanges,
+  type InventoryChangeRow,
+} from "@/lib/inventory-change";
 
 interface AssignKitParams {
   employeeId: string;
@@ -51,9 +55,13 @@ export async function assignKit(params: AssignKitParams) {
       };
     }
 
+    // Collected inside the transaction, logged after it commits (best-effort).
+    const auditRows: InventoryChangeRow[] = [];
+    const actor = session.user as { id: string; name?: string };
+
     await db.$transaction(async (tx) => {
       for (const item of kit.items) {
-        await tx.product.update({
+        const updatedProduct = await tx.product.update({
           where: { id: item.productId },
           data: { stockLevel: { decrement: item.quantity } },
         });
@@ -67,13 +75,15 @@ export async function assignKit(params: AssignKitParams) {
           },
         });
 
+        let newKitQty: number;
         if (existing) {
-          await tx.employeeProduct.update({
+          const updatedKit = await tx.employeeProduct.update({
             where: { id: existing.id },
             data: { quantity: { increment: item.quantity } },
           });
+          newKitQty = updatedKit.quantity;
         } else {
-          await tx.employeeProduct.create({
+          const createdKit = await tx.employeeProduct.create({
             data: {
               employeeId,
               productId: item.productId,
@@ -81,9 +91,37 @@ export async function assignKit(params: AssignKitParams) {
               notes: `Assigned via kit: ${kit.name}`,
             },
           });
+          newKitQty = createdKit.quantity;
         }
+
+        // Warehouse gave up the units …
+        auditRows.push({
+          productId: item.productId,
+          employeeId: null,
+          employeeName: null,
+          quantityChange: -item.quantity,
+          newQuantity: updatedProduct.stockLevel,
+          unit: item.product.unit,
+          reason: `Kit assigned to ${employee.name ?? "Pro"}: ${kit.name}`,
+          changedById: actor.id,
+          changedByName: actor.name ?? null,
+        });
+        // … the Pro's kit received them.
+        auditRows.push({
+          productId: item.productId,
+          employeeId,
+          employeeName: employee.name ?? null,
+          quantityChange: item.quantity,
+          newQuantity: newKitQty,
+          unit: item.product.unit,
+          reason: `Kit assigned: ${kit.name}`,
+          changedById: actor.id,
+          changedByName: actor.name ?? null,
+        });
       }
     });
+
+    await recordInventoryChanges(auditRows);
 
     revalidatePath(`/employees/${employeeId}`);
     revalidatePath("/inventory");

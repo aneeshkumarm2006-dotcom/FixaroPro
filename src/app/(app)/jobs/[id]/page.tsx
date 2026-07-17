@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import JobDetailView from "./JobDetailView";
 import AdminJobOpsPanel from "./AdminJobOpsPanel";
+import JobChatPanel from "./JobChatPanel";
 import { computeJobBilling, getBillingConfig } from "@/lib/billing";
 import { getEligibleProviderIdsFor } from "@/lib/eligibility";
 
@@ -136,6 +137,13 @@ export default async function JobPage({
     orderBy: { createdAt: "desc" },
   });
 
+  // Customer-attached review photos (submitted with the star rating).
+  const reviewPhotos = await db.reviewPhoto.findMany({
+    where: { jobId: id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, url: true, rating: true, createdAt: true },
+  });
+
   // Calculate total cost of products used
   const totalProductCost = job.productUsage.reduce((sum, usage) => {
     return sum + usage.quantity * usage.product.costPerUnit;
@@ -251,6 +259,13 @@ export default async function JobPage({
       : null,
   }));
 
+  const reviewPhotosData = reviewPhotos.map((photo) => ({
+    id: photo.id,
+    url: photo.url,
+    rating: photo.rating,
+    createdAt: photo.createdAt.toISOString(),
+  }));
+
   // Admin ops panel (SOP §9/§10): charge-review breakdown, painting bid
   // controls, and deposit reconciliation. Self-contained — rendered alongside
   // the existing detail view.
@@ -311,6 +326,7 @@ export default async function JobPage({
         productUsage={productUsageData}
         logs={logsData}
         photos={photosData}
+        reviewPhotos={reviewPhotosData}
         totalLogs={totalLogs}
         logsPage={logsPage}
         logsPerPage={logsPerPage}
@@ -322,6 +338,16 @@ export default async function JobPage({
         ratingStatus={ratingStatus}
       />
       {opsPanel}
+      {/* Per-job chat (office ↔ Pro ↔ client). The panel's server actions
+          re-derive the sender role from the session, so posting here is gated
+          to real participants regardless of who loads the page. */}
+      <div style={{ marginTop: 24, maxWidth: 720 }}>
+        <JobChatPanel
+          jobId={job.id}
+          viewerName={session.user.name}
+          audienceLabel="the Pro & client"
+        />
+      </div>
     </>
   );
 }

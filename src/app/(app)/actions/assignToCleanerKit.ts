@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { recordInventoryChanges } from "@/lib/inventory-change";
 
 /**
  * Admin action: add a quantity of a product to a cleaner's personal kit.
@@ -32,7 +33,7 @@ export async function assignToCleanerKit(input: {
 
   const product = await db.product.findUnique({
     where: { id: input.productId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, unit: true },
   });
   if (!product) return { success: false, error: "Product not found" };
 
@@ -42,7 +43,7 @@ export async function assignToCleanerKit(input: {
   });
   if (!cleaner) return { success: false, error: "Cleaner not found" };
 
-  await db.employeeProduct.upsert({
+  const updatedKit = await db.employeeProduct.upsert({
     where: {
       employeeId_productId: {
         employeeId: input.cleanerId,
@@ -60,6 +61,22 @@ export async function assignToCleanerKit(input: {
       ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
     },
   });
+
+  // Kit-only movement — master stock is intentionally untouched here.
+  const actor = session.user as { id: string; name?: string };
+  await recordInventoryChanges([
+    {
+      productId: input.productId,
+      employeeId: input.cleanerId,
+      employeeName: cleaner.name ?? null,
+      quantityChange: qty,
+      newQuantity: updatedKit.quantity,
+      unit: product.unit,
+      reason: `Added to ${cleaner.name ?? "Pro"}'s kit by admin`,
+      changedById: actor.id,
+      changedByName: actor.name ?? null,
+    },
+  ]);
 
   revalidatePath("/inventory");
   revalidatePath("/my-inventory");
@@ -94,6 +111,10 @@ export async function removeFromCleanerKit(input: {
         productId: input.productId,
       },
     },
+    include: {
+      product: { select: { unit: true } },
+      employee: { select: { name: true } },
+    },
   });
   if (!kit) return { success: false, error: "Cleaner does not have this item" };
   if (kit.quantity < qty) {
@@ -103,6 +124,7 @@ export async function removeFromCleanerKit(input: {
     };
   }
 
+  const newKitQty = kit.quantity - qty;
   if (kit.quantity === qty) {
     await db.employeeProduct.delete({ where: { id: kit.id } });
   } else {
@@ -111,6 +133,22 @@ export async function removeFromCleanerKit(input: {
       data: { quantity: { decrement: qty } },
     });
   }
+
+  // Kit-only movement — master stock is intentionally untouched here.
+  const actor = session.user as { id: string; name?: string };
+  await recordInventoryChanges([
+    {
+      productId: input.productId,
+      employeeId: input.cleanerId,
+      employeeName: kit.employee?.name ?? null,
+      quantityChange: -qty,
+      newQuantity: newKitQty,
+      unit: kit.product?.unit ?? null,
+      reason: `Removed from ${kit.employee?.name ?? "Pro"}'s kit by admin`,
+      changedById: actor.id,
+      changedByName: actor.name ?? null,
+    },
+  ]);
 
   revalidatePath("/inventory");
   revalidatePath("/my-inventory");

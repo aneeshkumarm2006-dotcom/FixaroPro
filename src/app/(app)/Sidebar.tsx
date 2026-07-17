@@ -37,6 +37,9 @@ import {
   Wrench,
   BookOpen,
   LogOut,
+  MessagesSquare,
+  ShieldAlert,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { getUnreadChatCount } from "./chat/actions";
@@ -95,6 +98,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/web-bookings", label: "Web Bookings", Icon: Globe },
       { href: "/leads", label: "Leads", Icon: Flame },
       { href: "/chat", label: "Chat", Icon: MessageCircle, badge: "chat" },
+      { href: "/group-chat", label: "Team Chat", Icon: MessagesSquare },
     ],
   },
   {
@@ -139,6 +143,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/training-docs", label: "Training & Docs", Icon: GraduationCap },
       { href: "/settings", label: "Settings", Icon: Settings },
       { href: "/training", label: "Training", Icon: GraduationCap },
+      { href: "/account", label: "Account", Icon: UserCog },
     ],
   },
 ];
@@ -155,6 +160,9 @@ const CLEANER_NAV: NavSection[] = [
       { href: "/training", label: "Training", Icon: GraduationCap },
       { href: "/documents", label: "Documents", Icon: FileSignature },
       { href: "/chat", label: "Chat", Icon: MessageCircle, badge: "chat" },
+      { href: "/group-chat", label: "Team Chat", Icon: MessagesSquare },
+      { href: "/strikes", label: "My Strikes", Icon: ShieldAlert },
+      { href: "/account", label: "Account", Icon: UserCog },
     ],
   },
 ];

@@ -9,6 +9,30 @@
 
 ---
 
+## ✅ Stage 11 — Cleano second-wave feature-parity port (2026-07-18)
+
+Ported the Cleano features that were missing from Fixaro (the batch 1-7 port covered CRM/Properties/
+Reports/ActivityLog/announcements/recurring/training-docs earlier). **Rag Wash deliberately excluded**
+(handyman removed it). 10 new models, one additive migration `20260718100000_cleano_feature_parity`
+(generated via `prisma migrate diff`, DB-free). `prisma validate` / `tsc` / `next build` (82 pages) /
+`vitest` (91) all pass. Migration **not yet deployed** — run `npx prisma migrate deploy`.
+
+- **Group chat** (GroupChannel/Member/Read/Message) → `/group-chat`, role-branched, DMs.
+- **Per-job chat** (JobChatMessage) → panel on admin/Pro/client job surfaces.
+- **Inventory change log** (InventoryChange) → written at 8 stock-mutation sites; history UI.
+- **Product links** (ProductLink) → "Where to buy" on inventory/[id].
+- **Availability exceptions** (AvailabilityException) → blocked days enforced at claim time.
+- **Client saved payment methods** (ClientPaymentMethod) → extends existing Stripe card-on-file.
+- **Review photos** (ReviewPhoto) → rate flow + reviews wall + admin job detail.
+- **Self-service pages** → `/strikes` (provider), `/account`, `/change-password`.
+- **Public landing page** → `/` now a handyman marketing home (was → /sign-in).
+- Sidebar nav added: Team Chat, My Strikes, Account.
+
+Follow-ups (non-blocking): job-chat SMS bridge omitted; landing trust-claims/pricing are placeholder
+copy to confirm; `setLocationStock` intentionally not logged (per-location ≠ warehouse qty).
+
+---
+
 ## ✅ Stage 10 — UI repair sweep + mock-page wiring (2026-07-18)
 
 Triggered by a broken `/recurring` screenshot. Full read-only sweep of every sidebar route across

@@ -4,6 +4,10 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import {
+  recordInventoryChanges,
+  type InventoryChangeRow,
+} from "@/lib/inventory-change";
 
 interface CheckoutInventoryInput {
   locationId: string;
@@ -75,6 +79,11 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
       }
     }
 
+    // Collected inside the transaction, written to the audit log AFTER it
+    // commits so a logging failure can never roll back a real pickup.
+    const auditRows: InventoryChangeRow[] = [];
+    const actorName = (session.user as { name?: string }).name ?? null;
+
     const checkout = await db.$transaction(
       async (tx) => {
         const created = await tx.inventoryCheckout.create({
@@ -103,12 +112,12 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
           });
 
           // Keep the global stockLevel admins see in sync with pickups.
-          await tx.product.update({
+          const updatedProduct = await tx.product.update({
             where: { id: item.productId },
             data: { stockLevel: { decrement: item.quantity } },
           });
 
-          await tx.employeeProduct.upsert({
+          const updatedKit = await tx.employeeProduct.upsert({
             where: {
               employeeId_productId: {
                 employeeId: session.user.id,
@@ -122,6 +131,32 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
               quantity: item.quantity,
             },
           });
+
+          const unit = stockByProduct.get(item.productId)?.product.unit ?? null;
+          // Pro's kit gained the units …
+          auditRows.push({
+            productId: item.productId,
+            employeeId: session.user.id,
+            employeeName: actorName,
+            quantityChange: item.quantity,
+            newQuantity: updatedKit.quantity,
+            unit,
+            reason: `Picked up from ${location.name}`,
+            changedById: session.user.id,
+            changedByName: actorName,
+          });
+          // … and the warehouse gave them up.
+          auditRows.push({
+            productId: item.productId,
+            employeeId: null,
+            employeeName: null,
+            quantityChange: -item.quantity,
+            newQuantity: updatedProduct.stockLevel,
+            unit,
+            reason: `Checked out to ${actorName ?? "Pro"} from ${location.name}`,
+            changedById: session.user.id,
+            changedByName: actorName,
+          });
         }
 
         return created;
@@ -133,6 +168,9 @@ export async function checkoutInventory(input: CheckoutInventoryInput) {
         timeout: 30_000,
       }
     );
+
+    // Best-effort audit write — the pickup already committed above.
+    await recordInventoryChanges(auditRows);
 
     revalidatePath("/my-inventory");
     revalidatePath("/my-inventory/checkout");

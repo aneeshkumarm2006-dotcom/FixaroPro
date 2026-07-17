@@ -1,0 +1,24 @@
+/* Colocated styles for the public marketing landing (src/app/page.tsx).
+   Kept out of globals.css / customer.css so this page owns its own chrome. */
+
+/* Accessible skip link: hidden off-screen until it receives keyboard focus,
+   then slides into view. Avoids shipping a focusable-but-invisible element. */
+.skipLink {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 50;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--accent, #e85d04);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skipLink:focus {
+  top: 12px;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(232, 93, 4, 0.25);
+}

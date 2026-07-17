@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isAdminRole } from "@/lib/role-routing";
 import { syncDefaultLocationStock } from "@/lib/inventory";
+import { recordInventoryChanges } from "@/lib/inventory-change";
 import { revalidatePath } from "next/cache";
 import type { ProductCategory } from "@prisma/client";
 
@@ -89,6 +90,23 @@ export default async function createProduct(
     // Mirror the initial stock into the default location so cleaners can see
     // and pick it up (cleaner pickup reads per-location stock, not stockLevel).
     await syncDefaultLocationStock(product.id, stockLevel);
+
+    // Best-effort genesis audit row (0 → initial) so the Stock History has a
+    // starting point. Skipped automatically when the product opens at 0.
+    const actor = session.user as { id: string; name?: string };
+    await recordInventoryChanges([
+      {
+        productId: product.id,
+        employeeId: null,
+        employeeName: null,
+        quantityChange: stockLevel,
+        newQuantity: stockLevel,
+        unit,
+        reason: "Initial stock on product creation",
+        changedById: actor.id,
+        changedByName: actor.name ?? null,
+      },
+    ]);
 
     revalidatePath("/inventory");
     return {

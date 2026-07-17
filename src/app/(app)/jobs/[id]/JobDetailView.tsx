@@ -136,6 +136,14 @@ interface JobPhoto {
   employee: { id: string; name: string; } | null;
 }
 
+// Customer-attached review photos (submitted alongside the star rating).
+interface ReviewPhoto {
+  id: string;
+  url: string;
+  rating: number | null;
+  createdAt: string;
+}
+
 interface User { id: string; name: string; email: string; }
 
 interface JobDetailViewProps {
@@ -143,6 +151,7 @@ interface JobDetailViewProps {
   productUsage: ProductUsage[];
   logs: JobLog[];
   photos?: JobPhoto[];
+  reviewPhotos?: ReviewPhoto[];
   totalLogs: number;
   logsPage: number;
   logsPerPage: number;
@@ -212,6 +221,7 @@ export default function JobDetailView({
   productUsage,
   logs,
   photos = [],
+  reviewPhotos = [],
   totalLogs,
   logsPage,
   logsPerPage,
@@ -948,6 +958,51 @@ export default function JobDetailView({
           </div>
         )}
       </div>
+
+      {/* Client review photos (attached to the star rating) */}
+      {reviewPhotos.length > 0 && (
+        <div className="dcard">
+          <div className="dcard-head">
+            <h3>Client review photos · {reviewPhotos.length}</h3>
+          </div>
+          <div className="photo-grid">
+            {reviewPhotos.map((photo, idx) => (
+              <a
+                key={photo.id}
+                href={photo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="photo-cell"
+                style={{ position: 'relative' }}
+                aria-label={
+                  photo.rating != null
+                    ? `Client review photo ${idx + 1} (${photo.rating}-star)`
+                    : `Client review photo ${idx + 1}`
+                }>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.url} alt="Client review photo" loading="lazy" />
+                {photo.rating != null && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      left: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      color: '#fff',
+                      background: 'rgba(0,0,0,0.62)',
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                    }}>
+                    {photo.rating}★
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Activity */}
       <div className="dcard">

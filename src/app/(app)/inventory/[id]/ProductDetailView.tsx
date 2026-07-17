@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
@@ -23,9 +23,22 @@ import {
   Archive,
   DollarSign,
   TrendingUp,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  ExternalLink,
+  ShoppingCart,
+  Plus,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { sanitizeHttpUrl, urlHost } from "@/lib/safe-url";
+import {
+  addProductLink,
+  removeProductLink,
+} from "../../actions/productLinks";
 
-type TabView = "overview" | "usage" | "assignments";
+type TabView = "overview" | "history" | "usage" | "assignments";
 
 const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
   [
@@ -33,6 +46,11 @@ const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
       id: "overview",
       label: "Overview",
       icon: <Package className="w-4 h-4" />,
+    },
+    {
+      id: "history",
+      label: "Stock History",
+      icon: <Clock className="w-4 h-4" />,
     },
     {
       id: "usage",
@@ -46,6 +64,12 @@ const MENU_ITEMS: Array<{ id: TabView; label: string; icon: React.ReactNode }> =
     },
   ];
 
+interface ProductLinkItem {
+  id: string;
+  label: string;
+  url: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -54,6 +78,19 @@ interface Product {
   costPerUnit: number;
   stockLevel: number;
   minStock: number;
+  links: ProductLinkItem[];
+}
+
+interface ChangeEntry {
+  id: string;
+  employeeId: string | null;
+  employeeName: string | null;
+  quantityChange: number;
+  newQuantity: number;
+  unit: string | null;
+  reason: string | null;
+  changedByName: string | null;
+  createdAt: string;
 }
 
 interface JobUsage {
@@ -87,6 +124,7 @@ interface ProductDetailViewProps {
   employeeAssignments: EmployeeAssignment[];
   totalAssigned: number;
   totalUsed: number;
+  changeHistory: ChangeEntry[];
 }
 
 export default function ProductDetailView({
@@ -95,6 +133,7 @@ export default function ProductDetailView({
   employeeAssignments,
   totalAssigned,
   totalUsed,
+  changeHistory,
 }: ProductDetailViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -104,9 +143,62 @@ export default function ProductDetailView({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [page, setPage] = useState(1);
 
+  // Product-link CRUD (admin "where to buy" list).
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [isSavingLink, startLinkSave] = useTransition();
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
   const isLowStock = product.stockLevel <= product.minStock;
   const totalInventory = product.stockLevel + totalAssigned;
   const totalValue = totalInventory * product.costPerUnit;
+
+  // Purchase links — anything that isn't an absolute http(s) URL is dropped
+  // rather than rendered: never trust a stored string about to become an href.
+  const purchaseLinks = product.links
+    .map((l) => {
+      const href = sanitizeHttpUrl(l.url);
+      if (!href) return null;
+      return { id: l.id, label: l.label || urlHost(href) || "Link", href };
+    })
+    .filter((l): l is { id: string; label: string; href: string } => l !== null);
+
+  const handleAddLink = () => {
+    setLinkError(null);
+    // Client-side allow-list check for instant feedback; the server re-validates.
+    if (!sanitizeHttpUrl(linkUrl)) {
+      setLinkError("Enter a full http:// or https:// link.");
+      return;
+    }
+    startLinkSave(async () => {
+      const res = await addProductLink({
+        productId: product.id,
+        label: linkLabel.trim() || undefined,
+        url: linkUrl.trim(),
+      });
+      if (res.success) {
+        setLinkLabel("");
+        setLinkUrl("");
+        router.refresh();
+      } else {
+        setLinkError(res.error);
+      }
+    });
+  };
+
+  const handleRemoveLink = (linkId: string) => {
+    setRemovingId(linkId);
+    startLinkSave(async () => {
+      const res = await removeProductLink({ productId: product.id, linkId });
+      setRemovingId(null);
+      if (res.success) {
+        router.refresh();
+      } else {
+        setLinkError(res.error);
+      }
+    });
+  };
 
   // Sync activeView with URL params
   useEffect(() => {
@@ -302,6 +394,117 @@ export default function ProductDetailView({
         </div>
       )}
 
+      {/* Where to buy — external re-order links (admin CRUD). Every href is
+          re-sanitized here (http/https only) and opened with rel="noopener
+          noreferrer" so the new tab can never reach back through window.opener. */}
+      <h2 className="input-label !text-[#1c1917]/70">Where to buy</h2>
+      <Card variant="default" className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+            <ShoppingCart className="w-4 h-4 text-[#1c1917]" />
+          </div>
+          <h3 className="text-sm font-[350] text-[#1c1917]/80">
+            Purchase links
+          </h3>
+        </div>
+
+        {purchaseLinks.length > 0 ? (
+          <div className="space-y-2 mb-4">
+            {purchaseLinks.map((l) => (
+              <div
+                key={l.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#e85d04]/5">
+                <a
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 min-w-0 flex-1 group">
+                  <div className="min-w-0">
+                    <p className="text-sm font-[400] text-[#1c1917] truncate group-hover:underline">
+                      {l.label}
+                    </p>
+                    <p className="text-xs text-[#1c1917]/60 truncate">
+                      {l.href}
+                    </p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-[#1c1917]/50 shrink-0" />
+                </a>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  submit={false}
+                  border={false}
+                  disabled={isSavingLink}
+                  onClick={() => handleRemoveLink(l.id)}
+                  className="!px-2 text-red-600 hover:bg-red-50 shrink-0"
+                  aria-label="Remove link">
+                  {removingId === l.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[#1c1917]/50 mb-4">
+            No purchase links yet. Add one so the team knows where to re-order.
+          </p>
+        )}
+
+        {/* Add-link form */}
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+          <Input
+            placeholder="Label (optional)"
+            value={linkLabel}
+            size="md"
+            variant="form"
+            border={false}
+            onChange={(e) => setLinkLabel(e.target.value)}
+            className="sm:w-1/3 h-[42px]"
+          />
+          <Input
+            placeholder="https://…"
+            value={linkUrl}
+            size="md"
+            variant="form"
+            border={false}
+            onChange={(e) => {
+              setLinkUrl(e.target.value);
+              if (linkError) setLinkError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddLink();
+              }
+            }}
+            className="flex-1 h-[42px]"
+          />
+          <Button
+            variant="action"
+            size="md"
+            submit={false}
+            border={false}
+            disabled={isSavingLink || !linkUrl.trim()}
+            onClick={handleAddLink}
+            className="rounded-xl px-4 whitespace-nowrap">
+            {isSavingLink && removingId === null ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-1" />
+                Add link
+              </>
+            )}
+          </Button>
+        </div>
+        {linkError && (
+          <p className="text-xs text-red-600 mt-2">{linkError}</p>
+        )}
+      </Card>
+
       {/* Description */}
       {product.description && (
         <>
@@ -375,6 +578,116 @@ export default function ProductDetailView({
             <p className="text-sm text-[#1c1917]/60">
               No usage recorded for this product
             </p>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+
+  // Stock History Tab Content — audit trail of every count change.
+  const HistoryTab = () => (
+    <div className="space-y-6">
+      {/* Current state summary */}
+      <Card variant="cleano_light" className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="input-label !text-[#1c1917]/70">
+              Current warehouse count
+            </p>
+            <p className="text-2xl font-[350] text-[#1c1917]">
+              {product.stockLevel} {product.unit}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="input-label !text-[#1c1917]/70">Assigned to Pros</p>
+            <p className="text-2xl font-[350] text-[#1c1917]">
+              {totalAssigned} {product.unit}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {changeHistory.length === 0 ? (
+        <Card variant="ghost" className="p-8">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-[#e85d04]/5 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Clock className="w-6 h-6 text-[#1c1917]/40" />
+            </div>
+            <p className="text-sm text-[#1c1917]/60">
+              No stock changes recorded yet
+            </p>
+            <p className="text-xs text-[#1c1917]/50 mt-1">
+              Adjustments to the count will appear here with who changed it and
+              why
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <Card variant="default" className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 bg-[#e85d04]/10 rounded-lg">
+              <Clock className="w-4 h-4 text-[#1c1917]" />
+            </div>
+            <h3 className="text-sm font-[350] text-[#1c1917]/80">
+              Recent stock changes
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {changeHistory.map((c) => {
+              const up = c.quantityChange >= 0;
+              // `previous` is derived (new − change) so it can never disagree
+              // with the delta. A kit row carries an employeeId; otherwise it's
+              // a warehouse movement.
+              const previous = c.newQuantity - c.quantityChange;
+              const isKit = !!c.employeeId;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#e85d04]/5">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className={`p-1.5 rounded-lg shrink-0 ${
+                        up ? "bg-green-100" : "bg-red-100"
+                      }`}>
+                      {up ? (
+                        <ArrowUpRight className="w-4 h-4 text-green-700" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-[400] text-[#1c1917]">
+                        {previous} → {c.newQuantity} {c.unit || product.unit}
+                        <span className="text-[#1c1917]/60">
+                          {" "}
+                          ({up ? "+" : ""}
+                          {c.quantityChange})
+                        </span>
+                        {isKit ? (
+                          <span className="text-[#1c1917]/60">
+                            {" "}
+                            · {c.employeeName || "Pro"}&rsquo;s kit
+                          </span>
+                        ) : (
+                          <span className="text-[#1c1917]/60"> · warehouse</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-[#1c1917]/60 truncate">
+                        {new Date(c.createdAt).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                        {c.changedByName ? ` · by ${c.changedByName}` : ""}
+                        {c.reason ? ` · ${c.reason}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -767,11 +1080,15 @@ export default function ProductDetailView({
           })}
         </div>
 
-        {/* Content Area */}
+        {/* Content Area — rendered as function calls (not <Tab />) so the tab
+            bodies reconcile in place instead of remounting on every parent
+            re-render, which would otherwise drop focus from the inputs inside
+            them (search box, add-link form) between keystrokes. */}
         <div className="flex-1">
-          {activeView === "overview" && <OverviewTab />}
-          {activeView === "usage" && <UsageHistoryTab />}
-          {activeView === "assignments" && <AssignmentsTab />}
+          {activeView === "overview" && OverviewTab()}
+          {activeView === "history" && HistoryTab()}
+          {activeView === "usage" && UsageHistoryTab()}
+          {activeView === "assignments" && AssignmentsTab()}
         </div>
       </div>
     </div>

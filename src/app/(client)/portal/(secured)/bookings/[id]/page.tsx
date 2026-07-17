@@ -9,6 +9,7 @@ import { StatusBadge, DateBadge } from "@/components/customer/atoms";
 import { Banner } from "@/components/customer/Field";
 import RequestActions from "./RequestActions";
 import PaintingOfferActions from "./PaintingOfferActions";
+import JobChatPanel from "@/app/(app)/jobs/[id]/JobChatPanel";
 import {
 } from "@/lib/policy";
 
@@ -272,6 +273,16 @@ export default async function BookingDetailPage({
               </ul>
             </section>
           ) : null}
+
+          {/* Per-job chat with the office & assigned Pro. The panel's server
+              actions confirm this signed-in client owns the job before showing
+              or posting any message (guards against IDOR). */}
+          <JobChatPanel
+            jobId={job.id}
+            viewerName={client.name}
+            audienceLabel="Fixaro & your Pro"
+            title="Messages about this job"
+          />
         </div>
 
         {/* Right column */}

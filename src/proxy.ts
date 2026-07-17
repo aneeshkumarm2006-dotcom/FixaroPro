@@ -4,6 +4,7 @@ import { getSessionCookie } from 'better-auth/cookies'
 
 // Exact public paths
 const PUBLIC_EXACT = new Set<string>([
+  '/', // public marketing landing / home page
   '/sign-in',
   '/sign-up',
   '/portal/login',
@@ -38,13 +39,10 @@ function isPublic(pathname: string): boolean {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // If trying to access "/" route, always redirect to "/sign-in"
-  if (pathname === '/') {
-    const redirectToSignInUrl = new URL('/sign-in', request.url)
-    return NextResponse.redirect(redirectToSignInUrl)
-  }
-
-  // Allow public routes (customer-facing + auth pages)
+  // Allow public routes (customer-facing + auth pages). "/" now resolves to the
+  // public marketing landing page (see PUBLIC_EXACT) instead of redirecting to
+  // /sign-in — every other app/portal route still falls through to the session
+  // check below.
   if (isPublic(pathname)) {
     return NextResponse.next()
   }

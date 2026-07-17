@@ -4,7 +4,12 @@ import { useState } from "react";
 import { Star, Check, AlertCircle } from "lucide-react";
 import SplitShell, { BRAND_IMAGES } from "@/components/customer/SplitShell";
 import { Field, Textarea, Button } from "@/components/customer/Field";
+import PhotoUploadField from "@/components/customer/PhotoUploadField";
 import { submitRating } from "../actions/submitRating";
+
+// Cap how many photos a customer can attach to a single review. The upload
+// action + submitRating both re-enforce this server-side, so this is UX only.
+const MAX_REVIEW_PHOTOS = 5;
 
 type Fallback = "expired" | "already" | "notfound";
 
@@ -50,6 +55,11 @@ export default function RateForm({
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+
+  // 1-star (poor) ratings get a gentler "make it right" prompt; higher ratings
+  // get a neutral "show off the work" prompt. Photos are optional either way.
+  const isPoor = rating > 0 && rating <= 1;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,7 +73,7 @@ export default function RateForm({
       }, 700);
       return;
     }
-    const res = await submitRating({ token, stars: rating, comment });
+    const res = await submitRating({ token, stars: rating, comment, photoUrls });
     setSubmitting(false);
     if (res.success) setSubmitted(true);
   }
@@ -168,6 +178,26 @@ export default function RateForm({
                 placeholder="Anything that stood out, good or bad…"
               />
             </Field>
+
+            {/* Photo attachments — only surfaced once a rating is picked. Reuses
+                the shared PhotoUploadField (Cloudinary via uploadIntakePhoto);
+                URLs are re-validated + persisted as ReviewPhoto rows on submit. */}
+            {rating > 0 && (
+              <Field
+                label={
+                  isPoor
+                    ? "Add photos so we can make it right (optional)"
+                    : "Add photos of the work (optional)"
+                }>
+                <PhotoUploadField
+                  value={photoUrls}
+                  onChange={setPhotoUrls}
+                  max={MAX_REVIEW_PHOTOS}
+                  label=""
+                  hint={`JPG, PNG, HEIC or WebP · up to ${MAX_REVIEW_PHOTOS} photos.`}
+                />
+              </Field>
+            )}
 
             <Button
               type="submit"

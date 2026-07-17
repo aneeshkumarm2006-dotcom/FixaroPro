@@ -4,6 +4,10 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import type { AvailabilityDay } from "@prisma/client";
+import {
+  businessDateKey,
+  dateKeyToStoredDate,
+} from "@/lib/availability-exceptions";
 import type {
   AvailabilityResult,
   CheckAvailabilityInput,
@@ -48,10 +52,37 @@ export async function checkAvailability(
       return { success: false, error: "Not authenticated" };
     }
 
+    if (!input?.employeeId || typeof input.employeeId !== "string") {
+      return { success: false, error: "Invalid provider" };
+    }
+
+    // Availability is schedule data: a Pro may only check themselves; admins/
+    // owners may check anyone. Mirrors getAvailability's guard. Fails closed.
+    const role = (session.user as { role?: string }).role;
+    const isAdmin = role === "OWNER" || role === "ADMIN";
+    if (!isAdmin && input.employeeId !== session.user.id) {
+      return { success: false, error: "Not authorized" };
+    }
+
     const start = new Date(input.startISO);
     const end = input.endISO ? new Date(input.endISO) : start;
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return { success: false, error: "Invalid date" };
+    }
+
+    // One-off blocked date (time off) wins over the weekly rule — and even over
+    // NO_DATA — so it is checked before the recurring slots below.
+    const storedDate = dateKeyToStoredDate(businessDateKey(start));
+    if (storedDate) {
+      const blockedDate = await db.availabilityException.findUnique({
+        where: {
+          employeeId_date: { employeeId: input.employeeId, date: storedDate },
+        },
+        select: { id: true },
+      });
+      if (blockedDate) {
+        return { success: true, result: "UNAVAILABLE" };
+      }
     }
 
     const allSlots = await db.employeeAvailability.findMany({

@@ -9,6 +9,10 @@ import { sendAdminClockedOut } from "@/lib/email";
 import { ensureRatingRequest } from "@/lib/rating";
 import { getBillingConfig, computeChargeAmount } from "@/lib/billing";
 import { logAudit } from "@/lib/audit";
+import {
+  recordInventoryChanges,
+  type InventoryChangeRow,
+} from "@/lib/inventory-change";
 
 const ML_PER_SPRAY = 1.25;
 const MAX_COMPLETION_NOTES = 4000;
@@ -216,6 +220,10 @@ export async function clockOut(
     const ops: Prisma.PrismaPromise<unknown>[] = [];
     let suppliesCost = 0;
     const restockNeeded: RestockItem[] = [];
+    // Collected here, written to the audit log AFTER the transaction commits so
+    // logging can never roll back a clock-out.
+    const kitUsageAudit: InventoryChangeRow[] = [];
+    const actorName = (session.user as { name?: string }).name ?? null;
 
     for (const [productId, used] of deductions.entries()) {
       const ep = epByProductId.get(productId);
@@ -225,6 +233,20 @@ export async function clockOut(
       const inventoryAfter = Math.max(0, inventoryBefore - used);
       const actualUsed = inventoryBefore - inventoryAfter;
       suppliesCost += actualUsed * ep.product.costPerUnit;
+
+      if (actualUsed > 0) {
+        kitUsageAudit.push({
+          productId,
+          employeeId: session.user.id,
+          employeeName: actorName,
+          quantityChange: -actualUsed,
+          newQuantity: inventoryAfter,
+          unit: ep.product.unit,
+          reason: `Used on job #${job.jobNumber}`,
+          changedById: session.user.id,
+          changedByName: actorName,
+        });
+      }
 
       // Upsert per-job usage record (merge if a partial pre-existed).
       const existingUsage = job.productUsage.find((pu) => pu.productId === productId);
@@ -391,6 +413,11 @@ export async function clockOut(
     }
 
     await db.$transaction(ops);
+
+    // Best-effort stock-history audit for kit items consumed on the job. The
+    // deductions above already committed; a logging failure must not block the
+    // clock-out.
+    await recordInventoryChanges(kitUsageAudit);
 
     // SOP §8: "Audit job status changes." The JobLog entry above is the job
     // timeline; this is the central, cross-entity audit trail (§9) that the

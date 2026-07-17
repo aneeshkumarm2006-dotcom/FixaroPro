@@ -6,6 +6,10 @@ import {
   getEquipmentReadinessByService,
   getEquipmentReadinessMode,
 } from "@/lib/equipment-readiness";
+import {
+  businessDateKey,
+  dateKeyFromStoredDate,
+} from "@/lib/availability-exceptions";
 import AvailableJobsClient from "./AvailableJobsClient";
 
 export default async function AvailableJobsPage() {
@@ -39,6 +43,27 @@ export default async function AvailableJobsPage() {
   // Filter to only jobs that still need cleaners
   const openJobs = jobs.filter((j) => j.cleaners.length < j.requiredCleaners);
 
+  // Hide jobs that land on a day this provider has blocked off (time off) so the
+  // board never shows a card they can't claim. `claimJob` re-checks this
+  // server-side — this filter is only to keep the board honest, never the gate.
+  const blockedRows = await db.availabilityException.findMany({
+    where: {
+      employeeId: session.user.id,
+      // Wide lower bound so today's midnight-UTC row is always included
+      // regardless of server timezone; equality on the business date key below
+      // is what actually decides a match.
+      date: { gte: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) },
+    },
+    select: { date: true },
+  });
+  const blockedKeys = new Set(
+    blockedRows.map((r) => dateKeyFromStoredDate(r.date))
+  );
+  const claimableJobs =
+    blockedKeys.size === 0
+      ? openJobs
+      : openJobs.filter((j) => !blockedKeys.has(businessDateKey(j.startTime)));
+
   // Required equipment per job type (SOP §8.4: providers must see the kit
   // before claiming). Resolved server-side via the admin-overridable checklist
   // (equipment-server), deduped by type so we hit the DB once per type.
@@ -46,7 +71,7 @@ export default async function AvailableJobsPage() {
   // Per D0.9.2 this STATIC list stays visible pre-claim regardless of readiness
   // — "sees required equipment before booking" is about knowing what the job
   // needs, not about what this particular provider is short of.
-  const uniqueTypes = [...new Set(openJobs.map((j) => j.jobType ?? "*"))];
+  const uniqueTypes = [...new Set(claimableJobs.map((j) => j.jobType ?? "*"))];
   const equipmentEntries = await Promise.all(
     uniqueTypes.map(async (t) => [t, await getRequiredEquipmentFor(t === "*" ? null : t)] as const)
   );
@@ -63,7 +88,7 @@ export default async function AvailableJobsPage() {
       ? new Map<string, { missing: string[] }>()
       : await getEquipmentReadinessByService(uniqueTypes, session.user.id);
 
-  const serialized = openJobs.map((j) => {
+  const serialized = claimableJobs.map((j) => {
     const readiness = readinessByType.get(j.jobType ?? "*");
     return {
       id: j.id,

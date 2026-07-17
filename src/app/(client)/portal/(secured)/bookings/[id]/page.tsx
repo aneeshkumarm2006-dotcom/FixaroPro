@@ -167,7 +167,7 @@ export default async function BookingDetailPage({
                 }`}
               />
               <DetailRow
-                dt="Cleaners"
+                dt="Your Pro"
                 dd={
                   job.cleaners.length
                     ? job.cleaners.map((c) => c.name).join(", ")
@@ -397,7 +397,7 @@ export default async function BookingDetailPage({
                 lineHeight: 1.55,
               }}>
               Email <a className="cl-link">contact@fixaropro.com</a> or text us at{" "}
-              <a className="cl-link">(514) 555-CLEAN</a>.
+              <a className="cl-link">(514) 555-FIXIT</a>.
             </p>
           </section>
         </div>

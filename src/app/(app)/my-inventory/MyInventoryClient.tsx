@@ -300,7 +300,7 @@ export default function MyInventoryClient({
               value={damageReason}
               onChange={(e) => setDamageReason(e.target.value)}
               rows={3}
-              placeholder="e.g. spray nozzle broke during job #2438"
+              placeholder="e.g. drill bit broke during job #2438"
               style={{
                 marginTop: 4,
                 width: "100%",

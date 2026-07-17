@@ -109,7 +109,7 @@ export default function RequestsPageClient({ jobs }: { jobs: JobRow[] }) {
     const num = jobs.find((j) => j.id === jobId)?.jobNumber ?? "";
     if (decision === "deny") return { title: "Deny request", body: `Keep Job #${num} as scheduled and let the customer know their request was declined.` };
     if (kind === "cancellation") return { title: "Approve cancellation", body: `Cancel Job #${num}. The slot will be freed and the customer notified.` };
-    return { title: "Approve reschedule", body: `Approve the reschedule for Job #${num}. The cleaners and customer will be notified.` };
+    return { title: "Approve reschedule", body: `Approve the reschedule for Job #${num}. The Pros and customer will be notified.` };
   })();
   const confirmCls = pending?.decision === "deny" ? "btn-secondary req-deny" : pending?.kind === "cancellation" ? "req-approve-cancel" : "req-approve-resched";
 

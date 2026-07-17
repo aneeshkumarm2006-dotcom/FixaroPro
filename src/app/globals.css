@@ -4843,3 +4843,253 @@ a.q-v:hover { color: var(--accent); }
 .cr-success-meta span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary-50); font-weight: 700; margin-bottom: 4px; }
 
 .cr-footer { text-align: center; margin-top: 28px; font-size: 12.5px; color: var(--primary-50); }
+
+/* ============================================================
+   Recurring series page (/recurring) + shared detail grid
+   These classes were referenced in JSX ported from the original
+   app but never had matching CSS in Fixaro (labels collapsed,
+   text rendered unstyled). Styled to the Fixaro design system.
+   td-grid / td-seclabel / ed-grid are shared with training-docs
+   and properties detail views.
+   ============================================================ */
+.td-grid { display: grid; grid-template-columns: 1fr; gap: 22px; align-items: start; }
+@media (min-width: 900px) { .td-grid { grid-template-columns: 1.6fr 1fr; } }
+.td-seclabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary-50); margin-bottom: 12px; }
+
+.rr-summary-meta { display: flex; gap: 28px; flex-wrap: wrap; }
+.rr-summary-meta > div { display: flex; flex-direction: column; gap: 3px; }
+.rr-summary-meta span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--primary-50); }
+.rr-summary-meta strong { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.rr-list { display: flex; flex-direction: column; gap: 10px; }
+.rr-occ { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid var(--primary-10); border-radius: 14px; background: #fff; }
+.rr-occ.done { background: var(--primary-5); }
+.rr-occ.generated { border-style: dashed; }
+.rr-occ-date { flex-shrink: 0; width: 96px; }
+.rr-occ-d { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.rr-occ-t { font-size: 12px; color: var(--primary-50); margin-top: 1px; }
+
+.rr-moved, .rr-gen, .rr-firstclean { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.rr-moved { background: rgba(232,93,4,0.10); color: #c2410c; }
+.rr-gen { background: var(--primary-10); color: var(--primary-60); }
+.rr-firstclean { background: var(--primary-10); color: var(--primary-60); }
+.rr-foot-note { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--primary-50); margin-top: 14px; }
+
+.rr-note { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--primary-5); font-size: 12.5px; line-height: 1.55; color: var(--primary-70); }
+.rr-note strong { color: var(--ink); }
+
+.ed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rr-scope { display: flex; flex-direction: column; gap: 10px; }
+.rr-scope-opt { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px; border: 1px solid var(--primary-15); border-radius: 12px; background: #fff; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.rr-scope-opt:hover { border-color: var(--primary-30); }
+.rr-scope-opt.on { border-color: var(--primary); background: var(--primary-5); }
+.rr-radio { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--primary-30); position: relative; }
+.rr-scope-opt.on .rr-radio { border-color: var(--primary); }
+.rr-scope-opt.on .rr-radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--primary); }
+.rr-scope-title { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.rr-scope-sub { display: block; font-size: 12.5px; color: var(--primary-60); margin-top: 2px; }
+.rr-impact { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border-radius: 10px; font-size: 12.5px; background: var(--primary-5); color: var(--primary-70); }
+.rr-impact.series { background: rgba(232,93,4,0.08); color: #c2410c; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CRM / Contacts / Reports — previously-undefined classes
+   Added to give existing JSX its intended styling. Append-only.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 1. Lead-score meter (contacts list, contact detail, reports) ──────── */
+.score-meter { display: flex; align-items: center; gap: 8px; }
+.score-bar {
+  display: block; width: 100%; height: 6px;
+  border-radius: 999px; background: var(--primary-10);
+  overflow: hidden; position: relative;
+}
+.score-meter .score-bar { width: 72px; flex: 0 0 72px; }
+.score-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: var(--accent);
+  transition: width .35s cubic-bezier(.2,.7,.3,1);
+}
+.score-num {
+  font-size: 12px; font-weight: 600; color: var(--primary-70);
+  font-variant-numeric: tabular-nums; min-width: 20px; text-align: right;
+}
+
+/* 2. Saved-view chips + column popover (contacts list) ──────────────── */
+/* .cviews / .cviews-sep are the chip bar's parent/separator — also
+   undefined in the JSX, added here so the row lays out cleanly. */
+.cviews { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.cviews-sep { width: 1px; height: 20px; background: var(--primary-15); margin: 0 2px; flex: 0 0 auto; }
+.cview-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--primary-15); background: #fff;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  color: var(--primary-70); cursor: pointer; white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.cview-chip:hover { background: var(--cream); color: var(--primary); border-color: var(--primary-20); }
+.cview-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.cview-count {
+  font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  background: var(--primary-10); color: var(--primary-70);
+  min-width: 18px; text-align: center;
+}
+.cview-chip.active .cview-count { background: rgba(255,255,255,0.22); color: #fff; }
+.cview-add {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1px dashed var(--primary-20); background: transparent;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  color: var(--primary-60); cursor: pointer; white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.cview-add:hover { color: var(--accent); border-color: var(--accent); background: rgba(232,93,4,0.05); }
+
+.col-wrap { position: relative; }
+.col-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+  width: 220px; background: #fff; border-radius: 14px;
+  border: 1px solid var(--primary-10);
+  box-shadow: 0 20px 50px rgba(28,25,23,0.18);
+  padding: 8px; animation: act-pop-in .18s ease-out;
+}
+.col-pop-head {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--primary-60); font-weight: 700; padding: 8px 10px 6px;
+}
+.col-pop-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 0; background: transparent; border-radius: 9px;
+  font-size: 13.5px; font-family: inherit; color: var(--ink); font-weight: 500;
+  cursor: pointer; text-align: left; transition: background .12s;
+}
+.col-pop-item:hover { background: var(--primary-5); }
+.col-pop-item.locked { cursor: default; color: var(--primary-50); }
+.col-pop-item.locked:hover { background: transparent; }
+.col-pop-check {
+  width: 18px; height: 18px; flex: 0 0 auto; border-radius: 6px;
+  border: 1.5px solid var(--primary-20); background: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; transition: background .12s, border-color .12s;
+}
+.col-pop-check.on { background: var(--accent); border-color: var(--accent); }
+
+.dup-flag {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto;
+  background: rgba(217,119,6,0.12); color: var(--amber-700);
+}
+
+/* 3. Duplicate banner + CRM modal (contact detail, duplicates, properties) */
+.dup-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 14px;
+  background: var(--amber-50); border: 1px solid var(--amber-200);
+  margin-bottom: 20px;
+}
+.dup-icon { flex: 0 0 auto; color: var(--amber-600); display: inline-flex; align-items: center; }
+.dup-text { flex: 1; min-width: 0; }
+.dup-title { font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; }
+.dup-sub { font-size: 12.5px; color: var(--primary-60); margin-top: 2px; line-height: 1.5; }
+.dup-dismiss {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
+  border: 0; background: transparent; cursor: pointer; color: var(--primary-50);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.dup-dismiss:hover { background: var(--primary-10); color: var(--ink); }
+
+.crm-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(28,25,23,0.45); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: clmFade .2s ease-out;
+}
+.crm-modal {
+  background: #fff; border-radius: 16px;
+  width: 520px; max-width: calc(100vw - 48px); max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 70px rgba(28,25,23,0.30);
+  animation: clmIn .25s cubic-bezier(.2,.7,.3,1) both;
+}
+.crm-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 22px 24px 16px; border-bottom: 1px solid var(--primary-10); flex: 0 0 auto;
+}
+.crm-modal-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.crm-modal-sub { margin: 4px 0 0; font-size: 13px; color: var(--primary-60); line-height: 1.5; }
+.crm-modal-body { padding: 22px 24px; overflow-y: auto; flex: 1 1 auto; }
+.crm-modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px; border-top: 1px solid var(--primary-10); flex: 0 0 auto;
+}
+
+/* 4. Properties internal-name inset (property editor) ───────────────── */
+.ed-internal {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-radius: 12px;
+  background: var(--primary-5); border: 1px solid var(--primary-10);
+  font-size: 13px; color: var(--primary-70);
+}
+.ed-internal > span:first-child {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 5. Tag chip (reports, contacts, duplicates) ──────────────────────── */
+.tagchip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  background: var(--primary-10); color: var(--primary-70);
+}
+
+/* 6. Misc — spinner + campaign budget meter ────────────────────────── */
+/* Reuses the existing @keyframes co-spin defined earlier in this file. */
+.cl-spin { animation: co-spin .8s linear infinite; }
+
+/* .sl-budget is a small budget-progress block; children (-row/-track/-fill)
+   are also undefined in the JSX, added here so it renders as one unit. */
+.sl-budget { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+.sl-budget-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12.5px; font-weight: 500; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.sl-budget-track { height: 6px; border-radius: 999px; background: var(--primary-10); overflow: hidden; }
+.sl-budget-fill { height: 100%; border-radius: 999px; background: var(--primary); transition: width .35s cubic-bezier(.2,.7,.3,1); }
+
+/* ============================================================
+   Duplicate-merge comparison grid (contacts/duplicates merge modal)
+   These classes were referenced but undefined; the merge modal body
+   rendered unstyled until now.
+   ============================================================ */
+.merge-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: var(--primary-60); }
+.merge-grid { border: 1px solid var(--primary-10); border-radius: 12px; overflow: hidden; }
+.merge-row { display: grid; align-items: stretch; border-bottom: 1px solid var(--primary-10); }
+.merge-row:last-child { border-bottom: 0; }
+.merge-corner { padding: 12px 14px; background: var(--primary-5); display: flex; align-items: flex-end; }
+.merge-corner-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary-50); }
+.merge-col-head { padding: 12px 14px; border-left: 1px solid var(--primary-10); }
+.dmember-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.dmember-sub { font-size: 12px; color: var(--primary-60); margin-top: 2px; }
+.dmember-badge { font-size: 11px; font-weight: 600; color: var(--primary-50); margin-top: 6px; }
+.merge-master-btn { margin-top: 8px; width: 100%; padding: 6px 10px; border: 1px solid var(--primary-20); border-radius: 8px; background: #fff; font-size: 12px; font-weight: 600; color: var(--primary-60); cursor: pointer; transition: all .15s; }
+.merge-master-btn:hover { border-color: var(--primary-40); color: var(--ink); }
+.merge-master-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.merge-flabel { padding: 12px 14px; background: var(--primary-5); font-size: 12px; font-weight: 600; color: var(--primary-70); display: flex; align-items: center; }
+.merge-flabel.conflict { color: #c2410c; }
+.merge-cell { padding: 8px 10px; border-left: 1px solid var(--primary-10); display: flex; }
+.merge-pick { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: 13px; color: var(--ink); text-align: left; cursor: pointer; transition: all .15s; }
+.merge-pick.static { cursor: default; }
+.merge-pick:not(.static):hover { background: var(--primary-5); }
+.merge-pick.chosen { background: var(--primary-5); border-color: var(--primary-20); }
+.merge-pick.conflict:not(.chosen) { background: rgba(232,93,4,0.05); }
+.merge-radio { flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--primary-30); position: relative; }
+.merge-pick.chosen .merge-radio { border-color: var(--primary); }
+.merge-pick.chosen .merge-radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--primary); }
+.merge-preview { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: rgba(5,150,105,0.06); border: 1px solid rgba(5,150,105,0.18); }
+.mp-icon { flex-shrink: 0; color: var(--emerald-600); display: flex; }
+.merge-preview-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--emerald-800); }
+.merge-preview-val { font-size: 13.5px; color: var(--ink); margin-top: 2px; }

@@ -9,6 +9,38 @@
 
 ---
 
+## ✅ Stage 10 — UI repair sweep + mock-page wiring (2026-07-18)
+
+Triggered by a broken `/recurring` screenshot. Full read-only sweep of every sidebar route across
+3 dimensions (orphaned CSS, cleaning terminology, mock-vs-real data), then fixes. `prisma validate`,
+`tsc --noEmit`, `next build` (77/77 pages), and `vitest` (91/91) all pass on the combined diff.
+
+- ✅ **Orphaned CSS (undefined classes → unstyled elements).** Root cause: JSX ported from Cleano
+  referencing classes never defined in Fixaro CSS. Fixed by adding definitions to `globals.css`:
+  `rr-*` + `td-grid/seclabel` + `ed-grid` (recurring); `score-*`, `cview-*`, `col-pop*`, `dup-*`,
+  `crm-modal*`, `tagchip`, `ed-internal`, `cl-spin`, `sl-budget*` (contacts, properties, reports);
+  `merge-*` + `dmember-*` (duplicate-merge modal). Only 2 pages were badly broken (recurring,
+  training-docs); the rest were secondary elements (score bars, chips, merge modal).
+- ✅ **Mock pages wired to real DB** (were hardcoded demo data, discarded interactions on reload):
+  - `activity` → real `ActivityLog` (existing model; admin-guarded; dead Retry button removed).
+  - `announcements` → **new** `Announcement`/`AnnouncementReaction`/`AnnouncementAck` models +
+    migration `20260718000000_announcements` (additive) + CRUD/react/ack server actions.
+  - `training-docs` → real `TrainingModule` + `Document` (reuses `updateTrainingProgress`; quiz/sign
+    flows link to real routes).
+  - `recurring` → **CSS-only** per client decision (still demo data; a real recurrence engine is a
+    separate feature — Jobs have no series/recurrence model today).
+- ✅ **Handyman terminology rebrand** — customer/provider-facing "cleaner"/"clean" → "Pro"/handyman
+  across portal, booking waitlist, rate email, jobs/new, requests, web-bookings, clock-out. Internal
+  `cleaners` relation/vars untouched. (join-waitlist option *values* changed too — old `Waitlist` rows
+  keep legacy `serviceType` strings; eyeball any admin view grouping by serviceType.)
+
+### ⚠️ Pending on prod after this stage
+- `npx prisma migrate deploy` for `20260718000000_announcements` (new tables — the announcements page
+  errors at runtime until applied).
+- Booking page confirmed present (`/book` + `/quote`); **no public landing** — `/` → `/sign-in`.
+
+---
+
 ## ✅ Stage 9 — QA, security & documentation (2026-07-14) — build is code-complete
 
 The §12 Developer QA Checklist was run against the whole build (Stages 1–8 in code). Full report:

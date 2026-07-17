@@ -1,63 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Check,
   CheckCircle2,
   Star,
   FileText,
-  Download,
   Lock,
   Play,
+  ExternalLink,
 } from "lucide-react";
 import { initials } from "@/lib/avatar";
+import { updateTrainingProgress } from "@/app/(app)/actions/updateTrainingProgress";
 
-interface Video {
+type TrainingStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
+type SignatureStatus = "SIGNED" | "PENDING" | "REVOKED" | "NONE";
+
+interface ModuleItem {
   id: string;
   title: string;
-  duration: string;
+  description: string | null;
+  duration: number | null;
+  isRequired: boolean;
+  hasQuiz: boolean;
+  status: TrainingStatus;
+  videoProgress: number;
+  quizScore: number | null;
 }
-interface Doc {
+interface DocItem {
   id: string;
   title: string;
-  kind: string;
-  pages: number;
+  description: string | null;
+  version: string;
+  status: SignatureStatus;
+  signedAt: string | null;
 }
-interface LogEntry {
+interface ActivityItem {
+  id: string;
   who: string;
-  docId: string;
-  action: "unlocked" | "viewed" | "downloaded";
-  minsAgo: number;
+  title: string;
+  action: "signed" | "completed";
+  at: string;
 }
 
-const VIDEOS: Video[] = [
-  { id: "V-1", title: "Welcome & professional standards", duration: "8:24" },
-  { id: "V-2", title: "Equipment & approved products", duration: "12:10" },
-  { id: "V-3", title: "Health, safety & WHMIS basics", duration: "9:46" },
-];
+interface Props {
+  modules: ModuleItem[];
+  documents: DocItem[];
+  activity: ActivityItem[];
+}
 
-const DOCS: Doc[] = [
-  { id: "D-1", title: "Employee handbook", kind: "PDF", pages: 24 },
-  { id: "D-2", title: "Service checklists (all clean types)", kind: "PDF", pages: 11 },
-  { id: "D-3", title: "Safety data sheets (SDS) binder", kind: "PDF", pages: 38 },
-  { id: "D-4", title: "Code of conduct & confidentiality", kind: "PDF", pages: 6 },
-];
-
-const LOG: LogEntry[] = [
-  { who: "Aïcha Diallo", docId: "D-1", action: "unlocked", minsAgo: 40 },
-  { who: "Aïcha Diallo", docId: "D-1", action: "viewed", minsAgo: 38 },
-  { who: "Diego Ramírez", docId: "D-2", action: "viewed", minsAgo: 190 },
-  { who: "Camille Bouchard", docId: "D-3", action: "downloaded", minsAgo: 1440 },
-  { who: "Sophie Lavoie", docId: "D-1", action: "unlocked", minsAgo: 2880 },
-];
-
-const ACTION_TINT: Record<LogEntry["action"], { bg: string; fg: string }> = {
-  unlocked: { bg: "var(--emerald-50)", fg: "var(--emerald-600)" },
-  viewed: { bg: "var(--blue-100)", fg: "var(--blue-800)" },
-  downloaded: { bg: "var(--amber-50)", fg: "var(--amber-800)" },
+const ACTION_TINT: Record<ActivityItem["action"], { bg: string; fg: string; label: string }> = {
+  signed: { bg: "var(--emerald-100)", fg: "var(--emerald-800)", label: "signed" },
+  completed: { bg: "var(--blue-100)", fg: "var(--blue-800)", label: "completed" },
 };
 
-function formatAgo(mins: number) {
+function formatAgo(iso: string) {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;
   if (mins < 1440) {
     const h = Math.round(mins / 60);
@@ -65,6 +66,11 @@ function formatAgo(mins: number) {
   }
   const d = Math.round(mins / 1440);
   return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+function formatDuration(mins: number | null) {
+  if (mins == null || mins <= 0) return "Video";
+  return `${mins} min`;
 }
 
 function Avatar({ name, size }: { name: string; size: number }) {
@@ -83,36 +89,82 @@ function Avatar({ name, size }: { name: string; size: number }) {
   );
 }
 
-export default function TrainingDocsClient() {
-  const [watched, setWatched] = useState<Record<string, boolean>>({});
-  const [passed, setPassed] = useState(false);
-  const [admin, setAdmin] = useState(false);
+const isWatched = (m: ModuleItem) => m.videoProgress >= 0.9 || m.status === "COMPLETED";
+const isModuleComplete = (m: ModuleItem) => m.status === "COMPLETED";
 
-  const watchedCount = VIDEOS.filter((v) => watched[v.id]).length;
-  const videosDone = watchedCount === VIDEOS.length;
-  const quizActuallyAvailable = videosDone && !passed;
-  const unlocked = passed;
+export default function TrainingDocsClient({ modules, documents, activity }: Props) {
+  const router = useRouter();
+  const [showLog, setShowLog] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Onboarding gate is derived from REAL progress. Required modules define the
+  // gate; if nothing is marked required, fall back to all active modules.
+  const requiredModules = modules.filter((m) => m.isRequired);
+  const gateModules = requiredModules.length ? requiredModules : modules;
+
+  const watchedCount = gateModules.filter(isWatched).length;
+  const completedCount = gateModules.filter(isModuleComplete).length;
+  const videosDone = gateModules.length > 0 && watchedCount === gateModules.length;
+  // Vacuously unlocked when there is nothing to gate (empty DB).
+  const unlocked =
+    gateModules.length === 0 || completedCount === gateModules.length;
+
+  const signedCount = documents.filter((d) => d.status === "SIGNED").length;
 
   const steps = [
     {
       label: "Watch videos",
-      sub: `${watchedCount} / ${VIDEOS.length} complete`,
+      sub:
+        gateModules.length === 0
+          ? "No videos assigned"
+          : `${watchedCount} / ${gateModules.length} complete`,
       done: videosDone,
-      active: !videosDone,
+      active: gateModules.length > 0 && !videosDone,
     },
     {
       label: "Pass the quiz",
-      sub: unlocked ? "Passed · 92%" : videosDone ? "Ready to take" : "Locked",
-      done: unlocked,
+      sub: unlocked
+        ? "All required modules passed"
+        : videosDone
+        ? "Ready to take"
+        : "Locked",
+      done: unlocked && gateModules.length > 0,
       active: videosDone && !unlocked,
     },
     {
       label: "Documents unlocked",
-      sub: unlocked ? `${DOCS.length} documents available` : "Locked",
+      sub: unlocked
+        ? documents.length === 0
+          ? "No documents yet"
+          : `${signedCount}/${documents.length} signed`
+        : "Locked",
       done: unlocked,
       active: false,
     },
   ];
+
+  async function markWatched(m: ModuleItem) {
+    if (pendingId) return;
+    setPendingId(m.id);
+    setError(null);
+    // Reuse the SAME progress mechanism as /training (updateTrainingProgress).
+    // A full watch sets videoProgress to 1; modules without a quiz complete
+    // immediately, modules with a quiz move to IN_PROGRESS pending the quiz.
+    const res = await updateTrainingProgress({
+      moduleId: m.id,
+      videoProgress: 1,
+      markComplete: !m.hasQuiz,
+    });
+    setPendingId(null);
+    if (!res.success) {
+      setError(res.error || "Could not update progress. Please try again.");
+      return;
+    }
+    // Re-fetch the server component so derived gate/state reflect the DB.
+    startTransition(() => router.refresh());
+  }
 
   return (
     <div className="admin-font">
@@ -126,13 +178,21 @@ export default function TrainingDocsClient() {
           </h1>
         </div>
         <button
-          className={`td-viewtoggle ${admin ? "on" : ""}`}
-          onClick={() => setAdmin((a) => !a)}>
-          {admin ? "Viewing as admin" : "View as admin"}
+          className={`td-viewtoggle ${showLog ? "on" : ""}`}
+          onClick={() => setShowLog((s) => !s)}>
+          {showLog ? "Hide activity log" : "Show activity log"}
         </button>
       </header>
 
-      {/* Unlock-gate stepper */}
+      {error ? (
+        <div
+          className="td-error"
+          role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      {/* Unlock-gate stepper — read-only summary derived from real progress */}
       <div className="td-stepper">
         {steps.map((s, i) => (
           <div key={i} style={{ display: "contents" }}>
@@ -154,77 +214,126 @@ export default function TrainingDocsClient() {
         {/* Left: videos + quiz */}
         <div className="td-col">
           <div className="td-seclabel">Required videos</div>
-          <div className="td-cards">
-            {VIDEOS.map((v) => {
-              const done = !!watched[v.id];
-              return (
-                <div className={`td-video ${done ? "done" : ""}`} key={v.id}>
-                  <span className="td-video-thumb">
-                    {done ? <Check size={16} /> : <Play size={14} fill="currentColor" />}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="td-video-title">{v.title}</div>
-                    <div className="td-video-meta">
-                      {v.duration} · {done ? "Watched" : "Not watched"}
-                    </div>
-                  </div>
-                  {done ? (
-                    <span className="td-check">
-                      <CheckCircle2 size={18} />
+          {modules.length === 0 ? (
+            <div className="td-empty">
+              No training modules have been published yet.
+            </div>
+          ) : (
+            <div className="td-cards">
+              {modules.map((m) => {
+                const done = isWatched(m);
+                const busy = pendingId === m.id;
+                return (
+                  <div className={`td-video ${done ? "done" : ""}`} key={m.id}>
+                    <span className="td-video-thumb">
+                      {done ? <Check size={16} /> : <Play size={14} fill="currentColor" />}
                     </span>
-                  ) : (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setWatched((w) => ({ ...w, [v.id]: true }))}>
-                      Mark watched
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="td-video-title">
+                        {m.title}
+                        {m.isRequired ? <span className="td-req">Required</span> : null}
+                      </div>
+                      <div className="td-video-meta">
+                        {formatDuration(m.duration)} ·{" "}
+                        {m.status === "COMPLETED"
+                          ? "Completed"
+                          : done
+                          ? m.hasQuiz
+                            ? "Watched · quiz pending"
+                            : "Watched"
+                          : "Not watched"}
+                      </div>
+                    </div>
+                    {m.status === "COMPLETED" ? (
+                      <span className="td-check" title="Completed">
+                        <CheckCircle2 size={18} />
+                      </span>
+                    ) : done ? (
+                      <Link href={`/training/${m.id}`} className="btn btn-secondary btn-sm">
+                        Open
+                      </Link>
+                    ) : (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={busy || !!pendingId}
+                        onClick={() => markWatched(m)}>
+                        {busy ? "Saving…" : "Mark watched"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="td-seclabel" style={{ marginTop: 22 }}>
             Knowledge quiz
           </div>
-          <div
-            className={`td-quiz ${
-              unlocked ? "passed" : quizActuallyAvailable ? "ready" : "locked"
-            }`}>
-            <span className="td-quiz-icon">
-              {unlocked ? (
-                <CheckCircle2 size={20} />
-              ) : quizActuallyAvailable ? (
-                <Star size={20} />
-              ) : (
-                <Lock size={18} />
-              )}
-            </span>
-            <div style={{ flex: 1 }}>
-              <div className="td-quiz-title">
-                {unlocked
-                  ? "Quiz passed — 92%"
-                  : quizActuallyAvailable
-                  ? "Quiz ready"
-                  : "Quiz locked"}
+          {(() => {
+            const quizModules = modules.filter((m) => m.hasQuiz);
+            if (quizModules.length === 0) {
+              return (
+                <div className="td-quiz locked">
+                  <span className="td-quiz-icon">
+                    <Lock size={18} />
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div className="td-quiz-title">No quizzes</div>
+                    <div className="td-quiz-sub">
+                      None of the current modules include a knowledge quiz.
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            const allQuizPassed = quizModules.every((m) => m.status === "COMPLETED");
+            const anyReady = quizModules.some(
+              (m) => isWatched(m) && m.status !== "COMPLETED"
+            );
+            const state = allQuizPassed ? "passed" : anyReady ? "ready" : "locked";
+            const nextModule =
+              quizModules.find((m) => isWatched(m) && m.status !== "COMPLETED") ??
+              quizModules.find((m) => m.status !== "COMPLETED");
+            return (
+              <div className={`td-quiz ${state}`}>
+                <span className="td-quiz-icon">
+                  {state === "passed" ? (
+                    <CheckCircle2 size={20} />
+                  ) : state === "ready" ? (
+                    <Star size={20} />
+                  ) : (
+                    <Lock size={18} />
+                  )}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div className="td-quiz-title">
+                    {state === "passed"
+                      ? "All quizzes passed"
+                      : state === "ready"
+                      ? "Quiz ready"
+                      : "Quiz locked"}
+                  </div>
+                  <div className="td-quiz-sub">
+                    {state === "passed"
+                      ? "Every module quiz has been completed."
+                      : state === "ready"
+                      ? "Watch a module, then take its quiz to finish."
+                      : "Watch the required videos to unlock the quiz."}
+                  </div>
+                </div>
+                {state === "ready" && nextModule ? (
+                  <Link
+                    href={`/training/${nextModule.id}`}
+                    className="btn btn-primary btn-sm">
+                    Take quiz
+                  </Link>
+                ) : null}
               </div>
-              <div className="td-quiz-sub">
-                {unlocked
-                  ? "Documents are now unlocked below."
-                  : quizActuallyAvailable
-                  ? "10 questions · 80% to pass"
-                  : "Watch all required videos to unlock the quiz."}
-              </div>
-            </div>
-            {quizActuallyAvailable ? (
-              <button className="btn btn-primary btn-sm" onClick={() => setPassed(true)}>
-                Start quiz
-              </button>
-            ) : null}
-          </div>
+            );
+          })()}
         </div>
 
-        {/* Right: documents (locked until gated) */}
+        {/* Right: documents (gated by real training completion) */}
         <div className="td-col">
           <div className="td-seclabel">
             Documents
@@ -241,57 +350,63 @@ export default function TrainingDocsClient() {
             </span>
           </div>
 
-          {!unlocked ? (
+          {documents.length === 0 ? (
+            <div className="td-empty">No documents have been published yet.</div>
+          ) : !unlocked ? (
             <div className="td-lockedcard">
               <span className="td-lockedcard-icon">
                 <Lock size={26} />
               </span>
-              <h3 className="td-lockedcard-title">{DOCS.length} documents are locked</h3>
+              <h3 className="td-lockedcard-title">
+                {documents.length} document{documents.length === 1 ? "" : "s"} locked
+              </h3>
               <p className="td-lockedcard-sub">
                 Complete the required videos and pass the quiz to unlock the document
-                library. Content is withheld until the gate is cleared.
+                library. Titles are listed, but content stays withheld until the gate is
+                cleared.
               </p>
               <div className="td-lockedcard-prog">
                 <div className="td-lockedcard-progrow">
                   <span>Videos watched</span>
                   <strong>
-                    {watchedCount}/{VIDEOS.length}
+                    {watchedCount}/{gateModules.length}
                   </strong>
                 </div>
-                <div className="score-bar" style={{ maxWidth: "100%", height: 7 }}>
+                <div className="score-bar">
                   <span
                     className="score-fill"
-                    style={{ width: `${(watchedCount / VIDEOS.length) * 100}%` }}
+                    style={{
+                      width: `${
+                        gateModules.length
+                          ? (watchedCount / gateModules.length) * 100
+                          : 0
+                      }%`,
+                    }}
                   />
                 </div>
                 <div className="td-lockedcard-progrow" style={{ marginTop: 12 }}>
-                  <span>Quiz</span>
+                  <span>Modules completed</span>
                   <strong
                     style={{
-                      color: quizActuallyAvailable
-                        ? "var(--amber-700)"
-                        : "var(--primary-50)",
+                      color: videosDone ? "var(--amber-700)" : "var(--primary-50)",
                     }}>
-                    {quizActuallyAvailable ? "Ready" : "Locked"}
+                    {completedCount}/{gateModules.length}
                   </strong>
                 </div>
               </div>
-              {/* Locked document names are shown, but never their content */}
               <div className="td-lockedlist">
-                {DOCS.map((d) => (
+                {documents.map((d) => (
                   <div className="td-lockedlist-item" key={d.id}>
                     <Lock size={13} />
                     <span>{d.title}</span>
-                    <span className="td-lockedlist-meta">
-                      {d.kind} · {d.pages}p
-                    </span>
+                    <span className="td-lockedlist-meta">v{d.version}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
             <div className="td-cards">
-              {DOCS.map((d) => (
+              {documents.map((d) => (
                 <div className="td-doc" key={d.id}>
                   <span className="td-doc-icon">
                     <FileText size={17} />
@@ -299,18 +414,22 @@ export default function TrainingDocsClient() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="td-doc-title">{d.title}</div>
                     <div className="td-doc-meta">
-                      {d.kind} · {d.pages} pages
+                      v{d.version} ·{" "}
+                      {d.status === "SIGNED"
+                        ? "Signed"
+                        : d.status === "REVOKED"
+                        ? "Revoked"
+                        : d.status === "PENDING"
+                        ? "Awaiting your signature"
+                        : "Not assigned to you"}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-secondary btn-sm">View</button>
-                    <button
-                      className="icon-btn"
-                      style={{ width: 32, height: 32 }}
-                      title="Download">
-                      <Download size={14} />
-                    </button>
-                  </div>
+                  <Link
+                    href={`/documents/${d.id}`}
+                    className="btn btn-secondary btn-sm"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    View <ExternalLink size={13} />
+                  </Link>
                 </div>
               ))}
             </div>
@@ -318,11 +437,11 @@ export default function TrainingDocsClient() {
         </div>
       </div>
 
-      {/* Admin access log */}
-      {admin ? (
+      {/* Recent activity log — real signings + completions. Route is admin-gated. */}
+      {showLog ? (
         <div style={{ marginTop: 26 }}>
           <div className="td-seclabel">
-            Document access log{" "}
+            Recent activity{" "}
             <span
               style={{
                 color: "var(--primary-50)",
@@ -333,51 +452,425 @@ export default function TrainingDocsClient() {
               · admin only
             </span>
           </div>
-          <div className="atable-wrap">
-            <div className="atable-scroll">
-              <table className="atable">
-                <thead>
-                  <tr>
-                    <th>Person</th>
-                    <th>Document</th>
-                    <th>Action</th>
-                    <th>When</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {LOG.map((l, i) => {
-                    const doc = DOCS.find((d) => d.id === l.docId);
-                    const cfg = ACTION_TINT[l.action];
-                    return (
-                      <tr key={i} style={{ cursor: "default" }}>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <Avatar name={l.who} size={30} />
-                            <span style={{ fontWeight: 600, color: "var(--ink)" }}>
-                              {l.who}
+          {activity.length === 0 ? (
+            <div className="td-empty">No signings or completions recorded yet.</div>
+          ) : (
+            <div className="atable-wrap">
+              <div className="atable-scroll">
+                <table className="atable">
+                  <thead>
+                    <tr>
+                      <th>Person</th>
+                      <th>Item</th>
+                      <th>Action</th>
+                      <th>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activity.map((a) => {
+                      const cfg = ACTION_TINT[a.action];
+                      return (
+                        <tr key={a.id} style={{ cursor: "default" }}>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={a.who} size={30} />
+                              <span style={{ fontWeight: 600, color: "var(--ink)" }}>
+                                {a.who}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ color: "var(--ink-soft)" }}>{a.title}</td>
+                          <td>
+                            <span className="pill" style={{ background: cfg.bg, color: cfg.fg }}>
+                              {cfg.label}
                             </span>
-                          </div>
-                        </td>
-                        <td style={{ color: "var(--ink-soft)" }}>
-                          {doc ? doc.title : l.docId}
-                        </td>
-                        <td>
-                          <span className="pill" style={{ background: cfg.bg, color: cfg.fg }}>
-                            {l.action}
-                          </span>
-                        </td>
-                        <td style={{ color: "var(--primary-60)", fontSize: 12.5 }}>
-                          {formatAgo(l.minsAgo)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td style={{ color: "var(--primary-60)", fontSize: 12.5 }}>
+                            {formatAgo(a.at)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : null}
+
+      <style jsx>{`
+        /* td-grid and td-seclabel are defined globally in globals.css — reused, not
+           redefined here. Everything below fills the previously-undefined classes. */
+        .td-viewtoggle {
+          appearance: none;
+          border: 1px solid var(--primary-15);
+          background: var(--surface);
+          color: var(--primary-60);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 9px 16px;
+          border-radius: 999px;
+          cursor: pointer;
+          transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+        .td-viewtoggle:hover {
+          border-color: var(--primary-30);
+          color: var(--ink);
+        }
+        .td-viewtoggle.on {
+          background: var(--primary);
+          border-color: var(--primary);
+          color: #fff;
+        }
+
+        .td-error {
+          margin-bottom: 18px;
+          padding: 11px 15px;
+          border-radius: 12px;
+          background: var(--amber-50);
+          border: 1px solid var(--amber-200);
+          color: var(--amber-800);
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        /* Stepper */
+        .td-stepper {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex-wrap: wrap;
+          padding: 18px 20px;
+          margin-bottom: 22px;
+          border: 1px solid var(--primary-10);
+          border-radius: 18px;
+          background: var(--surface);
+        }
+        .td-step {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+        .td-step-dot {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          font-size: 13px;
+          font-weight: 700;
+          flex-shrink: 0;
+          background: var(--primary-10);
+          color: var(--primary-50);
+        }
+        .td-step.active .td-step-dot {
+          background: var(--amber-50);
+          color: var(--amber-700);
+          box-shadow: 0 0 0 3px var(--amber-50);
+        }
+        .td-step.done .td-step-dot {
+          background: var(--emerald-600);
+          color: #fff;
+        }
+        .td-step-label {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--ink);
+        }
+        .td-step-sub {
+          font-size: 12px;
+          color: var(--primary-50);
+          margin-top: 1px;
+        }
+        .td-step-bar {
+          flex: 1 1 24px;
+          min-width: 24px;
+          height: 2px;
+          background: var(--primary-15);
+          border-radius: 2px;
+        }
+        .td-step-bar.done {
+          background: var(--emerald-600);
+        }
+
+        .td-col {
+          min-width: 0;
+        }
+        .td-cards {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .td-empty {
+          padding: 22px;
+          border: 1px dashed var(--primary-15);
+          border-radius: 14px;
+          background: var(--surface);
+          color: var(--primary-50);
+          font-size: 13.5px;
+          text-align: center;
+        }
+
+        /* Video cards */
+        .td-video {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 13px 15px;
+          border: 1px solid var(--primary-10);
+          border-radius: 14px;
+          background: var(--surface);
+        }
+        .td-video.done {
+          border-color: var(--emerald-100);
+          background: color-mix(in srgb, var(--emerald-100) 32%, var(--surface));
+        }
+        .td-video-thumb {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          flex-shrink: 0;
+          background: var(--primary-10);
+          color: var(--primary-60);
+        }
+        .td-video.done .td-video-thumb {
+          background: var(--emerald-600);
+          color: #fff;
+        }
+        .td-video-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--ink);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .td-video-meta {
+          font-size: 12px;
+          color: var(--primary-50);
+          margin-top: 2px;
+        }
+        .td-req {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: var(--amber-50);
+          color: var(--amber-700);
+        }
+        .td-check {
+          color: var(--emerald-600);
+          display: inline-flex;
+          flex-shrink: 0;
+        }
+
+        /* Quiz card */
+        .td-quiz {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 15px 16px;
+          border-radius: 14px;
+          border: 1px solid var(--primary-10);
+          background: var(--surface);
+        }
+        .td-quiz.ready {
+          border-color: var(--amber-200);
+          background: var(--amber-50);
+        }
+        .td-quiz.passed {
+          border-color: var(--emerald-100);
+          background: color-mix(in srgb, var(--emerald-100) 32%, var(--surface));
+        }
+        .td-quiz-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 11px;
+          flex-shrink: 0;
+          background: var(--primary-10);
+          color: var(--primary-50);
+        }
+        .td-quiz.ready .td-quiz-icon {
+          background: #fff;
+          color: var(--amber-700);
+        }
+        .td-quiz.passed .td-quiz-icon {
+          background: var(--emerald-600);
+          color: #fff;
+        }
+        .td-quiz-title {
+          font-size: 14.5px;
+          font-weight: 600;
+          color: var(--ink);
+        }
+        .td-quiz-sub {
+          font-size: 12.5px;
+          color: var(--primary-50);
+          margin-top: 2px;
+        }
+
+        /* Documents */
+        .td-lockpill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          margin-left: 8px;
+          padding: 3px 9px;
+          border-radius: 999px;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-transform: none;
+          background: var(--primary-10);
+          color: var(--primary-50);
+          vertical-align: middle;
+        }
+        .td-lockpill.open {
+          background: var(--emerald-100);
+          color: var(--emerald-800);
+        }
+        .td-doc {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 13px 15px;
+          border: 1px solid var(--primary-10);
+          border-radius: 14px;
+          background: var(--surface);
+        }
+        .td-doc-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          flex-shrink: 0;
+          background: var(--primary-10);
+          color: var(--primary-60);
+        }
+        .td-doc-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--ink);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .td-doc-meta {
+          font-size: 12px;
+          color: var(--primary-50);
+          margin-top: 2px;
+        }
+
+        /* Locked document card */
+        .td-lockedcard {
+          border: 1px solid var(--primary-10);
+          border-radius: 18px;
+          background: var(--surface);
+          padding: 26px 22px;
+          text-align: center;
+        }
+        .td-lockedcard-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 58px;
+          height: 58px;
+          border-radius: 999px;
+          background: var(--primary-10);
+          color: var(--primary-50);
+          margin-bottom: 14px;
+        }
+        .td-lockedcard-title {
+          font-size: 17px;
+          font-weight: 600;
+          color: var(--ink);
+          margin: 0 0 6px;
+        }
+        .td-lockedcard-sub {
+          font-size: 13px;
+          line-height: 1.5;
+          color: var(--primary-50);
+          max-width: 340px;
+          margin: 0 auto 18px;
+        }
+        .td-lockedcard-prog {
+          text-align: left;
+          max-width: 340px;
+          margin: 0 auto 18px;
+        }
+        .td-lockedcard-progrow {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12.5px;
+          color: var(--primary-60);
+          margin-bottom: 7px;
+        }
+        .td-lockedcard-progrow strong {
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .td-lockedlist {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          text-align: left;
+          max-width: 340px;
+          margin: 0 auto;
+        }
+        .td-lockedlist-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 12px;
+          border-radius: 10px;
+          background: var(--primary-5);
+          color: var(--primary-60);
+          font-size: 13px;
+        }
+        .td-lockedlist-item > span:first-of-type {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .td-lockedlist-meta {
+          font-size: 11.5px;
+          color: var(--primary-50);
+          flex-shrink: 0;
+        }
+
+        /* Score bar (shared visual for the video-progress meter) */
+        .score-bar {
+          width: 100%;
+          height: 7px;
+          border-radius: 999px;
+          background: var(--primary-10);
+          overflow: hidden;
+        }
+        .score-fill {
+          display: block;
+          height: 100%;
+          border-radius: 999px;
+          background: var(--emerald-600);
+          transition: width 0.3s ease;
+        }
+      `}</style>
     </div>
   );
 }

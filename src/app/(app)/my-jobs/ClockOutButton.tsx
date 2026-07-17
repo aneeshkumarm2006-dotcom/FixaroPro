@@ -177,7 +177,7 @@ export default function ClockOutButton({ jobId, employeeProducts, autoOpen }: Cl
                     </span>
                     <div>
                       <h3>Liquid sprays</h3>
-                      <p>How much did you spray?</p>
+                      <p>How much did you use?</p>
                     </div>
                   </div>
                   {sprays.map((ep) => {

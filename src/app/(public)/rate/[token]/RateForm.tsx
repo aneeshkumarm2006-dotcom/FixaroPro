@@ -86,7 +86,7 @@ export default function RateForm({
     <SplitShell
       image={BRAND_IMAGES.rate}
       quoteHtml={"Your feedback<br/>shapes <em>every visit.</em>"}
-      quoteSub="It takes 30 seconds — and goes straight to your cleaner."
+      quoteSub="It takes 30 seconds — and goes straight to your Pro."
       badge="Rate your service">
       {submitted ? (
         <SubmittedState />
@@ -240,7 +240,7 @@ function SubmittedState() {
       <p
         className="cl-subtitle"
         style={{ maxWidth: 380, margin: "0 auto", fontSize: 15 }}>
-        We'll make sure your cleaner sees it. We'd love to have you back soon.
+        We'll make sure your Pro sees it. We'd love to have you back soon.
       </p>
     </div>
   );

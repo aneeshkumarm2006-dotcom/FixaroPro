@@ -398,7 +398,7 @@ export default async function JobFormPage({
         </SectionCard>
 
         {/* Team */}
-        <SectionCard title="Team" subtitle="Assign cleaners to this job">
+        <SectionCard title="Team" subtitle="Assign Pros to this job">
           <CleanerSelector
             users={usersForSelector}
             initialSelectedIds={selectedCleanerIds}

@@ -153,7 +153,7 @@ export default async function PortalHome() {
                     <DateBadge iso={j.startTime.toISOString()} />
                     <div className="cl-stack-4">
                       <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
-                        {j.jobType ?? "Cleaning"} · {formatTime(j.startTime.toISOString())}
+                        {j.jobType ?? "Service"} · {formatTime(j.startTime.toISOString())}
                         {j.isFlexible ? (
                           <span style={{ fontSize: 12, color: "var(--primary-50)", marginLeft: 8, fontWeight: 400 }}>
                             (flexible)
@@ -163,7 +163,7 @@ export default async function PortalHome() {
                       <div style={{ fontSize: 13, color: "var(--primary-60)" }}>
                         {j.cleaners.length
                           ? `with ${j.cleaners.map((c) => c.name).join(", ")}`
-                          : "Cleaner being assigned…"}
+                          : "Your Pro is being assigned…"}
                       </div>
                     </div>
                   </div>

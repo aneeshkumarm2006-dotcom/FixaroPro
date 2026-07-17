@@ -2124,3 +2124,60 @@ model CleanerStrike {
   @@index([status])
   @@index([createdAt])
 }
+
+// Who a team announcement is targeted at. Visibility is enforced server-side
+// (see announcements/page.tsx): ADMINS-only posts never reach providers.
+enum AnnouncementAudience {
+  ALL
+  PROVIDERS
+  ADMINS
+}
+
+// Internal "Team hub" announcements. authorId / userId reference User.id but are
+// intentionally kept as plain columns (no DB FK to User) so this feature is a
+// purely additive set of new tables — it touches no existing model or column.
+model Announcement {
+  id          String                 @id @default(cuid())
+  title       String
+  body        String
+  authorId    String
+  authorLabel String
+  audience    AnnouncementAudience   @default(ALL)
+  pinned      Boolean                @default(false)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  reactions   AnnouncementReaction[]
+  acks        AnnouncementAck[]
+
+  @@index([pinned, createdAt])
+  @@index([authorId])
+  @@index([audience])
+}
+
+// One row per (announcement, user, emoji). The unique constraint makes toggling
+// idempotent — a repeat reaction is a no-op / delete, never a duplicate.
+model AnnouncementReaction {
+  id             String       @id @default(cuid())
+  announcementId String
+  userId         String
+  emoji          String
+  createdAt      DateTime     @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId, emoji])
+  @@index([announcementId])
+  @@index([userId])
+}
+
+// One row per (announcement, user). Acknowledging twice is idempotent.
+model AnnouncementAck {
+  id             String       @id @default(cuid())
+  announcementId String
+  userId         String
+  createdAt      DateTime     @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([announcementId])
+  @@index([userId])
+}

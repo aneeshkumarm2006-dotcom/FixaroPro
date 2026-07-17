@@ -51,7 +51,7 @@ function SetupForm() {
       return;
     }
     if (!address.trim()) {
-      setError("Please enter your address so we know where to clean.");
+      setError("Please enter your address so we know where to send your Pro.");
       return;
     }
     if (password.length < 8) {
@@ -99,7 +99,7 @@ function SetupForm() {
   return (
     <SplitShell
       image={BRAND_IMAGES.setup}
-      quoteHtml={"You're <em>two minutes</em><br/>from a cleaner home."}
+      quoteHtml={"You're <em>two minutes</em><br/>from a home that works."}
       quoteSub="Set a password and we'll save your details for next time."
       topRightLabel="Already have an account? Sign in"
       topRightHref="/portal/login"

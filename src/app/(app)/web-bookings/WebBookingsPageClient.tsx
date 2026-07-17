@@ -90,12 +90,12 @@ export default function WebBookingsPageClient({ jobs }: { jobs: WebJob[] }) {
         <h1 className="display" style={{ fontSize: "clamp(32px, 4.2vw, 46px)", marginTop: 6 }}>
           Web <em>bookings.</em> <span style={{ color: "var(--primary-40)", fontWeight: 300, fontFamily: "var(--font-serif)" }}>· {counts.all}</span>
         </h1>
-        <p className="subtitle" style={{ marginTop: 10, fontSize: 15.5 }}>Jobs booked through the public booking funnel. Assign cleaners and handle change requests.</p>
+        <p className="subtitle" style={{ marginTop: 10, fontSize: 15.5 }}>Jobs booked through the public booking funnel. Assign Pros and handle change requests.</p>
       </header>
 
       <div className="astat-grid" style={{ marginBottom: 26 }}>
         <FilterStat icon={Globe} label="Total" value={counts.all} hint="from /book" active={filter === "all"} onClick={() => setFilter("all")} />
-        <FilterStat icon={UserPlus} label="Needs cleaner" value={counts.cleaner} hint="understaffed" amber={counts.cleaner > 0} active={filter === "cleaner"} onClick={() => setFilter("cleaner")} />
+        <FilterStat icon={UserPlus} label="Needs Pro" value={counts.cleaner} hint="understaffed" amber={counts.cleaner > 0} active={filter === "cleaner"} onClick={() => setFilter("cleaner")} />
         <FilterStat icon={Clock} label="Flexible time" value={counts.flexible} hint="time TBD" active={filter === "flexible"} onClick={() => setFilter("flexible")} />
         <FilterStat icon={AlertCircle} label="Needs attention" value={counts.attention} hint="action required" amber={counts.attention > 0} active={filter === "attention"} onClick={() => setFilter("attention")} />
       </div>

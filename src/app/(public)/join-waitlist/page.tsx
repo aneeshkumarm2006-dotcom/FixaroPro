@@ -6,10 +6,10 @@ import PremiumSelect from "@/components/ui/PremiumSelect";
 import DatePicker from "@/components/ui/DatePicker";
 
 const SERVICE_TYPES = [
-  { value: "standard", label: "Standard Clean" },
-  { value: "deep", label: "Deep Clean" },
-  { value: "move-in", label: "Move-In / Move-Out" },
-  { value: "office", label: "Office Clean" },
+  { value: "furniture-assembly", label: "Furniture assembly" },
+  { value: "tv-mounting", label: "TV mounting" },
+  { value: "repairs", label: "Repairs" },
+  { value: "handyman", label: "Handyman service" },
 ];
 
 const inputStyle: React.CSSProperties = {

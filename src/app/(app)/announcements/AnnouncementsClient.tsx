@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   MessageCircle,
   AlertCircle,
@@ -8,64 +9,50 @@ import {
   Plus,
   Check,
   Pin,
+  Trash2,
 } from "lucide-react";
 import { initials } from "@/lib/avatar";
 import AdminModal from "@/components/ui/AdminModal";
+import {
+  createAnnouncement,
+  togglePin as togglePinAction,
+  deleteAnnouncement as deleteAnnouncementAction,
+  toggleReaction as toggleReactionAction,
+  acknowledgeAnnouncement as acknowledgeAction,
+} from "./actions";
 
-interface Announcement {
+// Shape produced by page.tsx (server). Reaction counts are pre-aggregated and
+// `youReacted` / `youAcked` are computed for the current viewer server-side.
+export interface AnnouncementDTO {
   id: string;
-  pinned: boolean;
-  audience: string;
-  author: string;
-  hoursAgo: number;
-  unread: boolean;
   title: string;
   body: string;
+  authorLabel: string;
+  audience: string;
+  pinned: boolean;
+  createdAt: string; // ISO
   reactions: Record<string, number>;
+  youReacted: string[];
   acked: number;
   total: number;
-  youAcked?: boolean;
+  youAcked: boolean;
 }
 
+// Must mirror the AnnouncementAudience enum (ALL / PROVIDERS / ADMINS).
 const AUDIENCE = [
-  { id: "all", label: "All cleaners" },
-  { id: "leads", label: "Lead cleaners" },
-  { id: "trainees", label: "Trainees" },
-  { id: "office", label: "Office / dispatch" },
+  { id: "ALL", label: "Everyone" },
+  { id: "PROVIDERS", label: "Providers" },
+  { id: "ADMINS", label: "Admins only" },
 ];
 const audienceLabel = (id: string) =>
   (AUDIENCE.find((a) => a.id === id) || AUDIENCE[0]).label;
 
 const REACTION_SET = ["👍", "🎉", "❤️"];
 
-const INITIAL: Announcement[] = [
-  {
-    id: "AN-5", pinned: true, audience: "all", author: "Diane Moreau", hoursAgo: 5, unread: true,
-    title: "New supply pickup hours start Monday",
-    body: "The supply room is now open 7:00–9:30 AM on weekdays only. Please grab your supplies and refills before your first job. Weekend pickups move to the Friday window.",
-    reactions: { "👍": 6, "🎉": 2 }, acked: 4, total: 12,
-  },
-  {
-    id: "AN-4", pinned: false, audience: "leads", author: "Karim Benali", hoursAgo: 28, unread: true,
-    title: "Lead cleaners: new quality checklist",
-    body: "We added 4 items to the move-out checklist (baseboards, inside window tracks, range hood filter, balcony sweep). Please review before your next move-out clean.",
-    reactions: { "👍": 3 }, acked: 2, total: 4,
-  },
-  {
-    id: "AN-3", pinned: false, audience: "all", author: "Diane Moreau", hoursAgo: 72, unread: false,
-    title: "Welcome Noémie to the crew! 🎉",
-    body: "Noémie joins us as a lead cleaner this week. Say hi if you see her on a shared job — she is shadowing Camille through Friday.",
-    reactions: { "🎉": 9, "👍": 5, "❤️": 4 }, acked: 11, total: 12,
-  },
-  {
-    id: "AN-2", pinned: false, audience: "all", author: "Diane Moreau", hoursAgo: 140, unread: false,
-    title: "Reminder: confirm your tools before each job",
-    body: "Please run through the equipment checklist in the app before heading out — jobs like AC installation and paint repair need specific tools on hand. Flag any missing items so we can restock before your next booking.",
-    reactions: { "👍": 7 }, acked: 9, total: 12,
-  },
-];
-
-function formatAgo(h: number) {
+function formatAgo(iso: string) {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const h = Math.floor((Date.now() - then) / 3_600_000);
   if (h <= 0) return "Just now";
   if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24);
@@ -82,13 +69,7 @@ function Avatar({ name, size }: { name: string; size: number }) {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="field" style={{ marginBottom: 14 }}>
       <label className="label">{label}</label>
@@ -127,26 +108,40 @@ function ComposeModal({
   onPublish,
 }: {
   onClose: () => void;
-  onPublish: (a: { title: string; body: string; pinned: boolean; audience: string }) => void;
+  onPublish: (a: {
+    title: string;
+    body: string;
+    pinned: boolean;
+    audience: string;
+  }) => Promise<{ success: boolean; error?: string }>;
 }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [pinned, setPinned] = useState(false);
-  const [audience, setAudience] = useState("all");
+  const [audience, setAudience] = useState("ALL");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const valid = title.trim() && body.trim();
 
-  function publish() {
-    if (!valid) return;
-    onPublish({ title: title.trim(), body: body.trim(), pinned, audience });
-    onClose();
+  async function publish() {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const res = await onPublish({ title: title.trim(), body: body.trim(), pinned, audience });
+    setSubmitting(false);
+    if (res.success) {
+      onClose();
+    } else {
+      setError(res.error || "Failed to publish");
+    }
   }
 
   return (
     <AdminModal
       open
       title="New announcement"
-      subtitle="Posts to the team hub and notifies the chosen audience."
+      subtitle="Posts to the team hub for the chosen audience."
       onClose={onClose}
       width={540}
       footer={
@@ -158,37 +153,37 @@ function ComposeModal({
             <Pin size={13} /> Pin to top
           </label>
           <div style={{ flex: 1 }} />
-          <button className="btn btn-secondary btn-sm" onClick={onClose}>
+          <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={submitting}>
             Cancel
           </button>
-          <button className="btn btn-primary btn-sm" onClick={publish} disabled={!valid}>
-            Publish
+          <button className="btn btn-primary btn-sm" onClick={publish} disabled={!valid || submitting}>
+            {submitting ? "Publishing…" : "Publish"}
           </button>
         </>
       }>
+      {error ? <div className="an-error">{error}</div> : null}
       <Field label="Title">
         <input
           className="input aselect"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Holiday schedule changes"
+          maxLength={200}
           autoFocus
         />
       </Field>
       <Field label="Message">
         <textarea
-          className="textarea"
+          className="an-textarea"
           rows={5}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          maxLength={5000}
           placeholder="Write your announcement…"
         />
       </Field>
       <Field label="Audience">
-        <select
-          className="aselect"
-          value={audience}
-          onChange={(e) => setAudience(e.target.value)}>
+        <select className="aselect" value={audience} onChange={(e) => setAudience(e.target.value)}>
           {AUDIENCE.map((a) => (
             <option key={a.id} value={a.id}>
               {a.label}
@@ -202,43 +197,59 @@ function ComposeModal({
 
 function AnnouncementCard({
   a,
-  onMarkRead,
+  canManage,
+  busy,
   onTogglePin,
+  onDelete,
   onReact,
   onAck,
 }: {
-  a: Announcement;
-  onMarkRead: (id: string) => void;
+  a: AnnouncementDTO;
+  canManage: boolean;
+  busy: boolean;
   onTogglePin: (id: string) => void;
+  onDelete: (id: string) => void;
   onReact: (id: string, emoji: string) => void;
   onAck: (id: string) => void;
 }) {
+  const unread = !a.youAcked;
   return (
-    <article
-      className={`an-card ${a.pinned ? "pinned" : ""}`}
-      onMouseEnter={() => a.unread && onMarkRead(a.id)}>
+    <article className={`an-card ${a.pinned ? "pinned" : ""}`}>
       <div className="an-card-head">
-        <Avatar name={a.author} size={38} />
+        <Avatar name={a.authorLabel} size={38} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span className="an-author">{a.author}</span>
+            <span className="an-author">{a.authorLabel}</span>
             <span className="an-aud">{audienceLabel(a.audience)}</span>
-            {a.unread ? <span className="an-new">New</span> : null}
+            {unread ? <span className="an-new">New</span> : null}
           </div>
-          <div className="an-time">{formatAgo(a.hoursAgo)}</div>
+          <div className="an-time">{formatAgo(a.createdAt)}</div>
         </div>
         {a.pinned ? (
           <span className="an-pinned-badge">
             <Pin size={12} /> Pinned
           </span>
         ) : null}
-        <button
-          className="icon-btn"
-          style={{ width: 30, height: 30 }}
-          title={a.pinned ? "Unpin" : "Pin"}
-          onClick={() => onTogglePin(a.id)}>
-          <Pin size={13} />
-        </button>
+        {canManage ? (
+          <>
+            <button
+              className="icon-btn"
+              style={{ width: 30, height: 30 }}
+              title={a.pinned ? "Unpin" : "Pin"}
+              disabled={busy}
+              onClick={() => onTogglePin(a.id)}>
+              <Pin size={13} />
+            </button>
+            <button
+              className="icon-btn an-del"
+              style={{ width: 30, height: 30 }}
+              title="Delete"
+              disabled={busy}
+              onClick={() => onDelete(a.id)}>
+              <Trash2 size={13} />
+            </button>
+          </>
+        ) : null}
       </div>
 
       <h3 className="an-title">{a.title}</h3>
@@ -248,10 +259,12 @@ function AnnouncementCard({
         <div className="an-reactions">
           {REACTION_SET.map((e) => {
             const n = a.reactions[e] || 0;
+            const mine = a.youReacted.includes(e);
             return (
               <button
                 key={e}
-                className={`an-react ${n ? "has" : ""}`}
+                className={`an-react ${n ? "has" : ""} ${mine ? "mine" : ""}`}
+                disabled={busy}
                 onClick={() => onReact(a.id, e)}>
                 <span style={{ fontSize: 14 }}>{e}</span>
                 {n ? <span className="an-react-n">{n}</span> : null}
@@ -265,7 +278,7 @@ function AnnouncementCard({
           </span>
           <button
             className={`btn btn-sm ${a.youAcked ? "btn-secondary" : "btn-primary"}`}
-            disabled={a.youAcked}
+            disabled={a.youAcked || busy}
             onClick={() => onAck(a.id)}>
             {a.youAcked ? (
               <>
@@ -281,67 +294,55 @@ function AnnouncementCard({
   );
 }
 
-export default function AnnouncementsClient() {
-  const [anns, setAnns] = useState<Announcement[]>(INITIAL);
-  const [seq, setSeq] = useState(100);
+export default function AnnouncementsClient({
+  announcements,
+  canManage,
+}: {
+  announcements: AnnouncementDTO[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
   const [composing, setComposing] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const items = [...anns].sort(
-    (a, b) => Number(b.pinned) - Number(a.pinned) || a.hoursAgo - b.hoursAgo
-  );
-  const unread = anns.filter((a) => a.unread).length;
-  const pinnedCount = anns.filter((a) => a.pinned).length;
+  const items = announcements; // already ordered pinned-first, newest-first
+  const unread = items.filter((a) => !a.youAcked).length;
+  const pinnedCount = items.filter((a) => a.pinned).length;
 
-  function publish({
-    title,
-    body,
-    pinned,
-    audience,
-  }: {
+  function refresh() {
+    startTransition(() => router.refresh());
+  }
+
+  async function publish(input: {
     title: string;
     body: string;
     pinned: boolean;
     audience: string;
   }) {
-    setAnns((prev) => [
-      {
-        id: "AN-" + seq,
-        pinned,
-        audience,
-        author: "Diane Moreau",
-        hoursAgo: 0,
-        unread: false,
-        title,
-        body,
-        reactions: {},
-        acked: 0,
-        total: 12,
-      },
-      ...prev,
-    ]);
-    setSeq((s) => s + 1);
+    const res = await createAnnouncement(input);
+    if (res.success) refresh();
+    return res;
   }
 
-  const markRead = (id: string) =>
-    setAnns((prev) => prev.map((a) => (a.id === id ? { ...a, unread: false } : a)));
-  const togglePin = (id: string) =>
-    setAnns((prev) => prev.map((a) => (a.id === id ? { ...a, pinned: !a.pinned } : a)));
-  const react = (id: string, emoji: string) =>
-    setAnns((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, reactions: { ...a.reactions, [emoji]: (a.reactions[emoji] || 0) + 1 } }
-          : a
-      )
-    );
-  const ack = (id: string) =>
-    setAnns((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, acked: Math.min(a.total, a.acked + 1), youAcked: true, unread: false }
-          : a
-      )
-    );
+  async function run(id: string, fn: () => Promise<{ success: boolean }>) {
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const res = await fn();
+      if (res.success) refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const togglePin = (id: string) => run(id, () => togglePinAction({ id }));
+  const remove = (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this announcement?")) return;
+    run(id, () => deleteAnnouncementAction({ id }));
+  };
+  const react = (id: string, emoji: string) => run(id, () => toggleReactionAction({ id, emoji }));
+  const ack = (id: string) => run(id, () => acknowledgeAction({ id }));
 
   return (
     <div className="admin-font">
@@ -354,35 +355,135 @@ export default function AnnouncementsClient() {
             Announcements
           </h1>
         </div>
-        <button className="btn btn-primary" onClick={() => setComposing(true)}>
-          <Plus size={15} /> New announcement
-        </button>
+        {canManage ? (
+          <button className="btn btn-primary" onClick={() => setComposing(true)}>
+            <Plus size={15} /> New announcement
+          </button>
+        ) : null}
       </header>
 
       <div
         className="astat-grid"
         style={{ marginBottom: 26, gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
-        <Stat icon={<MessageCircle size={16} />} label="Posts" value={items.length} hint="visible to the team" />
-        <Stat icon={<AlertCircle size={16} />} label="Unread" value={unread} hint="new since you last looked" up={unread > 0} />
+        <Stat icon={<MessageCircle size={16} />} label="Posts" value={items.length} hint="visible to you" />
+        <Stat icon={<AlertCircle size={16} />} label="Unread" value={unread} hint="not yet acknowledged" up={unread > 0} />
         <Stat icon={<Sparkles size={16} />} label="Pinned" value={pinnedCount} hint="kept at the top" />
       </div>
 
-      <div className="an-feed">
-        {items.map((a) => (
-          <AnnouncementCard
-            key={a.id}
-            a={a}
-            onMarkRead={markRead}
-            onTogglePin={togglePin}
-            onReact={react}
-            onAck={ack}
-          />
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <div className="an-empty-state">
+          <MessageCircle size={28} />
+          <p className="an-empty-title">No announcements yet</p>
+          <p className="an-empty-sub">
+            {canManage
+              ? "Publish the first update to reach the team."
+              : "Check back soon — team updates will appear here."}
+          </p>
+          {canManage ? (
+            <button className="btn btn-primary btn-sm" onClick={() => setComposing(true)}>
+              <Plus size={14} /> New announcement
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="an-feed" aria-busy={pending}>
+          {items.map((a) => (
+            <AnnouncementCard
+              key={a.id}
+              a={a}
+              canManage={canManage}
+              busy={busyId === a.id || pending}
+              onTogglePin={togglePin}
+              onDelete={remove}
+              onReact={react}
+              onAck={ack}
+            />
+          ))}
+        </div>
+      )}
 
-      {composing ? (
-        <ComposeModal onClose={() => setComposing(false)} onPublish={publish} />
-      ) : null}
+      {composing ? <ComposeModal onClose={() => setComposing(false)} onPublish={publish} /> : null}
+
+      <style>{`
+        .an-feed { display: flex; flex-direction: column; gap: 16px; }
+        .an-card {
+          background: #fff; border-radius: 16px; padding: 22px;
+          box-shadow: var(--shadow-soft);
+          border: 1px solid var(--primary-10);
+          display: flex; flex-direction: column; gap: 12px;
+        }
+        .an-card.pinned {
+          border-color: var(--primary-40);
+          box-shadow: 0 0 0 1px var(--primary-20), var(--shadow-soft);
+        }
+        .an-card-head { display: flex; align-items: center; gap: 12px; }
+        .an-author { font-weight: 700; color: var(--ink); font-size: 14px; }
+        .an-aud {
+          font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+          text-transform: uppercase; color: var(--primary-70);
+          background: var(--primary-10); padding: 2px 8px; border-radius: 999px;
+        }
+        .an-new {
+          font-size: 11px; font-weight: 700; color: #fff;
+          background: var(--primary); padding: 2px 8px; border-radius: 999px;
+        }
+        .an-time { font-size: 12px; color: var(--primary-50); margin-top: 2px; }
+        .an-pinned-badge {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 11px; font-weight: 700; color: var(--primary-70);
+          background: var(--primary-10); padding: 3px 9px; border-radius: 999px;
+        }
+        .an-del:hover { color: var(--error); }
+        .an-title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 2px 0 0; }
+        .an-body { font-size: 14px; line-height: 1.6; color: var(--ink-soft, #4a4a4a); margin: 0; white-space: pre-wrap; }
+        .an-foot {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 12px; flex-wrap: wrap; margin-top: 6px;
+          padding-top: 12px; border-top: 1px solid var(--primary-10);
+        }
+        .an-reactions { display: flex; align-items: center; gap: 8px; }
+        .an-react {
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 4px 10px; border-radius: 999px; cursor: pointer;
+          background: var(--primary-5); border: 1px solid var(--primary-10);
+          color: var(--ink); transition: background .12s, border-color .12s;
+        }
+        .an-react:hover { background: var(--primary-10); }
+        .an-react.mine { background: var(--primary-15); border-color: var(--primary-40); }
+        .an-react:disabled { opacity: .55; cursor: default; }
+        .an-react-n { font-size: 12px; font-weight: 700; color: var(--primary-70); }
+        .an-ack { display: flex; align-items: center; gap: 12px; }
+        .an-ack-count { font-size: 12px; font-weight: 600; color: var(--primary-60); }
+        .an-textarea {
+          width: 100%; border: 1px solid var(--primary-20); border-radius: 10px;
+          padding: 10px 12px; font: inherit; color: var(--ink); resize: vertical;
+          background: #fff; min-height: 96px;
+        }
+        .an-textarea:focus { outline: none; border-color: var(--primary); }
+        .an-pin-toggle {
+          display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+          font-size: 13px; font-weight: 600; color: var(--primary-70); user-select: none;
+        }
+        .an-pin-check {
+          width: 18px; height: 18px; border-radius: 5px; display: inline-flex;
+          align-items: center; justify-content: center;
+          border: 1.5px solid var(--primary-30); color: #fff;
+        }
+        .an-pin-check.on { background: var(--primary); border-color: var(--primary); }
+        .an-error {
+          background: var(--error-bg, #fdecea); color: var(--error-text, #b3261e);
+          border: 1px solid var(--error, #e5484d); border-radius: 10px;
+          padding: 9px 12px; font-size: 13px; font-weight: 600; margin-bottom: 14px;
+        }
+        .an-empty-state {
+          display: flex; flex-direction: column; align-items: center; gap: 8px;
+          text-align: center; padding: 56px 24px; color: var(--primary-50);
+          background: #fff; border-radius: 16px; box-shadow: var(--shadow-soft);
+          border: 1px dashed var(--primary-20);
+        }
+        .an-empty-title { font-size: 16px; font-weight: 700; color: var(--ink); margin: 4px 0 0; }
+        .an-empty-sub { font-size: 13px; color: var(--primary-60); margin: 0 0 8px; max-width: 340px; }
+      `}</style>
     </div>
   );
 }

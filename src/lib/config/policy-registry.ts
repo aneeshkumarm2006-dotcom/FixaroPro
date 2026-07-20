@@ -30,6 +30,7 @@ import {
   CANCELLATION_FEE_USD,
   CANCELLATION_FEE_WINDOW_HOURS,
   DEFAULT_LABOUR_RATE,
+  DEFAULT_PROVIDER_HOURLY_RATE,
   DEFAULT_BILLING_INCREMENT_MIN,
   DEFAULT_MIN_BILLABLE_HOURS,
   BASE_BOOKING_DEPOSIT_USD,
@@ -41,6 +42,8 @@ import { PAINTING_SURPLUS_RATE } from "@/lib/painting";
 export interface PolicyConfig {
   // Labour & billing (SOP §10)
   labourRate: number;
+  /** Default hourly PAY rate for providers. NOT the client labour rate. */
+  providerHourlyRate: number;
   threeHourPackage: number;
   minBookingHours: number;
   billingIncrementMinutes: number;
@@ -122,6 +125,19 @@ export const POLICY_SETTINGS: readonly PolicySettingDef[] = [
     max: 1000,
     step: 1,
     legacyPerUnitProp: "hourlyRate",
+  },
+  {
+    key: "pay.providerHourlyRate",
+    category: "pay",
+    field: "providerHourlyRate",
+    group: "Labour & billing",
+    label: "Default provider hourly pay rate",
+    help: "What a provider is PAID per clocked hour when neither the job nor the provider has its own rate. This is crew pay, not the customer's hourly labour rate above — the two are independent.",
+    unit: "$/hr",
+    default: DEFAULT_PROVIDER_HOURLY_RATE,
+    min: 0,
+    max: 1000,
+    step: 0.5,
   },
   {
     key: "pricing.threeHourPackage",

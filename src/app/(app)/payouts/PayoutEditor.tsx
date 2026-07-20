@@ -30,6 +30,14 @@ export default function PayoutEditor({ payout, locked }: Props) {
     (parseFloat(ded) || 0) +
     (parseFloat(reim) || 0);
 
+  // Pay is hourly, so the useful sanity check on a hand-edited base is the
+  // effective rate it implies. Tips are folded into base, so this reads a
+  // little high on tipped periods — it's a review aid, not the stored rate.
+  const effectiveRate =
+    payout.totalHours > 0 ? payout.baseAmount / payout.totalHours : null;
+  const editedEffectiveRate =
+    payout.totalHours > 0 ? (parseFloat(base) || 0) / payout.totalHours : null;
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -74,6 +82,11 @@ export default function PayoutEditor({ payout, locked }: Props) {
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-[#1c1917]/60 flex-wrap">
             <span>Base: ${payout.baseAmount.toFixed(2)}</span>
+            {effectiveRate !== null && (
+              <span title="Base ÷ hours — includes tips folded into base">
+                ≈ ${effectiveRate.toFixed(2)}/hr
+              </span>
+            )}
             {payout.adjustments !== 0 && (
               <span className="text-blue-600">
                 Adj: ${payout.adjustments.toFixed(2)}
@@ -166,6 +179,12 @@ export default function PayoutEditor({ payout, locked }: Props) {
           <span className="text-[#1c1917] font-[500]">
             ${computedFinal.toFixed(2)}
           </span>
+          {editedEffectiveRate !== null && (
+            <span className="text-xs text-[#1c1917]/50 ml-2">
+              ≈ ${editedEffectiveRate.toFixed(2)}/hr over{" "}
+              {payout.totalHours.toFixed(2)}h
+            </span>
+          )}
         </span>
         <div className="flex gap-2">
           <Button

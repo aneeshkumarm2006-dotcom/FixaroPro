@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { stripe } from "@/lib/stripe";
+import { stripe, STATEMENT_DESCRIPTOR_SUFFIX } from "@/lib/stripe";
 import { getBillingConfig, computeChargeAmount, depositCredit } from "@/lib/billing";
 import { logAudit } from "@/lib/audit";
 import {
@@ -179,7 +179,8 @@ export async function chargeJob(jobId: string) {
       payment_method: client.defaultPaymentMethodId,
       off_session: true,
       confirm: true,
-      description: `Fixaro job #${job.jobNumber} — ${job.jobType ?? "service"}`,
+      statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
+      description: `Fixaro Handyman — job #${job.jobNumber} (${job.jobType ?? "service"})`,
       metadata: { jobId, jobNumber: String(job.jobNumber) },
     });
 

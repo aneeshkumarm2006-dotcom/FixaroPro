@@ -17,7 +17,7 @@ import { createRatingToken } from "../../actions/createRatingToken";
 import { setAfterPhotoOverride } from "../../actions/setAfterPhotoOverride";
 import { duplicateJob } from "../../actions/duplicateJob";
 import { buildIntakeRows } from "@/lib/intake";
-import { BUSINESS_TZ } from "@/lib/timezone";
+import { BUSINESS_TZ, fmtDate } from "@/lib/timezone";
 import { StatusPill, WARNING_VISUAL } from "@/lib/status-icons";
 
 import {
@@ -600,7 +600,7 @@ export default function JobDetailView({
                   gap: 4,
                 }}>
                 <Users className="w-3 h-3" />
-                {job.cleaners.length === 0 ? 'Assign cleaners' : 'Change'}
+                {job.cleaners.length === 0 ? 'Assign pros' : 'Change'}
               </button>
             )}
           </div>
@@ -622,12 +622,12 @@ export default function JobDetailView({
               </div>
               <div className="team-meta">
                 <div className="name">{c.name}</div>
-                <div className="role">Cleaner</div>
+                <div className="role">Pro</div>
               </div>
             </div>
           ))}
           {job.cleaners.length === 0 && (
-            <p style={{ color: 'var(--primary-50)', fontSize: 14, padding: '4px 0' }}>No cleaners assigned yet.</p>
+            <p style={{ color: 'var(--primary-50)', fontSize: 14, padding: '4px 0' }}>No pros assigned yet.</p>
           )}
         </div>
       </div>
@@ -699,7 +699,7 @@ export default function JobDetailView({
         <div className="astat">
           <div className="astat-head"><span>Employee pay</span></div>
           <div className="astat-value">{job.employeePay !== null ? `$${job.employeePay.toFixed(2)}` : '—'}</div>
-          <div className="astat-delta">{job.cleaners.length} cleaner{job.cleaners.length === 1 ? '' : 's'}</div>
+          <div className="astat-delta">{job.cleaners.length} pro{job.cleaners.length === 1 ? '' : 's'}</div>
         </div>
         <div className="astat">
           <div className="astat-head"><span>Product cost</span></div>
@@ -748,7 +748,7 @@ export default function JobDetailView({
             </div>
             {job.employeePay !== null && (
               <div className="finrow negative">
-                <span className="finrow-label">Employee pay · {job.cleaners.length} cleaner{job.cleaners.length === 1 ? '' : 's'}</span>
+                <span className="finrow-label">Employee pay · {job.cleaners.length} pro{job.cleaners.length === 1 ? '' : 's'}</span>
                 <span className="finrow-value">−${job.employeePay.toFixed(2)}</span>
               </div>
             )}
@@ -1480,7 +1480,7 @@ export default function JobDetailView({
                 <>
                   <strong>Customer rated {ratingStatus.stars}/5.</strong>{" "}
                   {ratingStatus.ratedAt
-                    ? `Submitted ${new Date(ratingStatus.ratedAt).toLocaleDateString()}.`
+                    ? `Submitted ${fmtDate(ratingStatus.ratedAt)}.`
                     : ""}
                 </>
               )}
@@ -1499,7 +1499,7 @@ export default function JobDetailView({
                 <>
                   <strong>Rating request sent.</strong>{" "}
                   {ratingStatus.emailSentAt
-                    ? `Emailed ${new Date(ratingStatus.emailSentAt).toLocaleDateString()}.`
+                    ? `Emailed ${fmtDate(ratingStatus.emailSentAt)}.`
                     : ""}{" "}
                   Awaiting the customer’s response.
                 </>
@@ -1532,7 +1532,7 @@ export default function JobDetailView({
               ) : (
                 <>
                   <strong>After-photos blocked.</strong> The customer didn&apos;t consent at
-                  booking. Cleaners can&apos;t upload unless you override.
+                  booking. Pros can&apos;t upload unless you override.
                 </>
               )}
             </div>
@@ -1714,7 +1714,7 @@ export default function JobDetailView({
         </div>
       )}
 
-      {/* Assign cleaners modal */}
+      {/* Assign pros modal */}
       {assignOpen && (
         <div
           onClick={() => !assignSubmitting && setAssignOpen(false)}
@@ -1742,10 +1742,10 @@ export default function JobDetailView({
             <div style={{ padding: "24px 28px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
               <div>
                 <h2 style={{ fontFamily: "var(--font-serif, serif)", fontSize: 22, color: "var(--primary-deep)", margin: "0 0 4px", fontWeight: 400 }}>
-                  Assign cleaners
+                  Assign pros
                 </h2>
                 <p style={{ fontSize: 13, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
-                  Pick one or more cleaners for this booking. They'll be notified by email and in-app.
+                  Pick one or more pros for this booking. They'll be notified by email and in-app.
                 </p>
               </div>
               <button type="button" onClick={() => !assignSubmitting && setAssignOpen(false)}
@@ -1757,7 +1757,7 @@ export default function JobDetailView({
             <div style={{ padding: "0 28px 12px" }}>
               <input
                 type="search"
-                placeholder="Search cleaners by name…"
+                placeholder="Search pros by name…"
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
                 style={{
@@ -1784,7 +1784,7 @@ export default function JobDetailView({
                 if (candidates.length === 0) {
                   return (
                     <p style={{ textAlign: "center", color: "var(--primary-50)", fontSize: 13, padding: 20 }}>
-                      No cleaners match this search.
+                      No pros match this search.
                     </p>
                   );
                 }
@@ -1868,7 +1868,7 @@ export default function JobDetailView({
                     cursor: assignSubmitting ? "not-allowed" : "pointer",
                     opacity: assignSubmitting ? 0.6 : 1,
                   }}>
-                  {assignSubmitting ? "Assigning…" : `Assign ${assignSelected.size} cleaner${assignSelected.size === 1 ? "" : "s"}`}
+                  {assignSubmitting ? "Assigning…" : `Assign ${assignSelected.size} pro${assignSelected.size === 1 ? "" : "s"}`}
                 </button>
               </div>
             </div>

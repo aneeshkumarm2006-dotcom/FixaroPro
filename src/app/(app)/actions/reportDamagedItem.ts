@@ -66,7 +66,7 @@ export async function reportDamagedItem(input: {
         type: "LOW_INVENTORY",
         severity: "WARNING",
         title: `${kind === "damaged" ? "Damaged" : "Lost"} item: ${kit.product.name}`,
-        message: `${session.user.name ?? "A cleaner"} reported ${qty} ${kit.product.name} as ${kind}.${
+        message: `${session.user.name ?? "A pro"} reported ${qty} ${kit.product.name} as ${kind}.${
           input.reason?.trim() ? ` Reason: ${input.reason.trim()}` : ""
         } Master stock and the cleaner's kit have both been decremented.`,
         relatedId: input.productId,

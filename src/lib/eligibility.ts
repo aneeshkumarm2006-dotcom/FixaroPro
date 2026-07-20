@@ -1,6 +1,14 @@
 // Provider service eligibility helpers (SOP §8). Eligibility is admin-controlled
 // and read-only to providers. Ineligible jobs must be filtered out server-side,
 // never just hidden in the UI.
+//
+// Rows enter the matrix from three places, all writing isActive rows that the
+// reads below honour, and all audit-logged:
+//   1. hiring/onboarding  — actions/seedOnboardingEligibility.ts (Fix #9f), the
+//                           STARTING point for a newly hired provider;
+//   2. admin override     — actions/setEmployeeServiceEligibility.ts, authoritative;
+//   3. one-time backfill  — prisma/seed-eligibility.ts, for pre-migration crew.
+// (1) and (3) never overwrite an existing row, so (2) always wins.
 
 import { db } from "@/db";
 import {

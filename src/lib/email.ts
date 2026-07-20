@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { db } from "@/db";
 import { isNotificationEnabled } from "@/lib/notifications";
 import { coverFor } from "@/lib/gift-cards/covers";
+import { fmtDate as tzDate, fmtTime as tzTime } from "@/lib/timezone";
 
 /**
  * Identifies the catalog row that gates a given email send.
@@ -26,8 +27,10 @@ function getResend() {
 function fmt(n: number | null | undefined) {
   return `$${(n ?? 0).toFixed(2)}`;
 }
+// Emails render on the server, so without an explicit timeZone these follow
+// whatever timezone the host happens to run in. Pin them to the business tz.
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+  return tzDate(iso, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -35,10 +38,7 @@ function fmtDate(iso: string) {
   });
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return tzTime(iso);
 }
 
 // ── Shared layout ──────────────────────────────────────────────────────────
@@ -59,6 +59,24 @@ function layout(body: string) {
 </body></html>`;
 }
 
+/**
+ * Escape untrusted, user-supplied text before it enters email HTML.
+ *
+ * The layout helpers below (`p`, `h1`, `section`, `btn`) all take raw HTML by
+ * design — callers legitimately pass markup. That means any value ORIGINATING
+ * FROM A USER (a Pro's scope-change reason, a customer's name, an admin note)
+ * must be escaped at the call site, or it becomes an HTML/link-injection vector
+ * in an email that appears to come from Fixaro. Wrap every such value in esc().
+ */
+function esc(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function h1(text: string) {
   return `<h1 style="margin:0 0 8px;font-size:26px;font-weight:700;color:#c44c03">${text}</h1>`;
 }
@@ -77,6 +95,41 @@ function section(rows: [string, string][]) {
 }
 function btn(label: string, href: string) {
   return `<a href="${href}" style="display:inline-block;margin-top:8px;padding:12px 28px;background:#c44c03;color:#fff;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">${label}</a>`;
+}
+
+/** Neutral callout card — a heading plus bullet list. Used for policy blocks. */
+function calloutList(heading: string, items: string[]) {
+  const lis = items
+    .map(
+      (i) =>
+        `<li style="margin:0 0 6px;font-size:14px;line-height:1.55;color:#333">${i}</li>`
+    )
+    .join("");
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="background:#faf7f2;border:1px solid #ece5da;border-radius:10px;margin:0 0 16px">
+<tr><td style="padding:16px 18px">
+<p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#c44c03">${heading}</p>
+<ul style="margin:0;padding-left:18px">${lis}</ul>
+</td></tr></table>`;
+}
+
+/**
+ * SOP: customers must know up front which materials are on us and which are on
+ * them, so no one is surprised when the pro arrives without a $180 faucet.
+ */
+function suppliesExpectationBlock() {
+  return (
+    calloutList("What we bring", [
+      "All standard tools and equipment for the job.",
+      "Routine supplies and consumables — fasteners, sealant, tape, caulk, basic hardware.",
+    ]) +
+    calloutList("What you provide", [
+      "Any major replacement item: locks, faucets, toilets, doors, panels, light fixtures, appliances.",
+      "Have the replacement part on site before your visit so your pro can install it the same day.",
+    ]) +
+    p(
+      "Not sure which side something falls on? Reply to this email before your visit and we'll confirm."
+    )
+  );
 }
 
 // ── Send + log helper ──────────────────────────────────────────────────────
@@ -205,6 +258,7 @@ export async function sendBookingConfirmation(opts: {
     h1(`Booking confirmed, ${opts.clientName.split(" ")[0]}!`) +
       p(`We've got you down for a ${opts.serviceType ?? "service"} on <strong>${fmtDate(opts.startTime)}</strong>.`) +
       section(sectionRows) +
+      suppliesExpectationBlock() +
       p(chargeNote) +
       btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`) +
       btn("Manage all my bookings", `${appUrl}/portal/bookings`)
@@ -234,8 +288,8 @@ export async function sendReminder24h(opts: {
 }) {
   const cleanerLine =
     opts.cleanerNames.length > 0
-      ? `Your cleaner${opts.cleanerNames.length > 1 ? "s" : ""}: <strong>${opts.cleanerNames.join(", ")}</strong>`
-      : "We're finalizing your cleaner assignment.";
+      ? `Your pro${opts.cleanerNames.length > 1 ? "s" : ""}: <strong>${opts.cleanerNames.join(", ")}</strong>`
+      : "We're finalizing your pro assignment.";
 
   const html = layout(
     h1("Your appointment is tomorrow!") +
@@ -284,7 +338,7 @@ export async function sendReceipt(opts: {
       p(`Hi ${opts.clientName.split(" ")[0]}, here's your receipt for job #${opts.jobNumber}.`) +
       section([
         ["Date", fmtDate(opts.startTime)],
-        ["Service", opts.serviceType ?? "Cleaning"],
+        ["Service", opts.serviceType ?? "Service visit"],
         ["Address", opts.address],
         ["Subtotal", fmt(opts.subtotal)],
         ["GST (5%)", fmt(opts.gst)],
@@ -693,7 +747,7 @@ export async function sendCustomerBookingConfirmed(opts: LifecycleJobInfo & {
 }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
-    h1(`Your cleaner is confirmed`) +
+    h1(`Your pro is confirmed`) +
       p(`Hi ${opts.clientName.split(" ")[0]}, great news — your booking is fully set.`) +
       section([
         ["Booking #", String(opts.jobNumber)],
@@ -701,14 +755,14 @@ export async function sendCustomerBookingConfirmed(opts: LifecycleJobInfo & {
         ["Time", fmtTime(opts.startTime)],
         ["Address", opts.address],
         ["Service", opts.serviceType ?? "—"],
-        ["Your cleaner" + (opts.cleanerNames.length > 1 ? "s" : ""), opts.cleanerNames.join(", ") || "—"],
+        ["Your pro" + (opts.cleanerNames.length > 1 ? "s" : ""), opts.cleanerNames.join(", ") || "—"],
       ]) +
       btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
   );
 
   return deliver({
     to: opts.to,
-    subject: `Cleaner confirmed for your Fixaro booking #${opts.jobNumber}`,
+    subject: `Pro confirmed for your Fixaro booking #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.booking.confirmed" },
   });
@@ -958,6 +1012,95 @@ export async function sendProviderPaintingBidInvite(opts: {
 }
 
 /**
+ * On-site scope change (Phase 2B, catalog `cust.scope.revision_requested` —
+ * EMAIL + SMS). The assigned Pro found extra work mid-job and proposed a new
+ * all-in price; nothing is charged until the customer approves in the portal.
+ */
+export async function sendCustomerPriceRevisionRequest(opts: {
+  to: string;
+  clientName: string;
+  jobId: string;
+  jobNumber: number;
+  previousPrice: number;
+  proposedPrice: number;
+  reason: string;
+  providerName: string | null;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const difference = opts.proposedPrice - opts.previousPrice;
+  const html = layout(
+    h1("Approval needed — updated price for your job") +
+      p(
+        `Hi ${esc(opts.clientName.split(" ")[0])}, ${opts.providerName ? `${esc(opts.providerName.split(" ")[0])}, your Pro` : "your Pro"} on booking #${opts.jobNumber} has found work that falls outside the original scope and is asking you to approve an updated price.`
+      ) +
+      section([
+        ["Current price", fmt(opts.previousPrice)],
+        ["Proposed price", fmt(opts.proposedPrice)],
+        [difference >= 0 ? "Increase" : "Decrease", fmt(Math.abs(difference))],
+        // Provider free text — untrusted, must be escaped (see esc()).
+        ["Why", esc(opts.reason)],
+      ]) +
+      p(
+        "Nothing changes and nothing is charged until you approve. If you reject, your job continues at the original price and your Pro will be told."
+      ) +
+      btn("Review &amp; respond", `${appUrl}/portal/bookings/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Approval needed — updated price ${fmt(opts.proposedPrice)} for booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "CUSTOMER", key: "cust.scope.revision_requested" },
+  });
+}
+
+/**
+ * Tell the Pro how the customer answered their price revision (Phase 2B,
+ * catalog `prov.scope.revision_response` — EMAIL + APP_PUSH). The in-app Alert
+ * is raised alongside this by the action; this is the declared email half.
+ */
+export async function sendProviderPriceRevisionResponse(opts: {
+  to: string;
+  providerName: string;
+  jobId: string;
+  jobNumber: number;
+  approved: boolean;
+  proposedPrice: number;
+  previousPrice: number;
+  resolutionNote?: string | null;
+  resolvedByAdmin?: boolean;
+}) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const who = opts.resolvedByAdmin ? "Fixaro ops" : "The customer";
+  const html = layout(
+    h1(opts.approved ? "Price revision approved" : "Price revision declined") +
+      p(
+        `Hi ${esc(opts.providerName.split(" ")[0])}, ${who} ${opts.approved ? "approved" : "declined"} your requested price revision on booking #${opts.jobNumber}.`
+      ) +
+      section([
+        ["Booking #", String(opts.jobNumber)],
+        ["Original price", fmt(opts.previousPrice)],
+        [opts.approved ? "New price" : "Price stays at", opts.approved ? fmt(opts.proposedPrice) : fmt(opts.previousPrice)],
+        // Admin/customer free text — untrusted, must be escaped (see esc()).
+        ...(opts.resolutionNote
+          ? ([["Note", esc(opts.resolutionNote)]] as [string, string][])
+          : []),
+      ]) +
+      p(
+        opts.approved
+          ? "Carry on with the agreed extra work. Your pay is still your hourly rate × the hours you clock, so make sure the clock reflects the extra time."
+          : "Please continue with the originally agreed scope only. Contact ops before doing extra work."
+      ) +
+      btn("Open the job", `${appUrl}/my-jobs/${opts.jobId}`)
+  );
+  return deliver({
+    to: opts.to,
+    subject: `Price revision ${opts.approved ? "approved" : "declined"} — booking #${opts.jobNumber}`,
+    html,
+    notification: { recipient: "PROVIDER", key: "prov.scope.revision_response" },
+  });
+}
+
+/**
  * Ops phone-follow-up email when a painting final offer is still unanswered
  * inside 24h of the job (SOP §11, catalog `admin.painting.followup_24h` —
  * EMAIL + APP_PUSH). The cron raises the in-app Alert; this is the declared
@@ -1191,7 +1334,7 @@ export async function sendAdminNewReview(opts: {
     h1(`${opts.rating}/5 review for ${opts.employeeName}${isPoor ? " ⚠️" : ""}`) +
     p(opts.jobNumber ? `Left for job #${opts.jobNumber}.` : "Manual rating entry.") +
     section([
-      ["Cleaner", opts.employeeName],
+      ["Pro", opts.employeeName],
       ["Rating", `${opts.rating}/5`],
       ["Overall after recalc", typeof opts.overallRating === "number" ? `${opts.overallRating.toFixed(2)}/5` : "—"],
     ]) +
@@ -1246,7 +1389,7 @@ export async function sendProviderNewReview(opts: {
   });
 }
 
-/** Admin email when a cleaner clocks in. */
+/** Admin email when a pro clocks in. */
 export async function sendAdminClockedIn(opts: {
   jobId: string;
   jobNumber: number;
@@ -1271,7 +1414,7 @@ export async function sendAdminClockedIn(opts: {
   }
 }
 
-/** Admin email when a cleaner clocks out. */
+/** Admin email when a pro clocks out. */
 export async function sendAdminClockedOut(opts: {
   jobId: string;
   jobNumber: number;
@@ -1761,7 +1904,7 @@ export async function sendAdminSignupReview(opts: {
   if (admins.length === 0) return;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
-    h1("New cleaner sign-up to review") +
+    h1("New pro sign-up to review") +
       p(`<strong>${opts.applicantName}</strong> (${opts.applicantEmail}) signed up. Approve or reject from the admin.`) +
       btn("Open admin", `${appUrl}/requests`)
   );
@@ -1771,7 +1914,7 @@ export async function sendAdminSignupReview(opts: {
     for (const key of ["admin.signup.new_provider", "admin.signup.review_request"]) {
       await deliver({
         to: admin.email,
-        subject: `New cleaner sign-up: ${opts.applicantName}`,
+        subject: `New pro sign-up: ${opts.applicantName}`,
         html,
         notification: { recipient: "ADMIN", key },
       }).catch((e) => console.error("admin signup-review", admin.email, key, e));
@@ -1845,7 +1988,7 @@ export async function sendAdminUnassignedDeadline(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1(`Unassigned booking starts in ${subjectMap[opts.window]}`) +
-      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> has no cleaner assigned yet.`) +
+      p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> has no pro assigned yet.`) +
       section([
         ["Booking #", String(opts.jobNumber)],
         ["Start", `${fmtDate(opts.startTime)} at ${fmtTime(opts.startTime)}`],
@@ -1876,7 +2019,7 @@ export async function sendAdminNotClockedIn(opts: {
   if (admins.length === 0) return;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
-    h1("Cleaner hasn't clocked in") +
+    h1("Pro hasn't clocked in") +
       p(`Job #${opts.jobNumber} for <strong>${opts.clientName}</strong> was supposed to start at ${fmtTime(opts.startTime)}. No clock-in yet.`) +
       p(`Assigned: ${opts.cleanerNames.join(", ") || "—"}`) +
       btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
@@ -1906,7 +2049,7 @@ export async function sendAdminCashCheckReminder(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1(`Upcoming cash/check booking`) +
-      p(`Heads up — job #${opts.jobNumber} for <strong>${opts.clientName}</strong> uses ${opts.paymentType}. Cleaner should collect payment on-site.`) +
+      p(`Heads up — job #${opts.jobNumber} for <strong>${opts.clientName}</strong> uses ${opts.paymentType}. The pro should collect payment on-site.`) +
       btn("Open job", `${appUrl}/jobs/${opts.jobId}`)
   );
   for (const admin of admins) {
@@ -1955,8 +2098,8 @@ export async function sendCustomerReminder48h(opts: JobReminderOpts) {
         ["Address", opts.address],
       ]) +
       p(opts.cleanerNames.length > 0
-        ? `Your cleaner${opts.cleanerNames.length > 1 ? "s" : ""}: <strong>${opts.cleanerNames.join(", ")}</strong>`
-        : "We're finalizing your cleaner assignment.") +
+        ? `Your pro${opts.cleanerNames.length > 1 ? "s" : ""}: <strong>${opts.cleanerNames.join(", ")}</strong>`
+        : "We're finalizing your pro assignment.") +
       btn("View this booking", `${appUrl}/portal/bookings/${opts.jobId}`)
   );
   return deliver({
@@ -1980,7 +2123,7 @@ export async function sendCustomerNeverFoundProvider(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
     h1("We weren't able to staff your booking") +
-      p(`Hi ${opts.clientName.split(" ")[0]}, unfortunately we couldn't find a cleaner for your booking on ${fmtDate(opts.startTime)}. The booking has been canceled and you won't be charged.`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, unfortunately we couldn't find a pro for your booking on ${fmtDate(opts.startTime)}. The booking has been canceled and you won't be charged.`) +
       btn("Try a different time", `${appUrl}/book`)
   );
   return deliver({
@@ -2003,13 +2146,13 @@ export async function sendCustomerLeaveTip(opts: {
 }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const html = layout(
-    h1("Care to tip your cleaner?") +
-      p(`Hi ${opts.clientName.split(" ")[0]}, if you enjoyed your cleaning, leaving a tip is a great way to show ${opts.cleanerNames.join(" and ") || "your cleaner"} you appreciated it.`) +
+    h1("Care to tip your pro?") +
+      p(`Hi ${opts.clientName.split(" ")[0]}, if you were happy with the work, leaving a tip is a great way to show ${opts.cleanerNames.join(" and ") || "your pro"} you appreciated it.`) +
       btn("Add a tip", `${appUrl}/portal/bookings/${opts.jobId}`)
   );
   return deliver({
     to: opts.to,
-    subject: `Tip your cleaner for job #${opts.jobNumber}`,
+    subject: `Tip your pro for job #${opts.jobNumber}`,
     html,
     notification: { recipient: "CUSTOMER", key: "cust.completed.leave_tip" },
     logId: opts.logId,
@@ -2333,7 +2476,7 @@ export async function sendGiftCardPurchaserReceipt(opts: {
   scheduledDeliveryDate: string | null;
 }) {
   const sentLine = opts.scheduledDeliveryDate
-    ? `We'll deliver it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) on <strong>${new Date(opts.scheduledDeliveryDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</strong>.`
+    ? `We'll deliver it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) on <strong>${tzDate(opts.scheduledDeliveryDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</strong>.`
     : `We've sent it to <strong>${opts.recipientName}</strong> (${opts.recipientEmail}) just now.`;
   const html = layout(
     h1(`Thanks for your gift card purchase`) +
@@ -2385,7 +2528,7 @@ export async function sendAdminGiftCardPurchased(opts: {
         ["To", `${opts.recipientName} (${opts.recipientEmail})`],
         ["Amount", `$${opts.amount.toFixed(2)}`],
         ["Delivery", opts.scheduledDeliveryDate
-          ? `Scheduled for ${new Date(opts.scheduledDeliveryDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+          ? `Scheduled for ${tzDate(opts.scheduledDeliveryDate, { month: "long", day: "numeric", year: "numeric" })}`
           : "Immediate"],
       ])
   );
@@ -2620,7 +2763,7 @@ export async function sendCustomerNoShowFee(opts: {
 }) {
   const html = layout(
     h1(`No-show fee — booking #${opts.jobNumber}`) +
-      p(`Hi ${opts.clientName.split(" ")[0]}, our cleaner arrived for booking #${opts.jobNumber} but no one was there to provide access. As outlined in our cancellation policy, a $${opts.feeUsd.toFixed(2)} no-show fee has been charged to your card on file.`) +
+      p(`Hi ${opts.clientName.split(" ")[0]}, our pro arrived for booking #${opts.jobNumber} but no one was there to provide access. As outlined in our cancellation policy, a $${opts.feeUsd.toFixed(2)} no-show fee has been charged to your card on file.`) +
       p(`If you believe this was an error, please reply to this email and we'll review.`)
   );
   return deliver({

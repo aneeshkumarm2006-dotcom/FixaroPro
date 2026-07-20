@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import QuoteFormClient from "./QuoteFormClient";
 import { getRuntimeConfig } from "@/lib/config/service-config";
 import { ServiceConfigProvider } from "@/lib/config/ServiceConfigProvider";
@@ -58,7 +59,11 @@ export default async function QuotePage() {
           </p>
         </header>
 
-        <QuoteFormClient />
+        {/* QuoteFormClient reads the booking hand-off query params
+            (?service=…&address=…), so it needs a Suspense boundary. */}
+        <Suspense fallback={null}>
+          <QuoteFormClient />
+        </Suspense>
       </div>
     </div>
     </ServiceConfigProvider>

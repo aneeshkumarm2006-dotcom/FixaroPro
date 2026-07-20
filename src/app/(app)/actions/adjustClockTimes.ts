@@ -6,6 +6,12 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { getBillingConfig, computeChargeAmount } from "@/lib/billing";
+import {
+  getDefaultProviderHourlyRate,
+  perPersonHours,
+  resolveProviderHourlyRate,
+  round2,
+} from "@/lib/provider-pay";
 
 const ADMIN_ROLES = ["OWNER", "ADMIN", "OPS_MANAGER"];
 
@@ -58,14 +64,26 @@ export async function getJobClockTimes(jobId: string) {
   }
 }
 
-// If the job was already completed with both clock times, its hours were
-// folded into open payouts at clock-out (see clockOut.ts). Apply the delta so
-// pay-period hour totals stay in sync with the corrected clock record.
+/**
+ * A clock correction MOVES THE MONEY (Fix #3 / #8).
+ *
+ * If the job was already completed with both clock times, its hours AND its pay
+ * were folded into open payouts at clock-out (see clockOut.ts). Provider pay is
+ * now `rate × hours`, so correcting the hours must re-price the payout, not just
+ * restate the hour total — previously baseAmount/finalAmount were deliberately
+ * left alone, which meant a corrected clock silently paid the wrong amount.
+ *
+ * Only payouts in OPEN periods (DRAFT/APPROVED) are touched, exactly as before:
+ * a PAID period is a settled record and is corrected by ops, not rewritten here.
+ * Adjustments/deductions/reimbursements are preserved; only the hourly base and
+ * the derived final move.
+ */
 async function applyPayoutHoursDelta(
   job: {
     employeeId: string | null;
     jobDate: Date | null;
     startTime: Date;
+    providerHourlyRate: number | null;
     cleaners: Array<{ id: string }>;
   },
   oldHours: number,
@@ -95,7 +113,14 @@ async function applyPayoutHoursDelta(
   });
   if (activePeriods.length === 0) return;
 
-  const perPersonDelta = deltaHours / cleanerIds.length;
+  const perPersonDelta = perPersonHours(deltaHours, cleanerIds.length);
+
+  const providers = await db.user.findMany({
+    where: { id: { in: cleanerIds } },
+    select: { id: true, hourlyRate: true },
+  });
+  const providerRateMap = new Map(providers.map((p) => [p.id, p.hourlyRate]));
+  const defaultRate = await getDefaultProviderHourlyRate();
 
   for (const period of activePeriods) {
     for (const cleanerId of cleanerIds) {
@@ -103,10 +128,28 @@ async function applyPayoutHoursDelta(
         where: { payPeriodId_employeeId: { payPeriodId: period.id, employeeId: cleanerId } },
       });
       if (!existing) continue;
+
+      // Re-price the hour delta at the SAME rate resolution the payout was
+      // built with, so the correction adds/removes exactly the pay those hours
+      // were worth rather than re-deriving the whole period.
+      const hourlyRate = resolveProviderHourlyRate({
+        jobRate: job.providerHourlyRate,
+        providerRate: providerRateMap.get(cleanerId),
+        defaultRate,
+      });
+      const payDelta = round2(hourlyRate * perPersonDelta);
+
+      const newBase = Math.max(0, round2(existing.baseAmount + payDelta));
+      const newFinal = round2(
+        newBase + existing.adjustments - existing.deductions + existing.reimbursements
+      );
+
       await db.payout.update({
         where: { id: existing.id },
         data: {
           totalHours: Math.max(0, Number((existing.totalHours + perPersonDelta).toFixed(2))),
+          baseAmount: newBase,
+          finalAmount: newFinal,
         },
       });
     }
@@ -157,6 +200,8 @@ export async function adjustClockTimes(input: AdjustClockInput) {
         employeeId: true,
         jobDate: true,
         startTime: true,
+        // Per-job provider pay-rate override — needed to re-price corrected hours.
+        providerHourlyRate: true,
         cleaners: { select: { id: true } },
         // Fields computeChargeAmount needs to recompute hourly labour (SOP §10.1.3).
         jobType: true,

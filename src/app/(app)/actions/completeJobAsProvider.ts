@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { ensureRatingRequest } from "@/lib/rating";
 import { logAudit } from "@/lib/audit";
+import { checkAfterPhotoGate } from "@/lib/after-photo-gate";
 
 const MAX_NOTES = 4000;
 
@@ -86,6 +87,19 @@ export async function completeJobAsProvider(input: {
       return { success: false, error: "This job is already complete." };
     }
 
+    // Completion-photo gate (Fix #3c / #8b) — hard server-side block. Applies
+    // only when this call actually CLOSES the job; editing the write-up on an
+    // already-complete job is not a completion event. Any failure resolving the
+    // gate propagates to the catch below and denies the completion.
+    let photoGateWaiver: "ADMIN_OVERRIDE" | "NO_CONSENT" | null = null;
+    if (!alreadyComplete) {
+      const photoGate = await checkAfterPhotoGate(input.jobId, job);
+      if (!photoGate.ok) {
+        return { success: false, error: photoGate.error };
+      }
+      photoGateWaiver = photoGate.waived ? photoGate.reason : null;
+    }
+
     const now = new Date();
     const data: {
       completionNotes?: string | null;
@@ -116,7 +130,13 @@ export async function completeJobAsProvider(input: {
           field: "status",
           oldValue: job.status,
           newValue: "COMPLETED",
-          description: `${actor} marked this job complete${noClock ? " (no clock record — hours must be added by ops before charging)" : ""}`,
+          description: `${actor} marked this job complete${noClock ? " (no clock record — hours must be added by ops before charging)" : ""}${
+            photoGateWaiver === "ADMIN_OVERRIDE"
+              ? " — closed without after-photos under the admin after-photo override"
+              : photoGateWaiver === "NO_CONSENT"
+              ? " — closed without after-photos (customer did not consent)"
+              : ""
+          }`,
         },
       });
 

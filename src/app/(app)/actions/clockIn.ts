@@ -54,14 +54,21 @@ export async function clockIn(jobId: string) {
 
     const now = new Date();
 
-    // Late-arrival detection: minutes between scheduled start and clock-in.
+    // Punctuality is scored on ACTUAL ARRIVAL (Phase 2A), not clock-in. A Pro
+    // who taps "I've arrived" at 9:02 but only clocks in at 9:40 was on time —
+    // this block used to overwrite that good record with the clock-in delta and
+    // penalise them for the gap. Fall back to `now` when they never tapped.
+    const arrivalBasis = job.arrivedAt ?? now;
     const minutesLate = Math.max(
       0,
-      Math.floor((now.getTime() - job.startTime.getTime()) / 60_000)
+      Math.floor((arrivalBasis.getTime() - job.startTime.getTime()) / 60_000)
     );
     // The four late-arrival knobs are admin-editable policy values.
     const { policy } = await getRuntimeConfig();
     const ratingCap = computeLateArrivalRatingCap(minutesLate, policy);
+    // markArrived may already have recorded punctuality for this job; never
+    // rewrite it, so ops reads one number instead of two.
+    const punctualityAlreadyRecorded = job.lateArrivalAt !== null;
 
     // Update the job with clock in time and the rating cap when applicable.
     await db.job.update({
@@ -69,8 +76,11 @@ export async function clockIn(jobId: string) {
       data: {
         clockInTime: now,
         status: "IN_PROGRESS",
-        ...(ratingCap !== null
-          ? { lateArrivalAt: now, lateArrivalRatingCap: ratingCap }
+        // Backfill arrival server-side when the Pro never tapped "I've arrived",
+        // so the arrival record is never empty for a job that was worked.
+        ...(job.arrivedAt ? {} : { arrivedAt: now }),
+        ...(ratingCap !== null && !punctualityAlreadyRecorded
+          ? { lateArrivalAt: arrivalBasis, lateArrivalRatingCap: ratingCap }
           : {}),
       },
     });
@@ -103,7 +113,7 @@ export async function clockIn(jobId: string) {
       jobId,
       jobNumber: job.jobNumber,
       clientName: job.clientName,
-      cleanerName: session.user.name ?? "Cleaner",
+      cleanerName: session.user.name ?? "Pro",
     }).catch((e) => console.error("admin clocked-in email", e));
 
     // Late-arrival emails (admin + cleaner) when the cap is in effect.
@@ -112,7 +122,7 @@ export async function clockIn(jobId: string) {
         jobId,
         jobNumber: job.jobNumber,
         clientName: job.clientName,
-        cleanerName: session.user.name ?? "Cleaner",
+        cleanerName: session.user.name ?? "Pro",
         minutesLate,
         ratingCap,
       }).catch((e) => console.error("admin late-arrival email", e));
@@ -121,7 +131,7 @@ export async function clockIn(jobId: string) {
       if (sessionEmail) {
         sendProviderLateArrival({
           to: sessionEmail,
-          providerName: session.user.name ?? "Cleaner",
+          providerName: session.user.name ?? "Pro",
           jobId,
           jobNumber: job.jobNumber,
           minutesLate,

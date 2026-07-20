@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { revalidatePath } from "next/cache";
 import JobDetailView from "./JobDetailView";
 import AdminJobOpsPanel from "./AdminJobOpsPanel";
+import EquipmentReadinessPanel from "./EquipmentReadinessPanel";
 import JobChatPanel from "./JobChatPanel";
 import { computeJobBilling, getBillingConfig } from "@/lib/billing";
 import { getEligibleProviderIdsFor } from "@/lib/eligibility";
@@ -338,6 +339,9 @@ export default async function JobPage({
         ratingStatus={ratingStatus}
       />
       {opsPanel}
+      {/* Fix #7 — pre-job equipment readiness (not submitted / pending /
+          approved / rejected) so ops can see whether the Pro has prepped. */}
+      <EquipmentReadinessPanel jobId={job.id} />
       {/* Per-job chat (office ↔ Pro ↔ client). The panel's server actions
           re-derive the sender role from the session, so posting here is gated
           to real participants regardless of who loads the page. */}

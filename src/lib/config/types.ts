@@ -30,6 +30,22 @@ export interface ServiceConfigItem {
   materialsType: MaterialsType | null;
   /** Customer-facing qualifier on the materials line ("paint not included"). */
   materialsNote: string | null;
+  /**
+   * Phase 2C — this service needs a MAJOR REPLACEMENT ITEM the customer buys and
+   * has on site (the lock, the faucet, the toilet, the panels). Independent of
+   * `materialsAmount`/`customerRequestsMaterials`, which is about the
+   * consumables and equipment FIXARO can supply for a surcharge. A job can have
+   * both.
+   *
+   * OPTIONAL on the type (not on the DB column, which is NOT NULL with a false
+   * default) because the config import/export bundle in config-io.ts predates
+   * this field and builds ServiceConfigItem literals without it. Absent is read
+   * as "no customer part", which is the safe reading: we never invent a
+   * requirement the catalog didn't state.
+   */
+  requiresCustomerPart?: boolean;
+  /** The noun phrase, e.g. "the replacement lock". Null when the flag is off. */
+  customerPartNote?: string | null;
 }
 
 export interface PaintingScopeConfig {
@@ -126,6 +142,33 @@ export function materialsFor(
     type: svc.materialsType,
     note: svc.materialsNote,
   };
+}
+
+export interface CustomerPartRequirement {
+  /** Noun phrase for "you'll need to have ___ on site". */
+  note: string;
+}
+
+/**
+ * The customer-supplied replacement item this service needs, or null.
+ *
+ * Falls back to a generic noun phrase when an admin flips the flag on without
+ * writing a note, so the customer is never shown "have  on site". Fails CLOSED
+ * in the sense that matters here: an unknown service returns null, so we never
+ * invent a requirement for a service the catalog doesn't describe.
+ */
+export function customerPartOf(
+  svc: ServiceConfigItem | null | undefined
+): CustomerPartRequirement | null {
+  if (!svc || !svc.requiresCustomerPart) return null;
+  return { note: svc.customerPartNote?.trim() || "the replacement item" };
+}
+
+export function customerPartFor(
+  cfg: RuntimeConfig,
+  serviceType: string | null | undefined
+): CustomerPartRequirement | null {
+  return customerPartOf(findService(cfg, serviceType));
 }
 
 /** Types whose amount is captured on the customer's card at booking time. */

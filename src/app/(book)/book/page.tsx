@@ -3,8 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
-import { BookingDraft, EMPTY_DRAFT } from "./types";
-import { useMaterialsPricing } from "@/lib/config/ServiceConfigProvider";
+import {
+  BookingDraft,
+  EMPTY_DRAFT,
+  composeBookingNotes,
+  isTvIntakeComplete,
+  requiresCustomQuote,
+} from "./types";
+import { useMaterialsPricing, useService } from "@/lib/config/ServiceConfigProvider";
 import Step1PostalCode from "./steps/Step1PostalCode";
 import Step2Property from "./steps/Step2Property";
 import Step3Schedule from "./steps/Step3Schedule";
@@ -47,6 +53,12 @@ export default function BookPage() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BookingDraft>(EMPTY_DRAFT);
   const configuredMaterials = useMaterialsPricing(draft.serviceType);
+  const selectedService = useService(draft.serviceType);
+  // Gap 1/2/3 — a booking that must be quoted never advances past Step 2, so the
+  // deposit step (Step 5) and its card capture are unreachable for it. Recomputed
+  // on every render: going back and changing the TV size or wall re-locks the
+  // wizard even if the customer had already reached the review step.
+  const needsQuote = requiresCustomQuote(draft, selectedService?.pricing);
   const [basePrice, setBasePrice] = useState(0);
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -145,10 +157,17 @@ export default function BookPage() {
   }
 
   function canProceed(): boolean {
+    // Quote-routed services can never continue into checkout, from any step.
+    if (needsQuote) return false;
     switch (step) {
       case 0:
         return draft.postalCovered === true;
       case 1:
+        // TV mounting must answer size + wall before we can decide whether this
+        // is a standard mount or a quote job — an unanswered intake is not a pass.
+        if (draft.serviceType === "TV_MOUNTING" && !isTvIntakeComplete(draft)) {
+          return false;
+        }
         return !!(draft.address.trim() && draft.serviceType && draft.frequency && draft.hours > 0);
       case 2:
         return !!(draft.date && (draft.isFlexible || draft.timeSlot));
@@ -180,6 +199,14 @@ export default function BookPage() {
   }
 
   async function handleSubmit() {
+    // Fail closed: never create a booking (or take a payment) for a service that
+    // has to be quoted, even if the UI state were somehow bypassed.
+    if (needsQuote) {
+      setSubmitError(
+        "This service needs a custom quote — please use the Request a quote link."
+      );
+      return;
+    }
     if (submittingRef.current) return; // block double-click
     submittingRef.current = true;
     setSubmitting(true);
@@ -223,13 +250,19 @@ export default function BookPage() {
       acLocation: draft.acLocation,
       acMountType: draft.acMountType,
       clientHasAcUnit: draft.clientHasAcUnit,
+      // TV mounting intake — sent so the server can re-evaluate the
+      // quote-only rule (>60" or masonry) instead of trusting the client.
+      tvSize: draft.tvSize,
+      tvWallType: draft.tvWallType,
       date: draft.date,
       isFlexible: draft.isFlexible,
       timeSlot: draft.timeSlot,
       name: draft.name,
       phone: draft.phone,
       email: draft.email,
-      notes: draft.notes,
+      // TV size / wall type have no Job column and submitBooking is owned
+      // elsewhere, so the structured answers ride along in the notes field.
+      notes: composeBookingNotes(draft),
       photoUrls: draft.photoUrls,
       referralCode: draft.referralCode,
       afterPhotoConsent: draft.afterPhotoConsent,
@@ -258,7 +291,8 @@ export default function BookPage() {
     : 0;
   const subtotal = basePrice + addOnTotal + materialsAmount + draft.travelFee;
   const tax = calculateTax(subtotal);
-  const showSummary = step >= 1 && basePrice > 0;
+  // No running estimate on the quote path — the price is not ours to show yet.
+  const showSummary = step >= 1 && basePrice > 0 && !needsQuote;
 
   if (submitted) {
     return (
@@ -538,7 +572,9 @@ export default function BookPage() {
               lineHeight: 1.55,
               marginTop: "auto",
             }}>
-            A $20 deposit is charged at booking. The remaining balance is due after your visit.
+            {needsQuote
+              ? "This service is quoted before booking — nothing is charged and no card is needed."
+              : "A $20 deposit is charged at booking. The remaining balance is due after your visit."}
           </p>
         </aside>
 

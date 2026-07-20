@@ -11,6 +11,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import { StatusPill, DepositBadge } from "@/lib/status-icons";
 import { useJobTypeLabel } from "@/components/calendar/use-job-type-label";
 import { useServiceCatalog } from "@/lib/config/ServiceConfigProvider";
+import { fmtDate, fmtTime } from "@/lib/timezone";
 
 interface Job {
   id: string;
@@ -163,11 +164,11 @@ function AStatCard({ icon: Icon, label, value, hint }: { icon: any; label: strin
 
 function formatDate(dateStr: string | null, fallback: string): string {
   const d = dateStr ? new Date(dateStr) : new Date(fallback);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return fmtDate(d, { month: 'short', day: 'numeric' });
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return fmtTime(iso);
 }
 
 function formatTimeSpent(ms: number | undefined): string {
@@ -589,7 +590,7 @@ export default function JobsView({
                     <th>Date</th>
                     <th>Client</th>
                     <th>Type</th>
-                    <th>Cleaners</th>
+                    <th>Pros</th>
                     <th className="num">Time</th>
                     <th className="num">Price</th>
                     <th className="num">Discount</th>

@@ -1181,7 +1181,7 @@ export default function JobModal({
                   <div className="space-y-4">
                     <h3 className="input-label tracking-tight flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      Assign Cleaners
+                      Assign Pros
                     </h3>
 
                     {users.length === 0 ? (

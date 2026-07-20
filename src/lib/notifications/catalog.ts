@@ -756,4 +756,11 @@ export const NOTIFICATION_CATALOG: CatalogEntry[] = [
   { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.offer_reminder", label: "Painting offer daily reminder", trigger: "Daily reminder while a painting final offer is awaiting the customer's response.", channels: { EMAIL: true } },
   { recipient: "CUSTOMER", category: "Painting bids", key: "cust.painting.offer_rejected", label: "Painting offer rejected — charge refunded", trigger: "Customer rejected the final painting amount; booking cancelled and $119 materials/equipment charge refunded/removed.", channels: { EMAIL: true } },
   { recipient: "ADMIN", category: "Painting bids", key: "admin.painting.followup_24h", label: "Painting offer unanswered < 24h", trigger: "A painting final offer is unanswered within 24h of the job; ops must phone the client.", channels: { EMAIL: true, APP_PUSH: true } },
+
+  // On-site scope change / price revision (Phase 2B). The Pro finds extra work
+  // mid-job, proposes a new all-in price, and the customer approves or rejects
+  // it in the portal. Nothing moves until the customer answers.
+  { recipient: "CUSTOMER", category: "Scope change", key: "cust.scope.revision_requested", label: "Price revision requested", trigger: "The assigned Pro requests an on-site scope change; the customer must approve or reject the new price.", channels: { EMAIL: true, SMS: true } },
+  { recipient: "PROVIDER", category: "Scope change", key: "prov.scope.revision_response", label: "Price revision answered", trigger: "The customer approved or rejected the Pro's requested price revision.", channels: { EMAIL: true, APP_PUSH: true } },
+  { recipient: "ADMIN", category: "Scope change", key: "admin.scope.revision_pending", label: "Price revision awaiting customer", trigger: "A Pro requested an on-site price revision; it is visible in Requests until resolved.", channels: { APP_PUSH: true } },
 ];

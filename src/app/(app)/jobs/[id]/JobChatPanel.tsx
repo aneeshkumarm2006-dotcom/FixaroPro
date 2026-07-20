@@ -11,6 +11,7 @@ import {
   type JobChatMessageDTO,
   type JobChatRole,
 } from "@/app/(app)/actions/jobChatActions";
+import { fmtDate, fmtTime } from "@/lib/timezone";
 
 interface JobChatPanelProps {
   jobId: string;
@@ -35,22 +36,25 @@ const ROLE_LABEL: Record<JobChatRole, string> = {
 };
 
 function timeOnly(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return fmtTime(iso);
+}
+
+/** Calendar day in the business timezone, as "MM/DD/YYYY" — stable group key. */
+function businessDayKey(d: Date) {
+  return fmtDate(d, { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function dayLabel(d: Date) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const t = new Date(d);
-  t.setHours(0, 0, 0, 0);
-  const diff = Math.round((today.getTime() - t.getTime()) / 86400000);
+  // Compare Toronto calendar days, not the viewer's local days.
+  const todayKey = businessDayKey(new Date());
+  const thisKey = businessDayKey(d);
+  const diff = Math.round(
+    (Date.parse(todayKey) - Date.parse(thisKey)) / 86400000,
+  );
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
-  if (diff < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diff < 7) return fmtDate(d, { weekday: "long" });
+  return fmtDate(d, { month: "short", day: "numeric" });
 }
 
 function groupByDay(messages: JobChatMessageDTO[]) {
@@ -58,7 +62,7 @@ function groupByDay(messages: JobChatMessageDTO[]) {
   let currentKey = "";
   for (const m of messages) {
     const d = new Date(m.createdAt);
-    const key = d.toDateString();
+    const key = businessDayKey(d);
     if (key !== currentKey) {
       currentKey = key;
       groups.push({ label: dayLabel(d), messages: [m] });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   BookingDraft,
   FREQUENCIES,
@@ -8,6 +9,11 @@ import {
   PAINT_REPAIR_SURFACES,
   AC_TYPES,
   AC_MOUNT_TYPES,
+  TV_SIZE_CHOICES,
+  TV_WALL_TYPES,
+  requiresCustomQuote,
+  quoteReason,
+  quoteRedirectHref,
 } from "../types";
 import {
   useServiceCatalog,
@@ -20,7 +26,7 @@ import {
   useHourlyPrice,
   usePolicy,
 } from "@/lib/config/ServiceConfigProvider";
-import { materialsLineLabel, type ServiceConfigItem } from "@/lib/config/types";
+import { materialsLineLabel, customerPartOf, type ServiceConfigItem } from "@/lib/config/types";
 import { getRequiredEquipment } from "@/lib/equipment";
 import { getServiceChecklist } from "../../actions/getServiceChecklist";
 import { Field, Input } from "@/components/customer/Field";
@@ -38,6 +44,11 @@ export default function Step2Property({ draft, onChange }: Props) {
   const categories = useServiceCategories();
   const selectedService = useService(draft.serviceType);
   const materials = useMaterialsPricing(draft.serviceType);
+  // Phase 2C — the major replacement item the CUSTOMER buys. Deliberately not
+  // the same thing as `materials` below: that checkbox is about Fixaro supplying
+  // consumables and tools for a surcharge, this is about the lock/faucet/panel
+  // itself, which we never source. Both can apply to one booking.
+  const customerPart = customerPartOf(selectedService);
   const paintingScopes = usePaintingScopes();
   const quoteRangeFor = usePaintingQuoteRange();
   const basePriceFor = useBasePrice();
@@ -56,7 +67,14 @@ export default function Step2Property({ draft, onChange }: Props) {
   // to be `draft.serviceType === "SILICONE_SEALING"` in four places.
   const isPerUnit =
     selectedService?.pricing === "fixed" && selectedService.fixedPricePerUnit;
-  const isQuoteOnly = selectedService?.pricing === "quote";
+  // Gap 1/2/3 — does this selection have to leave the booking wizard for the
+  // Request-a-Quote path? Evaluated from the LIVE catalog pricing model plus the
+  // service-specific rules in types.ts. Painting is deliberately excluded: it is
+  // quote-priced but completes here via its own bid/offer workflow.
+  const needsQuote = requiresCustomQuote(draft, selectedService?.pricing);
+  // Quote-priced services never show an hours/price picker, whether they leave
+  // for /quote (mouldings, weatherproofing) or stay for the bid flow (painting).
+  const isQuotePriced = selectedService?.pricing === "quote";
 
   function selectService(item: ServiceConfigItem) {
     // Per-unit services start at 1 unit; hourly services at the booking minimum.
@@ -70,6 +88,7 @@ export default function Step2Property({ draft, onChange }: Props) {
   const isPainting = draft.serviceType === "PAINTING";
   const isSmallPaintRepair = draft.serviceType === "SMALL_PAINT_REPAIR";
   const isAcInstallation = draft.serviceType === "AC_INSTALLATION";
+  const isTvMounting = draft.serviceType === "TV_MOUNTING";
 
   // Equipment checklist (SOP §4). Seeded defaults render immediately; if an admin
   // has customised this service's list, swap in their version once it loads.
@@ -174,7 +193,7 @@ export default function Step2Property({ draft, onChange }: Props) {
           repricing a service moves what the customer sees at the point of sale.
           These used to be `rooms * 209` and a HOUR_OPTIONS array whose prices
           were baked in at module load from the seed rate. */}
-      {draft.serviceType && !isQuoteOnly && (
+      {draft.serviceType && !needsQuote && !isQuotePriced && (
         <div className="cl-stack-12">
           <span className="cl-label">
             {isPerUnit ? "Number of rooms" : "How many hours?"}
@@ -261,21 +280,74 @@ export default function Step2Property({ draft, onChange }: Props) {
         </div>
       )}
 
-      {/* Quote-only notice (non-painting custom-quote services, e.g. mouldings) */}
-      {isQuoteOnly && !isPainting && draft.serviceType && (
+      {/* TV mounting intake (Gap 3). Screen size + wall type are what make the
+          "60\"+ or brick/concrete → quote" rule detectable; both are required
+          before the wizard will continue. */}
+      {isTvMounting && (
+        <div className="cl-stack-12">
+          <span className="cl-label">TV details</span>
+          <div className="cl-stack-12">
+            <span className="cl-label">Screen size</span>
+            <div className="cl-grid-2">
+              {TV_SIZE_CHOICES.map((s) => (
+                <ChoiceButton
+                  key={s.value}
+                  active={draft.tvSize === s.value}
+                  title={s.value}
+                  onClick={() => onChange({ tvSize: s.value })}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="cl-stack-12">
+            <span className="cl-label">Wall / surface type</span>
+            <div className="cl-grid-2">
+              {TV_WALL_TYPES.map((w) => (
+                <ChoiceButton
+                  key={w}
+                  active={draft.tvWallType === w}
+                  title={w}
+                  onClick={() => onChange({ tvWallType: w })}
+                />
+              ))}
+            </div>
+          </div>
+          {!draft.tvSize || !draft.tvWallType ? (
+            <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+              Pick both so we can confirm this is a standard mount. Larger screens
+              and masonry walls are quoted individually.
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {/* Quote path (Gap 1/2/3). Everything that cannot be priced instantly ends
+          here instead of continuing to the deposit step — no card is ever
+          requested for these. Painting is exempt: it keeps its bid workflow. */}
+      {needsQuote && (
         <div
           style={{
-            padding: "16px 20px",
-            background: "rgba(28,25,23,0.04)",
+            padding: "20px 22px",
+            background: "rgba(232,93,4,0.05)",
             borderRadius: 14,
-            border: "1px solid rgba(28,25,23,0.10)",
+            border: "1px solid rgba(232,93,4,0.18)",
           }}>
-          <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>
-            This service requires a custom quote.
+          <p style={{ margin: 0, fontSize: 15, color: "var(--ink)", fontWeight: 600 }}>
+            This one needs a custom quote
           </p>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--primary-60)" }}>
-            Add details and photos in the notes step — we'll confirm pricing before the visit.
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.55 }}>
+            {quoteReason(draft)}
           </p>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--primary-60)", lineHeight: 1.55 }}>
+            Send us the details and we&apos;ll come back within one business day
+            with a price. Nothing is charged and no card is needed.
+          </p>
+          <Link
+            href={quoteRedirectHref(draft)}
+            className="cl-btn cl-btn-primary"
+            style={{ marginTop: 16, display: "inline-flex" }}>
+            Request a quote →
+          </Link>
         </div>
       )}
 
@@ -399,27 +471,30 @@ export default function Step2Property({ draft, onChange }: Props) {
         </div>
       )}
 
-      {/* Frequency */}
-      <div className="cl-stack-12">
-        <span className="cl-label">How often?</span>
-        <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
-          Recurring options auto-book future visits. You can change or cancel any visit before it happens.
-        </p>
-        <div className="cl-grid-2">
-          {FREQUENCIES.map((f) => (
-            <ChoiceButton
-              key={f.value}
-              active={draft.frequency === f.value}
-              title={f.label}
-              hint={f.hint}
-              onClick={() => onChange({ frequency: f.value })}
-            />
-          ))}
+      {/* Frequency. Hidden on the quote path — there is no recurring schedule to
+          pick until the price is agreed. */}
+      {!needsQuote && (
+        <div className="cl-stack-12">
+          <span className="cl-label">How often?</span>
+          <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
+            Recurring options auto-book future visits. You can change or cancel any visit before it happens.
+          </p>
+          <div className="cl-grid-2">
+            {FREQUENCIES.map((f) => (
+              <ChoiceButton
+                key={f.value}
+                active={draft.frequency === f.value}
+                title={f.label}
+                hint={f.hint}
+                onClick={() => onChange({ frequency: f.value })}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add-ons (admin-configurable) */}
-      {draft.addOns.length > 0 && (
+      {!needsQuote && draft.addOns.length > 0 && (
         <div className="cl-stack-12">
           <span className="cl-label">Add-ons</span>
           {draft.addOns.map((a, idx) => (
@@ -472,15 +547,49 @@ export default function Step2Property({ draft, onChange }: Props) {
             ))}
           </div>
           <p style={{ fontSize: 12, color: "var(--primary-60)", margin: 0, lineHeight: 1.5 }}>
-            Choose below whether Fixaro provides everything, or you'll have these ready before the visit.
+            {needsQuote
+              ? "Your quote will confirm what we bring and what you'll need to have ready."
+              : "Choose below whether Fixaro provides everything, or you'll have these ready before the visit."}
           </p>
+        </div>
+      )}
+
+      {/* Customer-supplied part (Phase 2C). Sits ABOVE the materials checkbox so
+          the customer reads "you must buy the lock" before the separate "should
+          Fixaro bring the materials?" question, and the two can't be confused.
+          Shown for quote-routed services too — the requirement is true either
+          way, only the pricing path differs. */}
+      {draft.serviceType && customerPart && (
+        <div className="cl-stack-12">
+          <span className="cl-label">You supply the part</span>
+          <div
+            style={{
+              background: "rgba(217,119,6,0.07)",
+              border: "1px solid rgba(217,119,6,0.28)",
+              borderRadius: 12,
+              padding: "14px 16px",
+            }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--ink)", lineHeight: 1.5 }}>
+              You&apos;ll need to buy {customerPart.note} and have it on site
+              before your Pro arrives.
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--primary-70)", lineHeight: 1.55 }}>
+              Fixaro doesn&apos;t source or purchase it — the choice of brand,
+              model and finish is yours. This is separate from the materials
+              &amp; equipment question below, which is about the supplies and
+              tools your Pro brings. We&apos;ll ask you to confirm it has
+              arrived before the appointment. If it isn&apos;t on site, your Pro
+              can&apos;t complete the work and the visit may need to be
+              rescheduled.
+            </p>
+          </div>
         </div>
       )}
 
       {/* Materials / equipment — all-or-nothing decision (SOP §4/§5).
           Appears at the bottom of the step. Default unchecked: the customer
           must actively confirm they want Fixaro to provide everything. */}
-      {draft.serviceType && materials && (
+      {draft.serviceType && materials && !needsQuote && (
         <div className="cl-stack-12">
           <span className="cl-label">Materials &amp; equipment</span>
           <label

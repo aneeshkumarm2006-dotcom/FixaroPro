@@ -4,7 +4,23 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import type { PayBreakdown } from "./getPayBreakdown.types";
+import {
+  clockedHours,
+  computeProviderJobPay,
+  getDefaultProviderHourlyRate,
+  perPersonHours,
+  perPersonTip,
+  resolveProviderHourlyRate,
+} from "@/lib/provider-pay";
 
+/**
+ * "Why is my pay this?" for the provider (Fix #3d / #8).
+ *
+ * Returns the CREW's numbers only — hourly rate, clocked hours and the pay that
+ * falls out of them. Client pricing (base price, add-on prices, discount,
+ * parking, client total) was previously included and rendered in the crew
+ * modal; it has been removed from this payload entirely.
+ */
 export async function getPayBreakdown(
   jobId: string
 ): Promise<
@@ -22,10 +38,15 @@ export async function getPayBreakdown(
   try {
     const job = await db.job.findUnique({
       where: { id: jobId },
-      include: {
-        employee: true,
-        cleaners: true,
-        addOns: true,
+      select: {
+        id: true,
+        clientName: true,
+        employeeId: true,
+        totalTip: true,
+        providerHourlyRate: true,
+        clockInTime: true,
+        clockOutTime: true,
+        cleaners: { select: { id: true } },
       },
     });
 
@@ -33,81 +54,69 @@ export async function getPayBreakdown(
       return { success: false, error: "Job not found" };
     }
 
+    const role = (session.user as { role?: string }).role;
     const isLead = job.employeeId === session.user.id;
     const isCleaner = job.cleaners.some((c) => c.id === session.user.id);
-    const isAdmin =
-      (session.user as any).role === "ADMIN" ||
-      (session.user as any).role === "OWNER";
+    const isAdmin = role === "ADMIN" || role === "OWNER" || role === "OPS_MANAGER";
 
+    // Authorization is per-resource: only someone actually assigned to THIS job
+    // (or ops) may see its pay. Fails closed.
     if (!isLead && !isCleaner && !isAdmin) {
       return { success: false, error: "You do not have access to this job" };
     }
 
-    let basePrice: number | null = null;
-    let basePriceSource: PayBreakdown["basePriceSource"] = "NONE";
+    // Whose pay are we explaining? The viewer's, when they worked the job.
+    // An admin viewing someone else's job sees the lead's numbers.
+    const subjectId =
+      isLead || isCleaner ? session.user.id : job.employeeId ?? session.user.id;
 
-    if (job.bedCount !== null && job.bathCount !== null) {
-      const rule = await db.pricingRule.findUnique({
-        where: {
-          bedCount_bathCount: {
-            bedCount: job.bedCount,
-            bathCount: job.bathCount,
-          },
-        },
-      });
-      if (rule && rule.isActive) {
-        basePrice = rule.basePrice;
-        basePriceSource = "PRICING_RULE";
-      }
-    }
+    const subject = await db.user.findUnique({
+      where: { id: subjectId },
+      select: { hourlyRate: true },
+    });
 
-    const addOnsTotal = job.addOns.reduce((sum, a) => sum + (a.price || 0), 0);
+    const defaultRate = await getDefaultProviderHourlyRate();
+    const hourlyRate = resolveProviderHourlyRate({
+      jobRate: job.providerHourlyRate,
+      providerRate: subject?.hourlyRate,
+      defaultRate,
+    });
+    const hourlyRateSource: PayBreakdown["hourlyRateSource"] =
+      job.providerHourlyRate != null && hourlyRate === job.providerHourlyRate
+        ? "JOB_OVERRIDE"
+        : subject?.hourlyRate != null && hourlyRate === subject.hourlyRate
+        ? "PROVIDER_RATE"
+        : "DEFAULT";
 
-    if (basePrice === null && job.price !== null) {
-      basePrice = Math.max(0, job.price - addOnsTotal);
-      basePriceSource = "JOB_PRICE";
-    }
+    // Team = lead + assigned crew. Hours and tips are split evenly across it,
+    // matching how the payout is actually written at clock-out.
+    const participantIds = new Set<string>();
+    if (job.employeeId) participantIds.add(job.employeeId);
+    for (const c of job.cleaners) participantIds.add(c.id);
+    const teamSize = Math.max(1, participantIds.size);
 
-    const discount = job.discountAmount || 0;
-    const parking = job.parking || 0;
-
-    const clientTotal =
-      job.price !== null
-        ? job.price
-        : (basePrice ?? 0) + addOnsTotal - discount;
-
-    const employeeBasePay = job.employeePay || 0;
-    const payMultiplier = job.payRateMultiplier ?? 1.0;
-
-    const payAfterMultiplier = employeeBasePay * payMultiplier;
-
+    const totalJobHours = clockedHours(job.clockInTime, job.clockOutTime);
+    const hours = perPersonHours(totalJobHours, teamSize);
     const totalTip = job.totalTip || 0;
-    const teamSize = 1 + job.cleaners.length;
-    const tipShare = teamSize > 0 ? totalTip / teamSize : 0;
+    const tipShare = perPersonTip(totalTip, teamSize);
 
-    const totalEmployeePay = payAfterMultiplier + tipShare;
+    const pay = computeProviderJobPay({ hourlyRate, hours, tipShare });
 
     return {
       success: true,
       breakdown: {
         jobId: job.id,
         clientName: job.clientName,
-        bedCount: job.bedCount,
-        bathCount: job.bathCount,
-        basePrice,
-        basePriceSource,
-        addOns: job.addOns.map((a) => ({ name: a.name, price: a.price })),
-        addOnsTotal,
-        discount,
-        parking,
-        clientTotal,
-        employeeBasePay,
-        payMultiplier,
-        payAfterMultiplier,
+        hourlyRate: pay.hourlyRate,
+        hourlyRateSource,
+        hours: Number(hours.toFixed(2)),
+        totalJobHours: Number(totalJobHours.toFixed(2)),
+        clockIncomplete: !job.clockInTime || !job.clockOutTime,
+        hourlyPay: pay.hourlyPay,
         totalTip,
         teamSize,
-        tipShare,
-        totalEmployeePay,
+        tipShare: pay.tipShare,
+        totalEmployeePay: pay.total,
         isLead,
       },
     };

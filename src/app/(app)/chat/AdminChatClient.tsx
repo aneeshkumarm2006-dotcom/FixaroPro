@@ -236,7 +236,7 @@ export default function AdminChatClient({ initialList }: AdminChatClientProps) {
               Team <em style={{ fontStyle: "italic", color: "var(--primary)" }}>chat.</em>
             </h1>
             <p style={{ fontSize: 14, color: "var(--primary-60)", margin: 0 }}>
-              Direct messages with cleaners. Coordinate jobs, share notes, and stay in touch.
+              Direct messages with pros. Coordinate jobs, share notes, and stay in touch.
             </p>
           </div>
         </div>

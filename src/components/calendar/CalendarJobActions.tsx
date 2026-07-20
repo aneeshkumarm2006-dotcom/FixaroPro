@@ -24,6 +24,7 @@ import { addJobNote } from "@/app/(app)/actions/addJobNote";
 // SOP §9.10: shared label helper so new services never render as raw codes.
 import { useJobTypeLabel } from "./use-job-type-label";
 import { WARNING_VISUAL, jobStatusLabel } from "@/lib/status-icons";
+import { fmtTime } from "@/lib/timezone";
 
 const WarningIcon = WARNING_VISUAL.Icon;
 
@@ -182,17 +183,8 @@ export default function CalendarJobActions() {
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <span>
-                {event.start.toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: true,
-                })}
-                {event.end &&
-                  ` - ${event.end.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}`}
+                {fmtTime(event.start)}
+                {event.end && ` - ${fmtTime(event.end)}`}
               </span>
             </div>
           )}

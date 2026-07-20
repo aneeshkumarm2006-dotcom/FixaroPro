@@ -8,15 +8,23 @@
 // rows on submit, or QuoteRequest.photoUrls) — and those persist paths only
 // trust our own uploads (see isTrustedIntakePhotoUrl).
 //
-// NOTE (deferred to the §12 security pass): like uploadResume, this endpoint has
-// no per-IP/session rate limit. Abuse (denial-of-wallet against Cloudinary) is
-// best mitigated at the edge (WAF / edge rate limiting) or with a shared
-// token-bucket store; both are cross-cutting and out of scope for this change.
-// The Next.js default server-action body limit (~1MB) and the raster-only
-// `allowed_formats` gate below bound the per-request blast radius in the interim.
+// RATE LIMITING (was deferred to the §12 security pass, now partially closed):
+// this endpoint now applies a per-IP in-process budget to blunt denial-of-wallet
+// abuse against Cloudinary. That limiter is per-instance memory only, so it does
+// NOT survive across serverless instances — edge rate limiting (WAF/CDN) or a
+// shared token-bucket store remains the real fix. The Next.js default server-
+// action body limit (~1MB) and the raster-only `allowed_formats` gate below
+// still bound the per-request blast radius.
 
+import { headers } from "next/headers";
 import { cloudinary } from "@/lib/cloudinary";
 import type { UploadApiResponse } from "cloudinary";
+import {
+  rateLimit,
+  clientIpFromHeaders,
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGE,
+} from "@/lib/rate-limit";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = [
@@ -77,6 +85,18 @@ export async function uploadIntakePhoto(
     !process.env.CLOUDINARY_API_SECRET
   ) {
     return { success: false, error: "Uploads are not configured on the server" };
+  }
+
+  // Per-IP budget, consumed only once the request would actually reach
+  // Cloudinary — so a customer whose file failed the size/type gate doesn't burn
+  // budget they'd need for the corrected re-upload. Server action → IP comes
+  // from `headers()`. NOTE: in-process only, see @/lib/rate-limit.
+  const limited = rateLimit(`ip:${clientIpFromHeaders(await headers())}`, {
+    name: "intake-photo-upload",
+    ...RATE_LIMITS.upload,
+  });
+  if (!limited.ok) {
+    return { success: false, error: RATE_LIMIT_MESSAGE };
   }
 
   try {

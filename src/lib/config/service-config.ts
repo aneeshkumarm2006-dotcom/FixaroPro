@@ -66,6 +66,8 @@ interface ServiceRow {
   materialsAmount: number | null;
   materialsType: string | null;
   materialsNote: string | null;
+  requiresCustomerPart: boolean;
+  customerPartNote: string | null;
 }
 
 function serviceFromRow(r: ServiceRow): ServiceConfigItem {
@@ -84,6 +86,8 @@ function serviceFromRow(r: ServiceRow): ServiceConfigItem {
       ? (MATERIALS_FROM_DB[r.materialsType] ?? null)
       : null,
     materialsNote: r.materialsNote,
+    requiresCustomerPart: r.requiresCustomerPart,
+    customerPartNote: r.customerPartNote,
   };
 }
 
@@ -206,6 +210,8 @@ export async function seedServiceConfig(): Promise<SeedResult> {
         materialsAmount: s.materialsAmount,
         materialsType: s.materialsType ? MATERIALS_TO_DB[s.materialsType] : null,
         materialsNote: s.materialsNote,
+        requiresCustomerPart: s.requiresCustomerPart,
+        customerPartNote: s.customerPartNote,
       })),
       skipDuplicates: true,
     });

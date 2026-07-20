@@ -7,8 +7,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Mail, Phone, Clock, FileText, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Briefcase, Mail, Phone, Clock, FileText, Sparkles, AlertTriangle, KeyRound } from "lucide-react";
+import { useServiceCatalog } from "@/lib/config/ServiceConfigProvider";
 import { updateApplicationStatus } from "../actions/updateApplicationStatus";
+import { hireApplicant } from "../actions/hireApplicant";
 
 type Status = "NEW" | "REVIEWING" | "INTERVIEW" | "HIRED" | "REJECTED" | "ARCHIVED";
 
@@ -54,6 +57,23 @@ export default function ApplicationsInboxClient({ applications }: { applications
     applications.find((a) => a.status === "NEW")?.id || applications[0]?.id
   );
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const catalog = useServiceCatalog();
+
+  // Fix #9f: the outcome of the last hire — which services onboarding seeded,
+  // and the standing prompt to review them. Kept in state (not a toast) so the
+  // admin cannot miss that a new provider's work authorisations are unreviewed.
+  const [hireOutcome, setHireOutcome] = useState<{
+    applicantName: string;
+    employeeId: string;
+    seeded: string[];
+    needsReview: boolean;
+    reviewReason: string;
+    tempPassword?: string;
+  } | null>(null);
+
+  const labelOf = (value: string) =>
+    catalog.find((s) => s.value === value)?.label ?? value;
 
   const counts = useMemo(() => {
     const m: Record<string, number> = { ALL: applications.length };
@@ -71,8 +91,38 @@ export default function ApplicationsInboxClient({ applications }: { applications
 
   async function setStatus(id: string, status: Status) {
     setBusy(true);
-    await updateApplicationStatus({ applicationId: id, status });
+    setError(null);
+
+    // Moving to HIRED is not just a status change: it provisions the provider
+    // account AND seeds their service eligibility from onboarding, so it must
+    // go through hireApplicant rather than the plain status update.
+    if (status === "HIRED") {
+      const applicantName = applications.find((a) => a.id === id)?.name ?? "Applicant";
+      const res = await hireApplicant(id);
+      setBusy(false);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setHireOutcome({
+        applicantName,
+        employeeId: res.eligibility.employeeId,
+        seeded: res.eligibility.seeded,
+        needsReview: res.eligibility.needsReview,
+        reviewReason: res.eligibility.reviewReason,
+        tempPassword: res.existing ? undefined : res.tempPassword,
+      });
+      router.refresh();
+      return;
+    }
+
+    const res = await updateApplicationStatus({ applicationId: id, status });
     setBusy(false);
+    if (!res?.success) {
+      const msg = (res as { error?: string } | undefined)?.error;
+      setError(msg ?? "Failed to update application");
+      return;
+    }
     router.refresh();
   }
 
@@ -95,6 +145,77 @@ export default function ApplicationsInboxClient({ applications }: { applications
           </button>
         ))}
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "#fee2e2", color: "#991b1b", fontSize: 13.5 }}>
+          {error}
+        </div>
+      )}
+
+      {hireOutcome && (
+        <div
+          role="status"
+          style={{
+            marginBottom: 16,
+            padding: 16,
+            borderRadius: 14,
+            border: "1px solid #f59e0b",
+            background: "#fffbeb",
+            color: "#78350f",
+            fontSize: 13.5,
+            lineHeight: 1.55,
+          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, marginBottom: 8 }}>
+            <AlertTriangle size={16} />
+            {hireOutcome.applicantName} hired — review their service eligibility
+          </div>
+
+          {hireOutcome.seeded.length > 0 ? (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 6 }}>Seeded from onboarding (starter set):</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {hireOutcome.seeded.map((s) => (
+                  <span
+                    key={s}
+                    style={{ padding: "3px 9px", borderRadius: 999, background: "#fef3c7", border: "1px solid #fcd34d", fontSize: 12 }}>
+                    {labelOf(s)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 8, fontWeight: 600 }}>
+              No services were seeded — this provider will see NO claimable jobs until you approve some.
+            </div>
+          )}
+
+          {hireOutcome.reviewReason && (
+            <div style={{ marginBottom: 10 }}>{hireOutcome.reviewReason}</div>
+          )}
+
+          {hireOutcome.tempPassword && (
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, padding: "8px 10px", borderRadius: 10, background: "#fff", border: "1px solid #fcd34d" }}>
+              <KeyRound size={14} />
+              <span>Temporary password (share securely, shown once):</span>
+              <code style={{ fontWeight: 700, letterSpacing: 0.5 }}>{hireOutcome.tempPassword}</code>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {/* The detail view keeps tab state locally (no URL param), so this
+                lands on the profile — the copy above says which tab to open. */}
+            <Link className="btn btn-primary btn-sm" href={`/employees/${hireOutcome.employeeId}`}>
+              Open provider profile
+            </Link>
+            <button className="btn btn-secondary btn-sm" onClick={() => setHireOutcome(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="apps-split">
         <div className="apps-list">

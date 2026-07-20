@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clockIn } from "../../../actions/clockIn";
+import {
+  markOnMyWay,
+  markArrived,
+  backfillArrivalFromClockIn,
+} from "../../../actions/onMyWay";
 import { BUSINESS_TZ } from "@/lib/timezone";
 
 interface ClockPageClientProps {
@@ -14,6 +19,10 @@ interface ClockPageClientProps {
   status: string;
   clockInTime: string | null;
   clockOutTime: string | null;
+  /** Set when the Pro tapped "On my way" — customer SMS already sent. */
+  onMyWayAt: string | null;
+  /** Actual on-site arrival. Explicit tap, or backfilled from clock-in. */
+  arrivedAt: string | null;
 }
 
 function pad(n: number) {
@@ -130,10 +139,13 @@ export default function ClockPageClient({
   startTime,
   clockInTime,
   clockOutTime,
+  onMyWayAt,
+  arrivedAt,
 }: ClockPageClientProps) {
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
+  const [enrouteLoading, setEnrouteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -163,12 +175,19 @@ export default function ClockPageClient({
     .slice(0, 2)
     .toUpperCase();
 
+  const onMyWayDate = onMyWayAt ? new Date(onMyWayAt) : null;
+  const arrivedDate = arrivedAt ? new Date(arrivedAt) : null;
+
   async function handleClockIn() {
     setLoading(true);
     setError(null);
     try {
       const result = await clockIn(jobId);
       if (result.success) {
+        // Safety net: if the Pro clocked in without ever tapping "I've arrived",
+        // stamp arrival from the clock-in time so the record is never empty.
+        // No-op when an explicit arrival tap already exists.
+        await backfillArrivalFromClockIn(jobId).catch(() => {});
         router.refresh();
       } else {
         setError(result.error || "Failed to clock in");
@@ -177,6 +196,34 @@ export default function ClockPageClient({
       setError("Failed to clock in");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleOnMyWay() {
+    setEnrouteLoading(true);
+    setError(null);
+    try {
+      const result = await markOnMyWay(jobId);
+      if (result.success) router.refresh();
+      else setError(result.error);
+    } catch {
+      setError("Could not update this job right now.");
+    } finally {
+      setEnrouteLoading(false);
+    }
+  }
+
+  async function handleArrived() {
+    setEnrouteLoading(true);
+    setError(null);
+    try {
+      const result = await markArrived(jobId);
+      if (result.success) router.refresh();
+      else setError(result.error);
+    } catch {
+      setError("Could not update this job right now.");
+    } finally {
+      setEnrouteLoading(false);
     }
   }
 
@@ -230,6 +277,86 @@ export default function ClockPageClient({
               ? "Your shift has been logged. Head back to the job to view the summary."
               : "Tap the button when you arrive on site. Your shift starts the moment you clock in."}
           </p>
+
+          {/* Travel & arrival — independent of the clock. "On my way" texts the
+              customer once; "I've arrived" is what punctuality is measured on. */}
+          {!isDone && (
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                margin: "0 0 18px",
+                padding: 14,
+                borderRadius: 14,
+                border: "1px solid rgba(232, 93, 4, 0.22)",
+                background: "rgba(232, 93, 4, 0.05)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                  color: "var(--primary)",
+                }}
+              >
+                Travel &amp; arrival
+              </div>
+
+              {onMyWayDate ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Customer notified · {fmtShort(onMyWayDate)}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="clk-action"
+                  onClick={handleOnMyWay}
+                  disabled={enrouteLoading}
+                  style={{ margin: 0 }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="5 12 19 12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                  {enrouteLoading ? "Sending…" : "On my way"}
+                </button>
+              )}
+
+              {arrivedDate ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Arrived on site · {fmtShort(arrivedDate)}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="clk-action out"
+                  onClick={handleArrived}
+                  disabled={enrouteLoading}
+                  style={{ margin: 0 }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  {enrouteLoading ? "Saving…" : "I've arrived"}
+                </button>
+              )}
+
+              <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
+                {onMyWayDate
+                  ? "We texted the customer your ETA. Tap “I’ve arrived” the moment you’re on site — that’s the time your punctuality is scored on."
+                  : "Tap “On my way” when you set off — the customer gets a text with your ETA."}
+              </p>
+            </div>
+          )}
 
           {!isDone ? (
             <button

@@ -291,7 +291,7 @@ export default function CampaignManager({ campaigns }: CampaignManagerProps) {
             <Input
               name="name"
               defaultValue={editingCampaign?.name || ""}
-              placeholder="e.g. Spring Cleaning Promo"
+              placeholder="e.g. Spring Home Repair Promo"
               required
             />
           </div>

@@ -20,6 +20,10 @@ import {
 } from "@/lib/email";
 import { isNotificationEnabled } from "@/lib/notifications";
 import { createAssignmentInvites } from "@/lib/invites";
+import { businessDateOnly, parseBusinessDateTime } from "@/lib/timezone";
+import { businessDateKey } from "@/lib/availability-exceptions";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { findService } from "@/lib/config/types";
 
 const VALID_PAYMENT_TYPES = [
   "CASH",
@@ -84,6 +88,32 @@ export async function saveJob(formData: FormData) {
     const startDate = formData.get("startDate") as string;
     const startTime = formData.get("startTime") as string;
 
+    // Start date + time are REQUIRED and are BUSINESS-timezone wall clock.
+    // `new Date(`${startDate}T${startTime}`)` parsed in the SERVER's timezone,
+    // so on a UTC host a 9:00 AM Toronto pick was stored as 09:00Z (5 AM
+    // Toronto); and the `?? new Date()` fallback silently stamped "now" on a
+    // blank submission rather than rejecting it.
+    const parsedStart = parseBusinessDateTime(startDate, startTime);
+    const parsedJobDate = businessDateOnly(startDate);
+    if (!parsedStart || !parsedJobDate) {
+      return { error: "A valid start date and time are required." };
+    }
+
+    // jobType is an allow-listed SERVICE VALUE from the runtime catalog, the
+    // same vocabulary the booking flow writes. The crew board filters
+    // `jobType in eligibleTypes` and equipment/kit matching keys off it, so an
+    // unknown code yields a job no provider can see. Looked up UNFILTERED so a
+    // job already on a retired service can still be edited.
+    const jobTypeRaw = ((formData.get("jobType") as string) || "").trim();
+    let jobType: string | null = null;
+    if (jobTypeRaw) {
+      const cfg = await getRuntimeConfig();
+      if (!findService(cfg, jobTypeRaw)) {
+        return { error: "That service isn't in the catalog." };
+      }
+      jobType = jobTypeRaw;
+    }
+
     const paymentTypeRaw = (formData.get("paymentType") as string) || "";
     const paymentType = VALID_PAYMENT_TYPES.includes(paymentTypeRaw as any)
       ? (paymentTypeRaw as (typeof VALID_PAYMENT_TYPES)[number])
@@ -120,14 +150,11 @@ export async function saveJob(formData: FormData) {
       clientName,
       clientId,
       description: (formData.get("description") as string) || null,
-      jobType: (formData.get("jobType") as string) || null,
+      jobType,
       location: (formData.get("location") as string) || null,
       apartmentNumber: (formData.get("apartmentNumber") as string) || null,
-      jobDate: startDate ? new Date(startDate) : null,
-      startTime:
-        startDate && startTime
-          ? new Date(`${startDate}T${startTime}`)
-          : new Date(),
+      jobDate: parsedJobDate,
+      startTime: parsedStart,
       price,
       employeePay: parseOptionalFloat(formData.get("employeePay")),
       totalTip: parseOptionalFloat(formData.get("totalTip")),
@@ -430,7 +457,7 @@ export async function saveJob(formData: FormData) {
 
       if (jobData.startTime) {
         await invalidateCalendarDay(
-          jobData.startTime.toISOString().slice(0, 10)
+          businessDateKey(jobData.startTime)
         );
       }
       revalidatePath("/jobs");
@@ -472,7 +499,7 @@ export async function saveJob(formData: FormData) {
 
       if (jobData.startTime) {
         await invalidateCalendarDay(
-          jobData.startTime.toISOString().slice(0, 10)
+          businessDateKey(jobData.startTime)
         );
       }
       revalidatePath("/jobs");

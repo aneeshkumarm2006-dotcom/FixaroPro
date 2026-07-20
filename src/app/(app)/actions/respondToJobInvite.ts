@@ -73,7 +73,7 @@ export async function respondToJobInvite(input: {
             jobId: invite.jobId,
             userId: session.user.id,
             action: "NOTE_ADDED",
-            description: `LAST-MINUTE CLAIM: ${session.user.name ?? "Cleaner"} claimed this booking. $${invite.bonusUsd.toFixed(2)} claim bonus to be added at payout.`,
+            description: `LAST-MINUTE CLAIM: ${session.user.name ?? "Pro"} claimed this booking. $${invite.bonusUsd.toFixed(2)} claim bonus to be added at payout.`,
           },
         }),
       ]);
@@ -89,7 +89,7 @@ export async function respondToJobInvite(input: {
             jobId: invite.jobId,
             userId: session.user.id,
             action: "NOTE_ADDED",
-            description: `${session.user.name ?? "Cleaner"} accepted the assignment.`,
+            description: `${session.user.name ?? "Pro"} accepted the assignment.`,
           },
         }),
       ]);
@@ -117,8 +117,8 @@ export async function respondToJobInvite(input: {
           userId: session.user.id,
           action: "NOTE_ADDED",
           description: input.reason?.trim()
-            ? `${session.user.name ?? "Cleaner"} declined: ${input.reason.trim()}`
-            : `${session.user.name ?? "Cleaner"} declined the assignment.`,
+            ? `${session.user.name ?? "Pro"} declined: ${input.reason.trim()}`
+            : `${session.user.name ?? "Pro"} declined the assignment.`,
         },
       }),
     ]);

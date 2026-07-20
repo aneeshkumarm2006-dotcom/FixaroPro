@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { claimJob } from "./claimJob";
 import type { EquipmentReadinessMode } from "@/lib/equipment-readiness-constants";
+import { fmtDate as tzDate, fmtTime as tzTime } from "@/lib/timezone";
 
 interface AvailableJob {
   id: string;
@@ -24,14 +25,14 @@ interface AvailableJob {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+  return tzDate(iso, {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
+  return tzTime(iso);
 }
 
 export default function AvailableJobsClient({

@@ -104,6 +104,17 @@ export const CANCELLATION_FEE_WINDOW_HOURS = 24;
  *  `pricing.labourRate` — see getLabourRate() in src/lib/billing.ts. */
 export const DEFAULT_LABOUR_RATE = 79;
 
+/**
+ * Default hourly PAY rate for a provider (what Fixaro pays the crew per clocked
+ * hour). Admin-configurable via AppSetting `pay.providerHourlyRate`.
+ *
+ * This is deliberately NOT `DEFAULT_LABOUR_RATE` — that is the CLIENT-facing
+ * billing rate ($79/hr, what the customer is charged). Never use the client rate
+ * as provider pay. Resolution order for an actual payout is
+ * `Job.providerHourlyRate ?? User.hourlyRate ?? this default`.
+ */
+export const DEFAULT_PROVIDER_HOURLY_RATE = 25;
+
 /** Deposit captured at checkout on a booking that has no upfront materials
  *  deposit/charge of its own, and credited against the final bill. Was
  *  hardcoded as a bare `20` in charge-deposit, submitBooking and

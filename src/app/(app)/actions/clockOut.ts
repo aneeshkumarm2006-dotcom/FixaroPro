@@ -13,6 +13,15 @@ import {
   recordInventoryChanges,
   type InventoryChangeRow,
 } from "@/lib/inventory-change";
+import { checkAfterPhotoGate } from "@/lib/after-photo-gate";
+import {
+  clockedHours,
+  computeProviderJobPay,
+  getDefaultProviderHourlyRate,
+  perPersonHours,
+  perPersonTip,
+  resolveProviderHourlyRate,
+} from "@/lib/provider-pay";
 
 const ML_PER_SPRAY = 1.25;
 const MAX_COMPLETION_NOTES = 4000;
@@ -30,13 +39,20 @@ interface RestockItem {
   productId: string;
 }
 
+/**
+ * Fold this job's provider pay into any open pay period (Fix #3 / #8).
+ *
+ * PAY IS HOURLY: each participant earns `their resolved hourly rate × their
+ * share of the clocked hours`, plus an even share of the tip. The old formula
+ * (`employeePay × job.payRateMultiplier × user.payMultiplier + tips`) is gone;
+ * neither multiplier is read here any more.
+ */
 async function updatePayoutsForCompletedJob(
   job: {
     id: string;
     employeeId: string | null;
-    employeePay: number | null;
     totalTip: number | null;
-    payRateMultiplier: number | null;
+    providerHourlyRate: number | null;
     jobDate: Date | null;
     startTime: Date;
     clockInTime: Date | null;
@@ -58,31 +74,31 @@ async function updatePayoutsForCompletedJob(
   });
   if (activePeriods.length === 0) return;
 
-  const employeeMultipliers = await db.user.findMany({
+  const providers = await db.user.findMany({
     where: { id: { in: cleanerIds } },
-    select: { id: true, payMultiplier: true },
+    select: { id: true, hourlyRate: true },
   });
-  const multiplierMap = new Map(
-    employeeMultipliers.map((e) => [e.id, e.payMultiplier ?? 1])
-  );
+  const providerRateMap = new Map(providers.map((e) => [e.id, e.hourlyRate]));
+  const defaultRate = await getDefaultProviderHourlyRate();
 
-  const basePay = (job.employeePay ?? 0) + (job.totalTip ?? 0);
-  const jobPayMultiplier = job.payRateMultiplier ?? 1;
-  const totalJobPay = basePay * jobPayMultiplier;
-  const perPerson = cleanerIds.length > 0 ? totalJobPay / cleanerIds.length : 0;
-
-  const clockIn = job.clockInTime;
-  const hours =
-    clockIn
-      ? Math.max(0, (clockOutTime.getTime() - clockIn.getTime()) / 3_600_000)
-      : 0;
-  const perPersonHours = cleanerIds.length > 0 ? hours / cleanerIds.length : 0;
+  const hours = clockedHours(job.clockInTime, clockOutTime);
+  const hoursEach = perPersonHours(hours, cleanerIds.length);
+  const tipEach = perPersonTip(job.totalTip ?? 0, cleanerIds.length);
 
   for (const period of activePeriods) {
     for (const cleanerId of cleanerIds) {
-      const empMultiplier = multiplierMap.get(cleanerId) ?? 1;
-      const contribution = Number((perPerson * empMultiplier).toFixed(2));
-      const hoursContrib = Number(perPersonHours.toFixed(4));
+      const hourlyRate = resolveProviderHourlyRate({
+        jobRate: job.providerHourlyRate,
+        providerRate: providerRateMap.get(cleanerId),
+        defaultRate,
+      });
+      const pay = computeProviderJobPay({
+        hourlyRate,
+        hours: hoursEach,
+        tipShare: tipEach,
+      });
+      const contribution = pay.total;
+      const hoursContrib = Number(hoursEach.toFixed(4));
 
       const existing = await db.payout.findUnique({
         where: { payPeriodId_employeeId: { payPeriodId: period.id, employeeId: cleanerId } },
@@ -148,6 +164,14 @@ export async function clockOut(
     }
     if (!job.clockInTime) return { success: false, error: "Not clocked in" };
     if (job.clockOutTime) return { success: false, error: "Already clocked out" };
+
+    // Completion-photo gate (Fix #3c / #8b). Clock-out CLOSES the job, so it is
+    // a completion path and must not pass without an after-photo on file.
+    // Fails closed: any error resolving the gate blocks the close.
+    const photoGate = await checkAfterPhotoGate(jobId, job);
+    if (!photoGate.ok) {
+      return { success: false, error: photoGate.error };
+    }
 
     const notes = completionNotes?.trim();
     if (notes && notes.length > MAX_COMPLETION_NOTES) {
@@ -352,6 +376,25 @@ export async function clockOut(
         },
       })
     );
+
+    // Record when the after-photo requirement did NOT apply, so a job that
+    // closed without completion photos is explainable months later.
+    if (photoGate.waived) {
+      ops.push(
+        db.jobLog.create({
+          data: {
+            jobId,
+            userId: session.user.id,
+            action: "UPDATED",
+            field: "afterPhotos",
+            description:
+              photoGate.reason === "ADMIN_OVERRIDE"
+                ? "Completed without after-photos — admin after-photo override is set on this job."
+                : "Completed without after-photos — the customer did not consent to after-photos.",
+          },
+        })
+      );
+    }
 
     if (notes) {
       ops.push(

@@ -2,10 +2,25 @@ import { db } from "@/db";
 import { requireCleaner } from "@/lib/page-guards";
 import MyPayClient from "./MyPayClient";
 import { getEmployeeAvgRating } from "../actions/setEmployeeRating";
+import {
+  getDefaultProviderHourlyRate,
+  resolveProviderHourlyRate,
+} from "@/lib/provider-pay";
 
 export default async function MyPayPage() {
   const session = await requireCleaner();
   const userId = session.user.id;
+
+  // Pay is hourly (Fix #8e): the crew screen shows hours, RATE and pay. It never
+  // shows what the client was charged.
+  const [me, defaultHourlyRate] = await Promise.all([
+    db.user.findUnique({ where: { id: userId }, select: { hourlyRate: true } }),
+    getDefaultProviderHourlyRate(),
+  ]);
+  const hourlyRate = resolveProviderHourlyRate({
+    providerRate: me?.hourlyRate,
+    defaultRate: defaultHourlyRate,
+  });
 
   const [payouts, withdrawals, starRating] = await Promise.all([
     db.payout.findMany({
@@ -92,6 +107,7 @@ export default async function MyPayPage() {
       availableBalance={availableBalance}
       currentPayout={currentPayout ? serializePayout(currentPayout) : null}
       year={now.getFullYear()}
+      hourlyRate={hourlyRate}
       starRating={starRating}
     />
   );

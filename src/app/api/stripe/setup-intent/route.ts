@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
       customer: customerId,
       payment_method_types: ["card"],
       usage: "off_session",
+      // SetupIntents have no statement descriptor (no charge is made). The mandate
+      // text shown to the customer here is ACCOUNT-level — see STATEMENT_DESCRIPTOR_SUFFIX
+      // in @/lib/stripe for what code can and cannot change.
+      description: "Fixaro Handyman — save card for future bookings",
     });
 
     return NextResponse.json({

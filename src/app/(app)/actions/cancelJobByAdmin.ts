@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { stripe } from "@/lib/stripe";
+import { stripe, STATEMENT_DESCRIPTOR_SUFFIX } from "@/lib/stripe";
 import { issueRefund } from "./issueRefund";
 import {
   sendAdminBookingCanceled,
@@ -129,7 +129,8 @@ export async function cancelJobByAdmin(input: CancelJobInput) {
           payment_method: job.client.defaultPaymentMethodId,
           off_session: true,
           confirm: true,
-          description: `Fixaro late-cancellation fee — job #${job.jobNumber}`,
+          statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
+          description: `Fixaro Handyman — late-cancellation fee, job #${job.jobNumber}`,
           metadata: { jobId: job.id, jobNumber: String(job.jobNumber), type: "cancellation_fee" },
         });
         await db.$transaction([

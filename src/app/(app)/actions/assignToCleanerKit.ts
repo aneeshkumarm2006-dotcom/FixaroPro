@@ -41,7 +41,7 @@ export async function assignToCleanerKit(input: {
     where: { id: input.cleanerId },
     select: { id: true, name: true, role: true },
   });
-  if (!cleaner) return { success: false, error: "Cleaner not found" };
+  if (!cleaner) return { success: false, error: "Pro not found" };
 
   const updatedKit = await db.employeeProduct.upsert({
     where: {
@@ -116,11 +116,11 @@ export async function removeFromCleanerKit(input: {
       employee: { select: { name: true } },
     },
   });
-  if (!kit) return { success: false, error: "Cleaner does not have this item" };
+  if (!kit) return { success: false, error: "Pro does not have this item" };
   if (kit.quantity < qty) {
     return {
       success: false,
-      error: `Cleaner only has ${kit.quantity} of this item`,
+      error: `Pro only has ${kit.quantity} of this item`,
     };
   }
 

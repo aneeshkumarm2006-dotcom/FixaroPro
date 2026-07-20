@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { stripe } from "@/lib/stripe";
+import { stripe, STATEMENT_DESCRIPTOR_SUFFIX } from "@/lib/stripe";
 import {
   sendCustomerHoldPlaced,
   sendCustomerHoldReleased,
@@ -72,7 +72,8 @@ export async function placeCardHold(jobId: string) {
       off_session: true,
       confirm: true,
       capture_method: "manual",
-      description: `Fixaro hold — job #${job.jobNumber}`,
+      statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
+      description: `Fixaro Handyman — authorization hold, job #${job.jobNumber}`,
       metadata: { jobId, jobNumber: String(job.jobNumber), kind: "hold" },
     });
 

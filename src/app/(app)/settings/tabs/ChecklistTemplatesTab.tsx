@@ -298,7 +298,7 @@ export default function ChecklistTemplatesTab({
               onChange={(e) =>
                 setDraft((prev) => ({ ...prev, name: e.target.value }))
               }
-              placeholder="e.g. Standard Residential Cleaning"
+              placeholder="e.g. Standard Residential Repair"
             />
           </Field>
 

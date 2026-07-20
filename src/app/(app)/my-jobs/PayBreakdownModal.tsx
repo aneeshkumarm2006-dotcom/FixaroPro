@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
-import { DollarSign, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { getPayBreakdown } from "../actions/getPayBreakdown";
 import type { PayBreakdown } from "../actions/getPayBreakdown.types";
 
@@ -57,94 +57,45 @@ export default function PayBreakdownModal({
 
       {data && (
         <div className="space-y-6">
-          {/* Client total */}
-          <section>
-            <h3 className="text-xs font-[400] text-gray-500 uppercase tracking-wider mb-3">
-              Client Charges
-            </h3>
-            <div className="space-y-2">
-              {data.basePrice !== null && (
-                <Row
-                  label={
-                    data.bedCount !== null && data.bathCount !== null
-                      ? `Base price (${data.bedCount} bed · ${data.bathCount} bath)`
-                      : "Base price"
-                  }
-                  value={`$${data.basePrice.toFixed(2)}`}
-                  hint={
-                    data.basePriceSource === "PRICING_RULE"
-                      ? "From pricing rules"
-                      : data.basePriceSource === "JOB_PRICE"
-                      ? "Derived from job price"
-                      : undefined
-                  }
-                />
-              )}
-              {data.addOns.length > 0 && (
-                <div className="rounded-xl bg-gray-50 px-3 py-2">
-                  <div className="text-sm text-gray-600 mb-1.5">Add-Ons</div>
-                  <div className="space-y-1">
-                    {data.addOns.map((a, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between text-sm">
-                        <span className="text-gray-700">{a.name}</span>
-                        <span className="text-gray-900">
-                          ${a.price.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between text-xs pt-1 border-t border-gray-200 text-gray-500">
-                      <span>Add-on subtotal</span>
-                      <span>${data.addOnsTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {data.discount > 0 && (
-                <Row
-                  label="Discount"
-                  value={`- $${data.discount.toFixed(2)}`}
-                  valueClass="text-red-600"
-                />
-              )}
-              {data.parking > 0 && (
-                <Row
-                  label="Parking"
-                  value={`$${data.parking.toFixed(2)}`}
-                />
-              )}
-              <Row
-                label="Client Total"
-                value={`$${data.clientTotal.toFixed(2)}`}
-                bold
-              />
-            </div>
-          </section>
-
-          {/* Employee pay */}
+          {/* Provider pay only. Client pricing (base price, add-ons, discount,
+              parking, client total) is intentionally NOT shown to crew and is
+              no longer returned by getPayBreakdown at all (Fix #3d). */}
           <section>
             <h3 className="text-xs font-[400] text-gray-500 uppercase tracking-wider mb-3">
               Your Pay
             </h3>
             <div className="space-y-2">
               <Row
-                label="Base employee pay"
-                value={`$${data.employeeBasePay.toFixed(2)}`}
+                label="Your hourly rate"
+                value={`$${data.hourlyRate.toFixed(2)}/hr`}
+                hint={
+                  data.hourlyRateSource === "JOB_OVERRIDE"
+                    ? "Rate set for this job"
+                    : data.hourlyRateSource === "PROVIDER_RATE"
+                    ? "Your standard rate"
+                    : "Standard rate"
+                }
               />
-              {data.payMultiplier !== 1 && (
-                <>
-                  <Row
-                    label="Pay multiplier"
-                    value={`× ${data.payMultiplier.toFixed(2)}`}
-                  />
-                  <Row
-                    label="Pay after multiplier"
-                    value={`$${data.payAfterMultiplier.toFixed(2)}`}
-                    subtle
-                  />
-                </>
-              )}
+              <Row
+                label={
+                  data.teamSize > 1
+                    ? `Your hours (${data.totalJobHours.toFixed(2)}h split ${
+                        data.teamSize
+                      } ways)`
+                    : "Hours clocked"
+                }
+                value={`${data.hours.toFixed(2)}h`}
+                hint={
+                  data.clockIncomplete
+                    ? "Not clocked out yet — hours update when you finish"
+                    : undefined
+                }
+              />
+              <Row
+                label="Hourly pay"
+                value={`$${data.hourlyPay.toFixed(2)}`}
+                subtle
+              />
               {data.totalTip > 0 && (
                 <>
                   <Row
@@ -163,7 +114,7 @@ export default function PayBreakdownModal({
               )}
               <div className="pt-2 mt-2 border-t border-gray-200">
                 <Row
-                  label="Total Employee Pay"
+                  label="Total pay for this job"
                   value={`$${data.totalEmployeePay.toFixed(2)}`}
                   bold
                   highlight
@@ -175,9 +126,9 @@ export default function PayBreakdownModal({
           <div className="flex items-start gap-2 text-xs text-gray-500 bg-gray-50 rounded-xl p-3">
             <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <p>
-              Tips are divided equally among the lead and all assigned cleaners.
-              Final pay may adjust based on actual job completion and admin
-              review.
+              You are paid by the hour: your rate × the hours you clock. Tips are
+              divided equally among the lead and all assigned crew. Final pay may
+              adjust after clock corrections and admin review.
             </p>
           </div>
         </div>

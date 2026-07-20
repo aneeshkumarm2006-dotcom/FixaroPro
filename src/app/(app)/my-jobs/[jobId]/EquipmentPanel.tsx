@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Wrench, Loader2, AlertTriangle, Check } from "lucide-react";
+import { Wrench, Loader2, AlertTriangle, Check, Lock } from "lucide-react";
 import { requestEquipmentReimbursement } from "../../actions/requestEquipmentReimbursement";
+import { loadPreJobEquipment } from "../../actions/preJobEquipment";
 
 // Handyman equipment for a job (SOP §8): the required-equipment list, which of
 // those items this provider is short of, a link to the locker for pickup, and a
@@ -28,6 +29,20 @@ export default function EquipmentPanel({
   const [receiptUrl, setReceiptUrl] = useState("");
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Fix #7 (7d): a claim can only be filed once ops have approved the pre-job
+  // equipment plan. Starts null = "unknown", and the button stays locked until
+  // the server says otherwise — the gate is re-enforced server-side regardless.
+  const [unlocked, setUnlocked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void loadPreJobEquipment(jobId).then((res) => {
+      if (live) setUnlocked(res.success ? res.data.canRequestReimbursement : false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [jobId]);
 
   const missingSet = new Set(missing);
 
@@ -108,12 +123,30 @@ export default function EquipmentPanel({
       </p>
 
       {!open ? (
-        <button
-          type="button"
-          onClick={openForm}
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium">
-          I bought equipment — request reimbursement
-        </button>
+        <div>
+          <button
+            type="button"
+            onClick={openForm}
+            disabled={unlocked !== true}
+            title={
+              unlocked === true
+                ? undefined
+                : "Get your pre-job equipment plan approved by ops first"
+            }
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            {unlocked === true ? null : <Lock size={13} />}
+            I bought equipment — request reimbursement
+          </button>
+          {unlocked === false && (
+            <p className="text-xs text-neutral-500 mt-2">
+              Ops must approve your{" "}
+              <a href="#pre-job-equipment" className="underline">
+                pre-job equipment plan
+              </a>{" "}
+              before you can claim a purchase.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
           <input

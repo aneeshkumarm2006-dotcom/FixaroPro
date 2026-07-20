@@ -45,6 +45,9 @@ interface MyPayClientProps {
   availableBalance: number;
   currentPayout: Payout | null;
   year: number;
+  /** Your standard hourly PAY rate. A job can carry its own override, so a
+   *  period's effective rate may differ — shown alongside. */
+  hourlyRate: number;
   starRating?: number | null;
 }
 
@@ -75,6 +78,7 @@ export default function MyPayClient({
   availableBalance,
   currentPayout,
   year,
+  hourlyRate,
   starRating,
 }: MyPayClientProps) {
   const [tab, setTab] = useState<Tab>("current");
@@ -159,6 +163,10 @@ export default function MyPayClient({
             <div className="cl-pay-tile-head"><span>Hours {year}</span></div>
             <div className="cl-pay-tile-val">{totalHoursYear.toFixed(1)}h</div>
           </div>
+          <div className="cl-pay-tile">
+            <div className="cl-pay-tile-head"><span>Your rate</span></div>
+            <div className="cl-pay-tile-val">${hourlyRate.toFixed(2)}/hr</div>
+          </div>
         </div>
 
         <div className="cl-pay-tabs">
@@ -190,7 +198,15 @@ export default function MyPayClient({
                 </p>
                 <div className="cl-block-stats">
                   <div>
-                    <div className="cl-block-stat-label">Base</div>
+                    <div className="cl-block-stat-label">Hours</div>
+                    <div className="cl-block-stat-val">{currentPayout.totalHours.toFixed(2)}h</div>
+                  </div>
+                  <div>
+                    <div className="cl-block-stat-label">Rate</div>
+                    <div className="cl-block-stat-val">${hourlyRate.toFixed(2)}/hr</div>
+                  </div>
+                  <div>
+                    <div className="cl-block-stat-label">Base (hours × rate)</div>
                     <div className="cl-block-stat-val">${currentPayout.baseAmount.toFixed(2)}</div>
                   </div>
                   <div>
@@ -209,7 +225,12 @@ export default function MyPayClient({
                 <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "var(--primary-60)", paddingTop: 4, borderTop: "1px solid rgba(232,93,4,0.07)" }}>
                   <span>{currentPayout.jobCount} jobs</span>
                   <span>·</span>
-                  <span>{currentPayout.totalHours.toFixed(1)} hours</span>
+                  <span>{currentPayout.totalHours.toFixed(2)} hours</span>
+                  <span>·</span>
+                  <span>
+                    Paid hourly. Tips are added on top, and a job may carry its
+                    own rate.
+                  </span>
                 </div>
               </div>
             ) : (

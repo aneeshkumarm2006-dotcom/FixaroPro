@@ -352,7 +352,7 @@ export default function CleanerSidebar({ user, signOutAction }: Props) {
             <div className="cl-snav-avatar">{initials}</div>
             <div className="cl-snav-user-meta">
               <div className="cl-snav-user-name">{displayName}</div>
-              <div className="cl-snav-user-role">Cleaner</div>
+              <div className="cl-snav-user-role">Pro</div>
             </div>
             <button
               className="cl-snav-settings"

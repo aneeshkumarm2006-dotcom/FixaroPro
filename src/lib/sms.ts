@@ -132,15 +132,38 @@ export function smsBookingConfirmation(opts: {
   });
 }
 
+/**
+ * Customer "your Pro is on the way" text. Fired once, by the provider tapping
+ * "On my way" (see actions/onMyWay.ts). Gated by the CUSTOMER catalog key, so
+ * an opted-out customer is skipped inside sendSms — callers never branch on it.
+ */
 export function smsOnTheWay(opts: {
   to: string;
-  cleanerName: string;
+  proName: string;
   etaMin: number;
 }) {
   return sendSms({
     to: opts.to,
-    body: `Fixaro: ${opts.cleanerName} is on the way, about ${opts.etaMin} min out.`,
+    body: `Fixaro: ${opts.proName} is on the way, about ${opts.etaMin} min out. Reply STOP to opt out.`,
     notification: { recipient: "CUSTOMER", key: "cust.booking.on_the_way" },
+  });
+}
+
+/**
+ * Admin heads-up that a Pro tapped "On my way". Gated by the existing
+ * `admin.clock.on_the_way` catalog key (SMS defaults to OFF there, so this is
+ * a no-op until an admin turns it on in Settings → Notifications).
+ */
+export function smsAdminOnTheWay(opts: {
+  to: string;
+  proName: string;
+  jobNumber: number;
+  etaMin: number;
+}) {
+  return sendSms({
+    to: opts.to,
+    body: `Fixaro: ${opts.proName} is on the way to booking #${opts.jobNumber} (~${opts.etaMin} min).`,
+    notification: { recipient: "ADMIN", key: "admin.clock.on_the_way" },
   });
 }
 
@@ -185,5 +208,22 @@ export function smsPaintingOffer(opts: {
     to: opts.to,
     body: `Fixaro: your painting quote for booking #${opts.jobNumber} is $${opts.finalAmount.toFixed(2)}. Accept or reject it in your portal. Reply STOP to opt out.`,
     notification: { recipient: "CUSTOMER", key: "cust.painting.final_offer" },
+  });
+}
+
+/**
+ * On-site scope change (Phase 2B). The Pro proposed a new all-in price mid-job;
+ * the customer approves or rejects it in the portal. Nothing is charged until
+ * they do. Catalog `cust.scope.revision_requested` — EMAIL + SMS.
+ */
+export function smsPriceRevisionRequest(opts: {
+  to: string;
+  jobNumber: number;
+  proposedPrice: number;
+}) {
+  return sendSms({
+    to: opts.to,
+    body: `Fixaro: your Pro found extra work on booking #${opts.jobNumber} and proposed a new price of $${opts.proposedPrice.toFixed(2)}. Nothing is charged until you approve it in your portal. Reply STOP to opt out.`,
+    notification: { recipient: "CUSTOMER", key: "cust.scope.revision_requested" },
   });
 }

@@ -131,7 +131,7 @@ export default async function DashboardPage() {
   if (lowStockProducts.length > 0)
     alerts.push({ icon: Package, label: "Low stock", value: String(lowStockProducts.length), hint: lowStockProducts.length === 1 ? "1 product" : `${lowStockProducts.length} products`, href: "/inventory?status=low" });
   if (refillAlertCount > 0)
-    alerts.push({ icon: AlertTriangle, label: "Refill alerts", value: String(refillAlertCount), hint: "cleaners low on supplies", href: "/inventory" });
+    alerts.push({ icon: AlertTriangle, label: "Refill alerts", value: String(refillAlertCount), hint: "pros low on supplies", href: "/inventory" });
 
   const QUICK = [
     { icon: Plus, label: "New job", sub: "Schedule a job", href: "/jobs/new" },
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
       {/* Secondary metrics + alerts */}
       <div className="dash-secondary" style={{ marginBottom: 32 }}>
         <AStat icon={Calendar} label="Today's jobs" value={todaysJobs} hint="scheduled today" />
-        <AStat icon={Clock} label="In progress" value={inProgressJobs} hint="cleaners on site" />
+        <AStat icon={Clock} label="In progress" value={inProgressJobs} hint="pros on site" />
         {alerts.map((a, i) => <AlertTile key={i} {...a} />)}
       </div>
 

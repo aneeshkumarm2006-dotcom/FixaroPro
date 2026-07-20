@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
+import { useJobTypeLabel } from "@/components/calendar/use-job-type-label";
+import { fmtTime as tzTime } from "@/lib/timezone";
 
 export type CalJob = {
   id: string;
@@ -16,11 +18,7 @@ export type CalJob = {
 
 function fmtTime(iso: string | null) {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  return tzTime(iso);
 }
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -251,6 +249,7 @@ function AgendaView({
   jobs: CalJob[];
   today: Date;
 }) {
+  const jobTypeLabel = useJobTypeLabel();
   const days = useMemo(() => {
     if (view === "day") return [new Date(cursor)];
     if (view === "week") {
@@ -312,7 +311,7 @@ function AgendaView({
                     </div>
                   )}
                   {j.jobType && (
-                    <div className="cl-agenda-event-sub">{j.jobType} cleaning</div>
+                    <div className="cl-agenda-event-sub">{jobTypeLabel(j.jobType)}</div>
                   )}
                 </Link>
               ))

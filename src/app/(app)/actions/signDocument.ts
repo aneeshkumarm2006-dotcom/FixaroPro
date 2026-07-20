@@ -114,7 +114,7 @@ export async function signDocument(input: SignDocumentInput) {
       select: { title: true },
     });
     sendAdminDocSigned({
-      signerName: session.user.name ?? "Cleaner",
+      signerName: session.user.name ?? "Pro",
       documentTitle: doc?.title ?? "Document",
     }).catch((e) => console.error("admin doc-signed", e));
 

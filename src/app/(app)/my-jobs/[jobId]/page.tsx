@@ -15,6 +15,8 @@ import JobChatPanel from "@/app/(app)/jobs/[id]/JobChatPanel";
 import JobChecklistPanel from "./JobChecklistPanel";
 import MapLinks from "./MapLinksClient";
 import EquipmentPanel from "./EquipmentPanel";
+import PreJobEquipmentPanel from "./PreJobEquipmentPanel";
+import ScopeChangePanel from "./ScopeChangePanel";
 import CompletionPanel from "./CompletionPanel";
 import { getRequiredEquipmentFor } from "@/lib/equipment-server";
 import {
@@ -73,6 +75,8 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         orderBy: { createdAt: "asc" },
         select: { id: true, url: true },
       },
+      // Phase 2B — scope-change history for this job, newest first.
+      priceRevisions: { orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -130,6 +134,19 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
   // Service-specific intake the customer gave at booking (SOP v4.2 §4).
   const intakeRows = buildIntakeRows(job);
   const intakePhotos = (job as { photos?: { id: string; url: string }[] }).photos ?? [];
+
+  // Phase 2B — Dates must cross the server/client boundary as ISO strings.
+  const priceRevisions = job.priceRevisions.map((r) => ({
+    id: r.id,
+    previousPrice: r.previousPrice,
+    proposedPrice: r.proposedPrice,
+    reason: r.reason,
+    status: r.status,
+    requestedByName: r.requestedByName,
+    createdAt: r.createdAt.toISOString(),
+    respondedAt: r.respondedAt?.toISOString() ?? null,
+    resolutionNote: r.resolutionNote,
+  }));
 
   const canClockIn = !jobWithClock.clockInTime && job.status !== "COMPLETED";
   const canClockOut = jobWithClock.clockInTime && !jobWithClock.clockOutTime;
@@ -544,10 +561,25 @@ export default async function JobDetailPage({ params, searchParams }: PageProps)
         </>
       )}
 
+      {/* Fix #7 — pre-job equipment & materials plan, due 24h before start.
+          Sits above EquipmentPanel, which links down to #pre-job-equipment.
+          Self-fetching + re-authorizing, so it only needs the job id. */}
+      <PreJobEquipmentPanel jobId={job.id} />
+
       <EquipmentPanel
         jobId={job.id}
         equipment={requiredEquipment}
         missing={missingEquipment}
+      />
+
+      {/* Phase 2B — on-site scope change; the Pro proposes a new price and the
+          customer approves it in their portal before the work continues. */}
+      <ScopeChangePanel
+        jobId={job.id}
+        currentPrice={job.price ?? null}
+        jobStatus={job.status}
+        paymentReceived={job.paymentReceived}
+        revisions={priceRevisions}
       />
 
       {/* Job completion (SOP §8). Clock-out is the primary path and collects the

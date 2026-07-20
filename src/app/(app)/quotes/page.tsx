@@ -34,6 +34,8 @@ export default async function QuotesPage() {
           photoUrls: q.photoUrls,
           status: q.status,
           notes: q.notes,
+          quotedPrice: q.quotedPrice,
+          convertedJobId: q.convertedJobId,
           createdAt: q.createdAt.toISOString(),
         }))}
       />

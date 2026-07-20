@@ -7,10 +7,24 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { sendAccountEmail } from "@/lib/email";
+import { seedOnboardingEligibility } from "./seedOnboardingEligibility";
+
+/**
+ * Fix #9f — what the hire seeded into the provider's service-eligibility matrix.
+ * Always present on a successful hire so the admin UI can prompt for review.
+ * Not exported: a "use server" module may only export async functions.
+ */
+interface HireEligibility {
+  /** Provider user id, so the admin UI can deep-link to the Eligibility tab. */
+  employeeId: string;
+  seeded: string[];
+  needsReview: boolean;
+  reviewReason: string;
+}
 
 type HireResult =
-  | { success: true; existing: true }
-  | { success: true; existing: false; tempPassword: string }
+  | { success: true; existing: true; eligibility: HireEligibility }
+  | { success: true; existing: false; tempPassword: string; eligibility: HireEligibility }
   | { error: string };
 
 /** Readable 12-char temp password (no ambiguous chars). */
@@ -58,9 +72,26 @@ export async function hireApplicant(applicationId: string): Promise<HireResult> 
         where: { id: applicationId },
         data: { status: "HIRED" },
       });
+
+      // Seed eligibility from onboarding. No-ops for a non-provider account
+      // (e.g. an existing admin), and never overwrites an existing row.
+      const seed = await seedOnboardingEligibility({
+        employeeId: existingUser.id,
+        applicationId,
+      });
+
       revalidatePath("/job-applications");
       revalidatePath("/employees");
-      return { success: true, existing: true };
+      return {
+        success: true,
+        existing: true,
+        eligibility: {
+          employeeId: existingUser.id,
+          seeded: seed.seeded,
+          needsReview: seed.needsReview,
+          reviewReason: seed.reviewReason,
+        },
+      };
     }
 
     const tempPassword = makeTempPassword();
@@ -89,6 +120,14 @@ export async function hireApplicant(applicationId: string): Promise<HireResult> 
       data: { status: "HIRED" },
     });
 
+    // Fix #9f: eligibility starts here, from onboarding — not from an empty
+    // matrix that leaves a new provider with zero claimable jobs. Awaited (not
+    // fire-and-forget) so the admin is told immediately what needs review.
+    const seed = await seedOnboardingEligibility({
+      employeeId: user.id,
+      applicationId,
+    });
+
     // Provider welcome emails (gated by Settings → Notifications).
     sendAccountEmail({ to: email, name: app.name, role: "PROVIDER", event: "new_account" }).catch(
       (e) => console.error("hire new_account email", e)
@@ -102,7 +141,17 @@ export async function hireApplicant(applicationId: string): Promise<HireResult> 
 
     revalidatePath("/job-applications");
     revalidatePath("/employees");
-    return { success: true, existing: false, tempPassword };
+    return {
+      success: true,
+      existing: false,
+      tempPassword,
+      eligibility: {
+        employeeId: user.id,
+        seeded: seed.seeded,
+        needsReview: seed.needsReview,
+        reviewReason: seed.reviewReason,
+      },
+    };
   } catch (e) {
     console.error("hireApplicant", e);
     return { error: "Failed to hire applicant" };

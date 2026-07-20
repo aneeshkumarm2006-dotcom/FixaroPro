@@ -55,9 +55,13 @@ describe("resolveBasePrice", () => {
     expect(resolveBasePrice(CFG, 0, "SILICONE_SEALING")).toBe(209);
   });
 
-  it("fixed flat: Weatherproofing is a flat price regardless of hours", () => {
-    expect(resolveBasePrice(CFG, 1, "WEATHERPROOFING")).toBe(74.5);
-    expect(resolveBasePrice(CFG, 5, "WEATHERPROOFING")).toBe(74.5);
+  it("quote: Weatherproofing is quote-priced until the price is approved", () => {
+    // Fix #5 — Weatherproofing moved from a flat $74.50 to "Request a Quote
+    // until price approved". Like painting, a quote-priced service contributes
+    // no base price at booking; WEATHERPROOFING_FIXED_PRICE survives only as the
+    // internal ops baseline for the $59–$90 band.
+    expect(resolveBasePrice(CFG, 1, "WEATHERPROOFING")).toBe(0);
+    expect(resolveBasePrice(CFG, 5, "WEATHERPROOFING")).toBe(0);
   });
 
   it("quote: painting contributes no base price (the bid supplies it)", () => {

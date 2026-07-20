@@ -13,6 +13,7 @@ import { assignKit } from "../../actions/assignKit";
 import { setEmployeeRating } from "../../actions/setEmployeeRating";
 import StrikesPanel from "./StrikesPanel";
 import EligibilityTab from "./EligibilityTab";
+import HourlyRatePanel from "./HourlyRatePanel";
 import {
   ArrowLeft,
   Mail,
@@ -160,6 +161,9 @@ interface EmployeeDetailViewProps {
     unpaidJobs: number;
   };
   starRating?: number | null;
+  /** Provider's own hourly PAY rate; null = use the configured default. */
+  hourlyRate: number | null;
+  defaultHourlyRate: number;
   upcomingJobs: Job[];
   recentJobs: Job[];
   topProducts: ProductUsage[];
@@ -189,6 +193,8 @@ export default function EmployeeDetailView({
   employee,
   stats,
   starRating,
+  hourlyRate,
+  defaultHourlyRate,
   upcomingJobs,
   recentJobs,
   topProducts,
@@ -425,6 +431,15 @@ export default function EmployeeDetailView({
               </p>
             )}
             <p className="text-xs text-gray-400 mt-2">Admin override. Customer ratings also update this average.</p>
+          </Card>
+
+          {/* Hourly pay rate (admin-only page; server re-checks the role) */}
+          <Card variant="default" className="p-5">
+            <HourlyRatePanel
+              employeeId={employee.id}
+              initialRate={hourlyRate}
+              defaultRate={defaultHourlyRate}
+            />
           </Card>
 
           {/* Financial Summary */}

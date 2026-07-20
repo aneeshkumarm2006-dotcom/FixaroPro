@@ -40,7 +40,7 @@ export async function manageStrikes(input: ManageStrikesInput) {
       where: { id: input.cleanerId },
       select: { id: true },
     });
-    if (!cleaner) return { success: false, error: "Cleaner not found" };
+    if (!cleaner) return { success: false, error: "Pro not found" };
 
     await db.cleanerStrike.create({
       data: {

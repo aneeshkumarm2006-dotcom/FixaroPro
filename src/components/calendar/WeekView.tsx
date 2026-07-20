@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useCalendar } from "./CalendarContext";
 import { useCalendarConfig } from "@/contexts/CalendarConfigContext";
-import { startOfWeek, addDays, isSameDay, eventOverlapsDay } from "./utils";
+import { startOfWeek, addDays, isSameDay, eventOverlapsDay, format } from "./utils";
 import { CalendarEvent } from "./types";
 import { getEventStyleInfo, EventTypesConfig } from "./event-styles";
 import {
@@ -464,10 +464,10 @@ export const WeekView: React.FC = () => {
                   className={`app-title ${
                     isToday ? "text-[#1c1917]" : "text-[#1c1917]/70"
                   }`}>
-                  {day.getDate()}
+                  {format(day, "d")}
                 </span>
                 <span className="app-subtitle !text-[#1c1917]/60">
-                  {day.toLocaleString("default", { weekday: "short" })}
+                  {format(day, "EEE")}
                 </span>
               </div>
             );

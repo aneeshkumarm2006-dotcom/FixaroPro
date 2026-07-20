@@ -62,6 +62,11 @@ export interface BookingDraft {
   acLocation: string;
   acMountType: string;
   clientHasAcUnit: boolean | null;
+  // TV mounting (SOP v4.2 §4) — screen size band + wall/surface type. These two
+  // fields are what makes the "60\"+ or brick/concrete → custom quote" rule
+  // detectable at all; without them the priceNote was purely advisory.
+  tvSize: string;
+  tvWallType: string;
   // Step 3
   date: string;
   isFlexible: boolean;
@@ -104,6 +109,8 @@ export const EMPTY_DRAFT: BookingDraft = {
   acLocation: "",
   acMountType: "",
   clientHasAcUnit: null,
+  tvSize: "",
+  tvWallType: "",
   date: "",
   isFlexible: true,
   timeSlot: "",
@@ -148,6 +155,8 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "SMALL_PAINT_REPAIR", label: "Small paint repair", category: "Repairs", pricing: "hourly", priceNote: "$79/hr — you provide the paint" },
 
   // Installation & Assembly
+  // Hourly by default, but the TV_QUOTE_* rule below diverts oversized screens
+  // and masonry walls to the quote path before any card is captured.
   { value: "TV_MOUNTING", label: "TV mounting", category: "Installation & Assembly", pricing: "hourly", priceNote: "Large TVs (60\"+) or brick/concrete walls: custom quote" },
   { value: "CURTAIN_ROD", label: "Curtain rod installation", category: "Installation & Assembly", pricing: "hourly" },
   { value: "SHELF_INSTALLATION", label: "Shelf installation", category: "Installation & Assembly", pricing: "hourly" },
@@ -189,7 +198,11 @@ export const SERVICE_CATALOG: ServiceItem[] = [
   { value: "DECK_REPAIRS", label: "Deck repairs", category: "Outdoor & Seasonal", pricing: "hourly" },
   { value: "EXTERIOR_CAULKING", label: "Exterior caulking", category: "Outdoor & Seasonal", pricing: "hourly" },
   { value: "SEASONAL_SETUP", label: "Seasonal setup", category: "Outdoor & Seasonal", pricing: "hourly" },
-  { value: "WEATHERPROOFING", label: "Weatherproofing", category: "Outdoor & Seasonal", pricing: "fixed", priceNote: "Fixed price $59–$90" },
+  // Gap 2 (SOP: "Request a Quote until price approved"). Scope varies far too
+  // much to charge a card up front, so weatherproofing is quote-routed. The
+  // $59–$90 band stays as the internal baseline (WEATHERPROOFING_FIXED_PRICE)
+  // that ops quote against — it is no longer an instant-checkout price.
+  { value: "WEATHERPROOFING", label: "Weatherproofing", category: "Outdoor & Seasonal", pricing: "quote", priceNote: "Request a quote — typically $59–$90" },
   { value: "OUTDOOR_FURNITURE", label: "Outdoor furniture assembly", category: "Outdoor & Seasonal", pricing: "hourly" },
   { value: "GUTTER_CLEANING", label: "Gutter cleaning", category: "Outdoor & Seasonal", pricing: "hourly" },
   { value: "DRYER_VENT", label: "Dryer vent cleaning", category: "Outdoor & Seasonal", pricing: "hourly" },
@@ -287,6 +300,55 @@ export const MATERIALS_PRICING: Record<string, MaterialsPricing> = {
   MINOR_EXTERIOR: { amount: 59, type: "cost" },
 };
 
+// ── Customer-supplied parts (Phase 2C) ─────────────────────────────────────
+//
+// The INVERSE of MATERIALS_PRICING / `customerRequestsMaterials`. Those describe
+// consumables and equipment FIXARO can supply for a surcharge. This map is about
+// the major replacement ITEM itself — the lock, the faucet, the toilet, the door
+// hardware, the panels, the fixture being installed. Fixaro never sources those:
+// the customer buys the item and has it on site before the Pro arrives.
+//
+// A job can carry BOTH concepts at once: "Fixaro provides the materials &
+// equipment" (caulk, shims, anchors, tools — surcharge) AND "you must supply the
+// replacement lock" (no surcharge, we simply cannot start without it).
+//
+// SEED DEFAULT ONLY. At runtime read `customerPartFor(cfg, serviceType)` from
+// the admin-editable config (ServiceCatalogItem.requiresCustomerPart /
+// .customerPartNote), never this constant — same rule as MATERIALS_PRICING.
+//
+// The value is the noun phrase dropped into "you'll need to have __ on site",
+// so it must read naturally after "have".
+export const CUSTOMER_PART_DEFAULTS: Record<string, string> = {
+  // Repairs — the replacement item, not the consumables.
+  LOCK_REPLACEMENT: "the replacement lock",
+  FAUCET_REPAIR: "the replacement faucet or cartridge",
+  TOILET_REPAIR: "the replacement toilet part (fill valve, flapper, seat) or the new toilet",
+  DOOR_REPAIR: "the replacement door or door hardware",
+
+  // Installation & Assembly — we install the item you bought.
+  LOCK_INSTALLATION: "the new lock set",
+  FAUCET_INSTALLATION: "the new faucet",
+  VANITY_INSTALLATION: "the new vanity",
+  LIGHT_FIXTURE: "the light fixture",
+  BLINDS_INSTALLATION: "the blinds",
+  MIRROR_HANGING: "the mirror and its mounting hardware",
+  TV_MOUNTING: "the TV wall mount / bracket",
+  CURTAIN_ROD: "the curtain rod and brackets",
+  SHELF_INSTALLATION: "the shelves and their brackets",
+  FURNITURE_ASSEMBLY: "the flat-pack furniture, unopened and complete",
+  APPLIANCE_HOOKUP: "the appliance",
+
+  // Home Improvement / Outdoor.
+  DOOR_HARDWARE: "the new door hardware (handles, hinges, closer)",
+  CABINET_HARDWARE: "the replacement cabinet handles and knobs",
+  WALL_PANELING: "the wall panels",
+  OUTDOOR_FURNITURE: "the outdoor furniture, unopened and complete",
+
+  // AC_INSTALLATION is deliberately ABSENT: its own intake question
+  // (`clientHasAcUnit`) already asks whether the customer has the unit, and
+  // adding it here would ask the same thing twice in different words.
+};
+
 // ── Service-specific intake options (SOP v4.2 §4) ──────────────────────────
 // Deliberately excludes any paint-colour / procurement field: Fixaro never
 // supplies or picks up paint, so that data is not collected.
@@ -312,6 +374,182 @@ export const AC_MOUNT_TYPES = [
   "Floor / freestanding",
   "Not sure",
 ] as const;
+
+// ── TV mounting intake + quote rule (Gap 3) ────────────────────────────────
+// The catalog note already promised "Large TVs (60\"+) or brick/concrete walls:
+// custom quote", but nothing captured the size or the wall, so the condition
+// could never fire and those jobs went straight to card capture at $79/hr.
+
+/** Screen-size bands. `maxInches` is the top of the band, so the >60" rule is a
+ *  plain numeric comparison rather than string matching on the label. */
+export const TV_SIZE_CHOICES = [
+  { value: 'Up to 42"', maxInches: 42 },
+  { value: '43"–55"', maxInches: 55 },
+  { value: '56"–60"', maxInches: 60 },
+  { value: 'Over 60"', maxInches: 999 },
+] as const;
+
+export const TV_WALL_TYPES = [
+  "Drywall",
+  "Wood stud / plaster",
+  "Brick",
+  "Concrete",
+  "Other / not sure",
+] as const;
+
+/** Size above which the job must be quoted rather than instantly booked. */
+export const TV_QUOTE_SIZE_THRESHOLD_INCHES = 60;
+
+/** Wall types that force the quote path. "Other / not sure" is included
+ *  deliberately: if we cannot rule out masonry we quote rather than commit to an
+ *  hourly price and take a deposit — ambiguity resolves toward the quote. */
+export const TV_QUOTE_WALL_TYPES: readonly string[] = [
+  "Brick",
+  "Concrete",
+  "Other / not sure",
+];
+
+/** Top of the selected size band, or null when nothing is selected yet. */
+export function tvSizeMaxInches(tvSize: string): number | null {
+  const band = TV_SIZE_CHOICES.find((c) => c.value === tvSize);
+  return band ? band.maxInches : null;
+}
+
+/** True once both TV fields are answered. Booking cannot advance without them —
+ *  an unanswered intake is exactly the case the rule exists to catch. */
+export function isTvIntakeComplete(draft: Pick<BookingDraft, "tvSize" | "tvWallType">): boolean {
+  return !!(draft.tvSize && draft.tvWallType);
+}
+
+/**
+ * Gap 3 rule. Quote when the screen is over 60" OR the wall is brick/concrete
+ * (or unidentified). Returns false while the intake is incomplete — the wizard
+ * blocks on `isTvIntakeComplete` instead, so an unanswered form can never be
+ * read as "safe to charge".
+ */
+export function tvMountingNeedsQuote(
+  draft: Pick<BookingDraft, "tvSize" | "tvWallType">
+): boolean {
+  const maxInches = tvSizeMaxInches(draft.tvSize);
+  if (maxInches !== null && maxInches > TV_QUOTE_SIZE_THRESHOLD_INCHES) return true;
+  return TV_QUOTE_WALL_TYPES.includes(draft.tvWallType);
+}
+
+// ── Quote routing (Gap 1 / Gap 2) ──────────────────────────────────────────
+
+/**
+ * Quote-priced services that nonetheless complete inside the booking wizard
+ * because they have their own approval workflow.
+ *
+ * PAINTING only. Painting shows an immediate quote range from the scope picker,
+ * takes the flat $119 materials/equipment charge, is created with
+ * paintingStatus=BIDDING and fans out to painting-approved providers
+ * (submitBooking → notifyPaintingProviders). Diverting it to /quote would
+ * silently delete that bid/offer flow, so it is exempt.
+ */
+export const BID_FLOW_SERVICES: readonly string[] = ["PAINTING"];
+
+/**
+ * Services that must reach Request-a-Quote even if a stale ServiceCatalogItem
+ * row still says "fixed" or "hourly".
+ *
+ * The live catalog is admin-editable in the DB and this file only seeds it, so a
+ * pricing change here does not reach an already-seeded environment. This list is
+ * the fail-closed floor: these services never take a card, whatever the row
+ * says. Remove an entry only once the DB row is authoritative.
+ */
+export const QUOTE_ONLY_SERVICES: readonly string[] = [
+  "MOULDINGS",
+  "WEATHERPROOFING",
+];
+
+/**
+ * Single source of truth for "this booking must go to /quote, not to checkout".
+ *
+ * `pricingModel` is the LIVE catalog value (from the runtime config), so admin
+ * edits are honoured; the constants above only ever add services to the quote
+ * path, never remove one from it.
+ */
+export function requiresCustomQuote(
+  draft: Pick<BookingDraft, "serviceType" | "tvSize" | "tvWallType">,
+  pricingModel: ServicePricingType | undefined
+): boolean {
+  const service = draft.serviceType;
+  if (!service) return false;
+  if (BID_FLOW_SERVICES.includes(service)) return false;
+  if (pricingModel === "quote") return true;
+  if (QUOTE_ONLY_SERVICES.includes(service)) return true;
+  if (service === "TV_MOUNTING") return tvMountingNeedsQuote(draft);
+  return false;
+}
+
+/** Human-readable reason, shown to the customer and carried into the quote. */
+export function quoteReason(
+  draft: Pick<BookingDraft, "serviceType" | "tvSize" | "tvWallType">
+): string {
+  if (draft.serviceType === "TV_MOUNTING") {
+    const maxInches = tvSizeMaxInches(draft.tvSize);
+    const oversized =
+      maxInches !== null && maxInches > TV_QUOTE_SIZE_THRESHOLD_INCHES;
+    if (oversized && TV_QUOTE_WALL_TYPES.includes(draft.tvWallType)) {
+      return `TVs over ${TV_QUOTE_SIZE_THRESHOLD_INCHES}" and brick/concrete walls both need a custom quote.`;
+    }
+    if (oversized) {
+      return `TVs over ${TV_QUOTE_SIZE_THRESHOLD_INCHES}" need a custom quote — larger screens need heavier mounts and a second pair of hands.`;
+    }
+    return "Brick, concrete and unidentified walls need a custom quote — masonry anchoring is priced per job.";
+  }
+  if (draft.serviceType === "WEATHERPROOFING") {
+    return "Weatherproofing is quoted per property. We confirm the price with you before any work is scheduled.";
+  }
+  return "This service is priced per job, so we quote it before booking.";
+}
+
+/**
+ * Structured intake summary for the fields that have no column of their own.
+ *
+ * TV size / wall type are new and Job has no column for them; submitBooking is
+ * owned elsewhere, so rather than inventing a schema field we fold them into the
+ * existing free-text notes the job already carries.
+ */
+export function serviceIntakeSummary(draft: BookingDraft): string {
+  if (draft.serviceType !== "TV_MOUNTING") return "";
+  const parts: string[] = [];
+  if (draft.tvSize) parts.push(`TV size: ${draft.tvSize}`);
+  if (draft.tvWallType) parts.push(`Wall type: ${draft.tvWallType}`);
+  return parts.length > 0 ? `TV mounting — ${parts.join(", ")}.` : "";
+}
+
+/** Notes actually submitted with the booking: customer notes + intake summary. */
+export function composeBookingNotes(draft: BookingDraft): string {
+  const summary = serviceIntakeSummary(draft);
+  const notes = draft.notes.trim();
+  if (!summary) return notes;
+  return notes ? `${notes}\n\n${summary}` : summary;
+}
+
+/**
+ * Prefilled Request-a-Quote link for a booking that cannot be checked out.
+ *
+ * Only fields the customer typed into this wizard are carried across, and the
+ * quote form re-validates every one of them (the service value must exist in the
+ * live catalog) — the query string is a convenience, never a trust boundary.
+ */
+export function quoteRedirectHref(draft: BookingDraft): string {
+  const params = new URLSearchParams();
+  if (draft.serviceType) params.set("service", draft.serviceType);
+  if (draft.address.trim()) params.set("address", draft.address.trim());
+  if (draft.name.trim()) params.set("name", draft.name.trim());
+  if (draft.email.trim()) params.set("email", draft.email.trim());
+  if (draft.phone.trim()) params.set("phone", draft.phone.trim());
+
+  const message = [draft.notes.trim(), serviceIntakeSummary(draft)]
+    .filter(Boolean)
+    .join("\n\n");
+  if (message) params.set("message", message);
+
+  return `/quote?${params.toString()}`;
+}
 
 /**
  * Materials/equipment pricing for a service from the SEED DEFAULTS, or null.

@@ -6,8 +6,13 @@
  * this grants each field provider eligibility for every service type they have
  * actually worked (as lead or assigned cleaner). Admins can prune afterwards.
  *
+ * This covers crew who pre-date the migration. Providers hired AFTER it get
+ * their starting eligibility from onboarding instead — see
+ * src/app/(app)/actions/seedOnboardingEligibility.ts (Fix #9f).
+ *
  * Run once:  npx tsx prisma/seed-eligibility.ts
- * Idempotent — re-running only adds missing rows.
+ * Idempotent — re-running only adds missing rows, and only audit-logs rows it
+ * actually creates.
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -31,18 +36,38 @@ async function main() {
     });
     const types = [...new Set(jobs.map((j) => j.jobType).filter(Boolean) as string[])];
     for (const serviceType of types) {
-      const res = await db.employeeServiceEligibility.upsert({
+      const existing = await db.employeeServiceEligibility.findUnique({
         where: { employeeId_serviceType: { employeeId: p.id, serviceType } },
-        create: { employeeId: p.id, serviceType, isActive: true },
-        update: {},
+        select: { id: true },
       });
-      if (res) granted++;
+      if (existing) continue; // never overwrite an admin decision
+
+      await db.employeeServiceEligibility.create({
+        // isActive:true so getEligibleServiceTypes() picks these up.
+        data: { employeeId: p.id, serviceType, isActive: true },
+      });
+
+      // Same audit shape as the admin matrix, so the override trail is
+      // continuous even for rows this script created.
+      await db.auditLog.create({
+        data: {
+          entityType: "EmployeeEligibility",
+          entityId: p.id,
+          action: "ELIGIBILITY_GRANTED",
+          field: serviceType,
+          oldValue: "none",
+          newValue: "true",
+          reason: "backfilled from job history",
+          description: `Backfill granted ${serviceType} eligibility to provider ${p.id} based on completed job history.`,
+        },
+      });
+      granted++;
     }
     if (types.length) {
       console.log(`${p.name}: ${types.length} service(s) — ${types.join(", ")}`);
     }
   }
-  console.log(`\nBackfill complete. ${providers.length} providers processed, ${granted} eligibility rows ensured.`);
+  console.log(`\nBackfill complete. ${providers.length} providers processed, ${granted} new eligibility row(s) created and audit-logged.`);
 }
 
 main()

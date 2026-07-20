@@ -82,7 +82,7 @@ export async function updateChecklistItem(input: UpdateChecklistItemInput) {
             jobId: item.checklist.jobId,
             jobNumber: jobInfo.jobNumber,
             clientName: jobInfo.clientName,
-            cleanerName: session.user.name ?? "Cleaner",
+            cleanerName: session.user.name ?? "Pro",
             itemCount: itemsAfter.length,
           }).catch((e) => console.error("admin checklist email", e));
         }

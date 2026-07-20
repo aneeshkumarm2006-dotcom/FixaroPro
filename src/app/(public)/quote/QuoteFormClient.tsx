@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { submitQuote } from "./actions/submitQuote";
 import {
   PAINT_REPAIR_SURFACES,
@@ -25,13 +26,26 @@ export default function QuoteFormClient() {
   const catalog = useServiceCatalog();
   const categories = useServiceCategories();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [serviceType, setServiceType] = useState("");
+  // Prefill from the booking wizard's "Request a quote" hand-off (Gap 1/2/3).
+  // Query params are convenience only, never trusted: every value is length-
+  // clamped, the service must exist in the live catalog, and the server action
+  // re-validates and writes through Prisma regardless of what arrives here.
+  const searchParams = useSearchParams();
+  const prefilledService = (() => {
+    const raw = searchParams.get("service")?.trim() ?? "";
+    return catalog.some((s) => s.value === raw) ? raw : "";
+  })();
+
+  const [name, setName] = useState(() => clamp(searchParams.get("name"), 120));
+  const [email, setEmail] = useState(() => {
+    const v = clamp(searchParams.get("email"), 200);
+    return v.includes("@") ? v : "";
+  });
+  const [phone, setPhone] = useState(() => clamp(searchParams.get("phone"), 40));
+  const [address, setAddress] = useState(() => clamp(searchParams.get("address"), 300));
+  const [serviceType, setServiceType] = useState(prefilledService);
   const [preferredDate, setPreferredDate] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => clamp(searchParams.get("message"), 2000));
 
   // Service-specific intake (SOP v4.2 §4).
   const [paintRepairArea, setPaintRepairArea] = useState("");
@@ -341,6 +355,11 @@ export default function QuoteFormClient() {
       </button>
     </form>
   );
+}
+
+/** Trim + length-clamp a query-string prefill. */
+function clamp(value: string | null, max: number): string {
+  return (value ?? "").slice(0, max).trim();
 }
 
 function Row({ children }: { children: React.ReactNode }) {

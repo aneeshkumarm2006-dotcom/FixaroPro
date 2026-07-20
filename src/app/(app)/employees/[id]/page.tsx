@@ -5,6 +5,7 @@ import { db } from "@/db";
 import EmployeeDetailView from "./EmployeeDetailView";
 import { getEmployeeAvgRating } from "../../actions/setEmployeeRating";
 import { getStrikeSummary } from "@/lib/strikes";
+import { getDefaultProviderHourlyRate } from "@/lib/provider-pay";
 
 export default async function EmployeePage({
   params,
@@ -269,6 +270,8 @@ export default async function EmployeePage({
 
   const starRating = await getEmployeeAvgRating(id);
   const strikeSummary = await getStrikeSummary(id);
+  // Provider pay is hourly (Fix #3e / #8d) — surface the rate and its fallback.
+  const defaultHourlyRate = await getDefaultProviderHourlyRate();
 
   return (
     <EmployeeDetailView
@@ -281,6 +284,8 @@ export default async function EmployeePage({
         role: employee.role as "OWNER" | "ADMIN" | "EMPLOYEE",
       }}
       starRating={starRating}
+      hourlyRate={employee.hourlyRate}
+      defaultHourlyRate={defaultHourlyRate}
       availability={availabilitySlots}
       availabilityConflicts={conflicts}
       serviceEligibilities={employee.serviceEligibilities.map((e) => e.serviceType)}

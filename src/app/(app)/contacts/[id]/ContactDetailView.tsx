@@ -347,7 +347,7 @@ function BookingsTab({ rows }: { rows: BookingRow[] }) {
     <div className="atable-wrap">
       <div className="atable-scroll">
         <table className="atable">
-          <thead><tr><th>Date</th><th>Service</th><th>Cleaner</th><th>Status</th><th className="num">Amount</th><th>Payment</th></tr></thead>
+          <thead><tr><th>Date</th><th>Service</th><th>Pro</th><th>Status</th><th className="num">Amount</th><th>Payment</th></tr></thead>
           <tbody>
             {rows.map((b) => {
               return (

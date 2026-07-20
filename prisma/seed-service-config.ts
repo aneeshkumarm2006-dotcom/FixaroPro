@@ -16,7 +16,7 @@
  * has visited yet, and for provisioning an environment before its first login.
  */
 import { PrismaClient } from "@prisma/client";
-import { SERVICE_CATALOG, MATERIALS_PRICING, SILICONE_PRICE_PER_ROOM, WEATHERPROOFING_FIXED_PRICE } from "../src/app/(book)/book/types";
+import { SERVICE_CATALOG, MATERIALS_PRICING, CUSTOMER_PART_DEFAULTS, SILICONE_PRICE_PER_ROOM, WEATHERPROOFING_FIXED_PRICE } from "../src/app/(book)/book/types";
 import { PAINTING_SCOPES } from "../src/lib/painting";
 import { POLICY_SETTINGS } from "../src/lib/config/policy-registry";
 
@@ -55,11 +55,30 @@ async function main() {
           materialsAmount: materials?.amount ?? null,
           materialsType: materials ? MATERIALS_TO_DB[materials.type] : null,
           materialsNote: MATERIALS_NOTE_DEFAULTS[s.value] ?? null,
+          requiresCustomerPart: CUSTOMER_PART_DEFAULTS[s.value] != null,
+          customerPartNote: CUSTOMER_PART_DEFAULTS[s.value] ?? null,
         },
       ],
       skipDuplicates: true,
     });
     services += res.count;
+  }
+
+  // Phase 2C backfill — `createMany({skipDuplicates})` above only creates rows,
+  // so an environment seeded BEFORE requiresCustomerPart existed would keep the
+  // column at its `false` default forever and never tell a customer to bring the
+  // lock. Backfill it, but ONLY for rows nobody has touched (flag still false AND
+  // note still null). Once ops edit the pair in the admin catalog editor this
+  // stops matching, so re-running never clobbers a deliberate decision — which is
+  // also why this lives in the standalone script and NOT in the
+  // ensureServiceConfigSeeded() path that runs on every admin page load.
+  let backfilled = 0;
+  for (const [value, note] of Object.entries(CUSTOMER_PART_DEFAULTS)) {
+    const res = await db.serviceCatalogItem.updateMany({
+      where: { value, requiresCustomerPart: false, customerPartNote: null },
+      data: { requiresCustomerPart: true, customerPartNote: note },
+    });
+    backfilled += res.count;
   }
 
   let painting = 0;
@@ -91,7 +110,7 @@ async function main() {
   });
 
   console.log(
-    `Config seeded — ${services} service(s), ${painting} painting baseline(s), ${policy.count} policy value(s) created. Existing rows untouched.`
+    `Config seeded — ${services} service(s), ${painting} painting baseline(s), ${policy.count} policy value(s) created, ${backfilled} customer-part flag(s) backfilled. Existing rows otherwise untouched.`
   );
 }
 

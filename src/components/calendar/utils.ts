@@ -1,4 +1,5 @@
 import { CalendarEvent } from "./types";
+import { fmtDate, fmtTime } from "@/lib/timezone";
 
 // Date utilities
 export const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
@@ -42,31 +43,48 @@ export const eventOverlapsDay = (event: CalendarEvent, day: Date) => {
 
   return eventStart <= dayEnd && eventEnd >= dayStart;
 };
+/**
+ * Grid cells (startOfMonth/startOfWeek/addDays) are built from LOCAL calendar
+ * components, so they are day placeholders rather than true instants. Anchor
+ * them at midday UTC so that rendering them in the business timezone always
+ * yields the intended calendar day, no matter where the viewer sits.
+ */
+const businessDay = (d: Date) =>
+  new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12));
+
 export const format = (d: Date, token: string) => {
-  if (token === "d") return d.getDate().toString();
+  // Clock tokens describe a real instant — render it in the business timezone.
+  if (token === "h:mm a") return fmtTime(d);
+  if (token === "d") return fmtDate(businessDay(d), { day: "numeric" });
+  if (token === "EEE") return fmtDate(businessDay(d), { weekday: "short" });
   if (token === "MMMM yyyy")
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return fmtDate(businessDay(d), { month: "long", year: "numeric" });
   if (token === "EEE d")
-    return d.toLocaleDateString("en-US", {
+    return fmtDate(businessDay(d), {
       weekday: "short",
       day: "numeric",
     });
   if (token === "EEEE, d MMMM yyyy")
-    return d.toLocaleDateString("en-US", {
+    return fmtDate(businessDay(d), {
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     });
   if (token === "d MMM")
-    return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    return fmtDate(businessDay(d), { day: "numeric", month: "short" });
   if (token === "d MMM yyyy")
-    return d.toLocaleDateString("en-US", {
+    return fmtDate(businessDay(d), {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
-  return d.toDateString();
+  return fmtDate(businessDay(d), {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 };
 
 export const eventOverlaps = (a: CalendarEvent, b: CalendarEvent) => {

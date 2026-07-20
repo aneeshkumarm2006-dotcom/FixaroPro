@@ -23,7 +23,10 @@ model User {
   // signUp would otherwise mint an EMPLOYEE.
   role                         Roles                        @default(CLIENT)
   emailVerified                Boolean                      @default(false)
-  payMultiplier                Float                        @default(1.0)
+  payMultiplier                Float                        @default(1.0) /// DEPRECATED (Fix #3): legacy pay multiplier. No longer used in payout math.
+  /// Provider's hourly PAY rate (what Fixaro pays them). Distinct from the
+  /// client labour rate. Null => fall back to the configured default pay rate.
+  hourlyRate                   Float?
   multiplierLastRecalculatedAt DateTime?
   lastSeenAt                   DateTime?
   accounts                     Account[]
@@ -193,6 +196,11 @@ model ServiceCatalogItem {
   /// Customer-facing qualifier appended to the materials line, e.g. painting's
   /// "paint not included" (D0.3). Copy ops should own, not a deploy.
   materialsNote   String?
+  /// Phase 2C — this service needs a customer-supplied replacement item (lock,
+  /// faucet, toilet, door, panel). Drives the pre-appointment confirmation.
+  requiresCustomerPart Boolean @default(false)
+  /// What the customer must have on site, e.g. "the replacement lock".
+  customerPartNote     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -420,7 +428,9 @@ model Job {
   discountAmount                 Float?
   bedCount                       Int?
   bathCount                      Int?
-  payRateMultiplier              Float?                @default(1.0)
+  payRateMultiplier              Float?                @default(1.0) /// DEPRECATED (Fix #3): legacy pay multiplier. No longer used in payout math.
+  /// Per-job override of the provider's hourly PAY rate. Null => use User.hourlyRate.
+  providerHourlyRate             Float?
   isFlexible                     Boolean               @default(false)
   requiredCleaners               Int                   @default(1)
   subtotalAmount                 Float                 @default(0)
@@ -558,6 +568,18 @@ model Job {
   paintingBids                   PaintingBid[]
   reviewPhotos                   ReviewPhoto[]
   chatMessages                   JobChatMessage[]
+
+  // --- Round 2 (Fixaro_SoftwareFixes) ---
+  /// Phase 2A — provider tapped "On my way"; and the actual arrival timestamp
+  /// that feeds the punctuality record (instead of relying on manual clock-in).
+  onMyWayAt                      DateTime?
+  arrivedAt                      DateTime?
+  /// Phase 2C — customer confirmed the required customer-supplied part
+  /// (lock/faucet/toilet/door) is on site before the appointment.
+  customerPartConfirmedAt        DateTime?
+  equipmentSubmission            JobEquipmentSubmission?
+  equipmentReimbursements        EquipmentReimbursement[]
+  priceRevisions                 JobPriceRevision[]
 
   @@index([jobDate])
   @@index([clientName])
@@ -1766,6 +1788,11 @@ model QuoteRequest {
   status             QuoteRequestStatus @default(NEW)
   source             String?
   notes              String?
+  /// Phase 2D — the agreed price ops quoted, and the job it converted into.
+  /// One-click conversion carries this price onto the created job.
+  quotedPrice        Float?
+  convertedJobId     String?
+  convertedAt        DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -2341,4 +2368,108 @@ model ReviewPhoto {
   job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+}
+
+// ============================================================
+// Round 2 — Fixaro_SoftwareFixes (#7 pre-job equipment, Phase 2B/2D)
+// New tables only (additive).
+// ============================================================
+
+/// Fix #7 — the provider's pre-job equipment & materials submission, due at
+/// least 24h before the appointment. One per job; a manager approves, rejects
+/// or edits it before any purchase happens.
+model JobEquipmentSubmission {
+  id     String                    @id @default(cuid())
+  jobId  String                    @unique
+  status EquipmentSubmissionStatus @default(PENDING)
+  /// The six spec'd buckets. Stored as string lists so the checklist stays
+  /// admin-editable per service without a migration per bucket.
+  coreTools       String[] @default([])
+  consumables     String[] @default([])
+  accessEquipment String[] @default([])
+  ppe             String[] @default([])
+  customerSupplied String[] @default([])
+  /// Items the provider says must be purchased (drives the reimbursement flow).
+  toPurchase      String[] @default([])
+  providerNotes   String?
+  submittedById   String?
+  submittedAt     DateTime @default(now())
+  /// Manager review.
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  updatedAt       DateTime @updatedAt
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([submittedById])
+}
+
+enum EquipmentSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Fix #7 — a real reimbursement record tied to the job (was only an Alert +
+/// audit row). Created after the manager approves the pre-job list.
+model EquipmentReimbursement {
+  id          String              @id @default(cuid())
+  jobId       String
+  providerId  String
+  item        String
+  amount      Float
+  reason      String?
+  receiptUrl  String?
+  status      ReimbursementStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNotes  String?
+  paidAt       DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  job         Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([providerId])
+  @@index([status])
+}
+
+enum ReimbursementStatus {
+  PENDING
+  APPROVED
+  DENIED
+  PAID
+}
+
+/// Phase 2B — on-site scope change. The provider requests a price revision
+/// mid-job; the customer approves or rejects it in-app before work continues,
+/// and the job total + payout follow the approved amount.
+model JobPriceRevision {
+  id             String              @id @default(cuid())
+  jobId          String
+  requestedById  String?
+  requestedByName String?
+  /// Price before and after, so the client's approval is auditable.
+  previousPrice  Float
+  proposedPrice  Float
+  reason         String
+  status         PriceRevisionStatus @default(PENDING)
+  respondedAt    DateTime?
+  /// Set when an admin overrides/cancels the request rather than the client.
+  resolvedById   String?
+  resolutionNote String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  job            Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+  @@index([status])
+}
+
+enum PriceRevisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }

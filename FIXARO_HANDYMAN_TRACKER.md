@@ -9,6 +9,99 @@
 
 ---
 
+## ✅ Stage 13 — Fixaro_SoftwareFixes round 2 (2026-07-20)
+
+The deferred items from round 1. `prisma validate` / `tsc` / `next build` (83 pages) / `vitest` (105)
+all pass. Migration `20260720200000_round2_prejob_scope_quote` — 3 models, 3 enums, 8 columns,
+**0 destructive statements** — **not deployed** (round 1's migration is also still pending).
+
+- ✅ **#7 pre-job equipment workflow.** `JobEquipmentSubmission` + `EquipmentReimbursement`. Provider
+  submits the six spec'd buckets (prefilled from the admin-editable service checklist, 24h deadline
+  flagged), manager approves/rejects/edits, readiness derives from the submission
+  (`derivePreJobReadiness` — kept strictly separate from the pre-existing *inventory* readiness),
+  reimbursements are real records gated on approval with a PENDING→APPROVED→PAID state machine.
+- ✅ **Phase 2A On My Way + arrival.** Wired the SMS template, notification keys and policy knob that
+  already existed but had zero callers. `Job.onMyWayAt` / `arrivedAt`; idempotent via conditional
+  `updateMany`. **Also fixed a real bug in `clockIn.ts`**: it unconditionally overwrote
+  `lateArrivalAt`, so a Pro who arrived on time but clocked in late lost their good record. Lateness
+  now derives from `arrivedAt ?? now`, never overwrites, and backfills arrival server-side.
+- ✅ **Phase 2B scope change / price revision.** `JobPriceRevision` + provider request → customer
+  in-app approval → admin override in `/requests`. Load-bearing find: writing `price` alone is
+  silently reverted at the next clock-out because `computeChargeAmount()` rebuilds hourly price — so
+  the hourly path adds a **delta to `bookedSubtotalAmount`** and is idempotent across clock
+  corrections. Provider pay is deliberately NOT changed (pay is hours×rate since Fix #3; extra scope
+  pays through extra clocked hours) and the UI/email/JobLog say so explicitly.
+- ✅ **Phase 2C customer-supplied parts.** `ServiceCatalogItem.requiresCustomerPart` +
+  `customerPartNote` (19 services seeded), `Job.customerPartConfirmedAt`, portal confirmation with the
+  IDOR guard. Copy explicitly disambiguated from `customerRequestsMaterials` (which is the inverse).
+- ✅ **Phase 2D quote → booking.** Was a stub redirecting to a blank form. Now a real one-click
+  conversion in a transaction with a conditional claim (no double-booking), mirroring `submitBooking`
+  (catalog `jobType`, business-tz date helpers). ⚠️ Treats `quotedPrice` as the **pre-tax base**
+  ($500 → ~$574.88 all-in) — confirm with the client.
+- ✅ **#9f eligibility from onboarding.** `hireApplicant` was **dead code**; HIRED just flipped a
+  status without provisioning an account. Now seeds from an admin-configured starter set
+  (`AppSetting["onboarding.starterServices"]`), allow-listed against the live catalog, never
+  overwriting an admin revocation, always `needsReview`. Deliberately does NOT keyword-match cover
+  letters — that would let an applicant self-grant work authorisation by prose.
+  ⚠️ Behaviour change: OPS_MANAGER can no longer mark an applicant HIRED (now OWNER/ADMIN).
+- ✅ **Security.** `deleteJob` now writes a full financial-snapshot audit row before deleting;
+  in-process rate limiter (IP+email) on the three unauthenticated payment/upload endpoints; two raw
+  error-detail leaks closed. **Added `esc()` to `email.ts`** — the layout helpers take raw HTML by
+  design, so a Pro's scope-change reason was an HTML/phishing-injection path into customer email.
+
+### Still open
+- **#4 Stripe** — needs Fixaro Stripe keys from the client (mandate copy + business name are
+  account-level; the code-side statement descriptor is done).
+- New part flags aren't in the admin Service Catalog editor or config export/import; no reminder
+  email asking the customer to confirm the part; `admin.clock.not_on_the_way` still needs a cron
+  sweep; soft-delete for jobs remains the better fix than an audit row alone.
+- Notification catalog seeder must be re-run for the 3 new scope-change keys.
+
+---
+
+## ✅ Stage 12 — Fixaro_SoftwareFixes P0–P2 round 1 (2026-07-20)
+
+Audited all 12 fixes + 6 Phase-2 items against code first (3 already done, 5 partial, 4 not done),
+then implemented the agreed order. `prisma validate` / `tsc` / `next build` (82 pages) / `vitest`
+(105) all pass. Migration `20260720100000_provider_hourly_rate` (2 nullable columns) **not deployed**.
+
+- 🔴 **Security (not on the client's list, found during audit):** `deleteJob` had **no auth at all**
+  (any caller could delete any job by id); the `/jobs/new` inline save action had no admin guard; and
+  the page itself rendered for any EMPLOYEE/CLIENT. All now `isAdminRole`-guarded, fail closed.
+- ✅ **#6 + #1 (one root cause).** `Job.jobType` carried two vocabularies — booking wrote service
+  codes, the admin form wrote `"R - Residential"`. Admin form now uses the runtime service catalog
+  (category → service), stores the real service value, drops bed/bath fields. That alone fixes #1
+  (crew board filters `jobType in eligibleTypes`) and repairs equipment-checklist + kit matching.
+- ✅ **#3 + #8 hourly pay.** Payout was `employeePay × payRateMultiplier × payMultiplier`; now
+  `rate × clockedHours + tip` via `src/lib/provider-pay.ts`, rate = `Job.providerHourlyRate ??
+  User.hourlyRate ?? policy pay.providerHourlyRate ($25)` — deliberately NOT the $79 client rate.
+  Clock corrections now re-price the payout. Completion-photo gate added (with logged waivers).
+  **Client price removed from the crew payload/modal** (was leaking basePrice/add-ons/clientTotal).
+  Admin per-provider hourly-rate panel (audit-logged). Multipliers left in schema but unused.
+- ✅ **#2 timezone.** Root cause was the WRITE path parsing in the server's tz. New DST-correct
+  `parseBusinessDateTime`/`businessDateOnly`; ~12 display sites pinned to Toronto. Extras found:
+  every customer **email** rendered dates in the server tz; the admin edit form prefilled 13:00 for a
+  9 AM job; recurring children drifted an hour across DST; month-view events printed a date, not a time.
+- ✅ **#5 quote routing.** Quote-only services (mouldings, weatherproofing) can no longer reach card
+  capture; TV mounting gained size/wall intake with a numeric >60"/masonry rule. Guard mirrored
+  **server-side** in `submitBooking` + `/api/stripe/charge-deposit` (the agent's version was
+  client-only). Weatherproofing → `pricing: "quote"`; its config test updated to the new intent.
+- ✅ **#11 labels.** 56 user-visible strings → Pro/Team, incl. customer email subjects. Fixed a bug
+  rendering `"{service} cleaning"` on the crew calendar.
+- ✅ **#4 Stripe (code half).** Sanitized `STATEMENT_DESCRIPTOR_SUFFIX` (env-overridable) on all 7
+  PaymentIntents. **Still needs the account swap** — mandate copy + business name are account-level.
+- ✅ **#5e** booking confirmation now states what Fixaro brings vs what the customer provides.
+
+### Deferred to round 2
+#7 pre-job equipment submission + manager approve/reject + readiness status (needs new models);
+#9f eligibility seeded from the onboarding checklist; Phase 2 **B** scope change/price revision,
+**C** customer-supplied parts confirmation, **D** quote→booking conversion (button is a stub today),
+**E** is DONE via the photo gate, **A** is ~25% (SMS template + notification keys + policy knob exist,
+never wired to a button). Also flagged: `deleteJob` is a hard delete with no audit row; the public
+`charge-deposit` + gift-card endpoints are unauthenticated and unrated-limited.
+
+---
+
 ## ✅ Stage 11 — Cleano second-wave feature-parity port (2026-07-18)
 
 Ported the Cleano features that were missing from Fixaro (the batch 1-7 port covered CRM/Properties/

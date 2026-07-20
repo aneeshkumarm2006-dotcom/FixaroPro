@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
   { id: "inventory", label: "Inventory" },
-  { id: "kits", label: "Cleaner Kits" },
+  { id: "kits", label: "Pro Kits" },
 ] as const;
 
 export default function InventoryTabsHeader({ activeTab }: { activeTab: string }) {

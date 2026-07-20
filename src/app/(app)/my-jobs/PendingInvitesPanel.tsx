@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { respondToJobInvite } from "../actions/respondToJobInvite";
+import { fmtDateTime } from "@/lib/timezone";
 
 export interface PendingInvite {
   id: string;
@@ -20,7 +21,7 @@ function minutesUntil(iso: string): number {
 }
 
 function fmtSlot(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
+  return fmtDateTime(iso, {
     weekday: "short",
     month: "short",
     day: "numeric",

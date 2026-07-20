@@ -3,6 +3,17 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import { homeForRole, isAdminRole } from "@/lib/role-routing";
+import { requireAdmin } from "@/lib/page-guards";
+import { logAudit } from "@/lib/audit";
+import {
+  BUSINESS_TZ,
+  businessDateOnly,
+  parseBusinessDateTime,
+} from "@/lib/timezone";
+import { businessDateKey } from "@/lib/availability-exceptions";
+import { getRuntimeConfig } from "@/lib/config/service-config";
+import { findService } from "@/lib/config/types";
 import CleanerSelector from "./CleanerSelector";
 import JobTypeSelector from "./JobTypeSelector";
 import SubmitButton from "./SubmitButton";
@@ -21,18 +32,15 @@ import { ArrowLeft } from "lucide-react";
 export default async function JobFormPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; error?: string }>;
 }) {
-  const { edit: jobId } = await searchParams;
+  const { edit: jobId, error: formError } = await searchParams;
   const isEditing = !!jobId;
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    redirect("/sign-in");
-  }
+  // Admin-app roles only. This page creates/edits/DELETES jobs and writes price,
+  // employee pay and payment status, so "is signed in" was never the right bar —
+  // it let any EMPLOYEE or CLIENT open the form. Matches the /jobs page guard.
+  const session = await requireAdmin();
 
   // Get existing job if editing
   let existingJob = null;
@@ -100,12 +108,30 @@ export default async function JobFormPage({
   async function saveJob(formData: FormData) {
     "use server";
 
+    // Re-authenticate INSIDE the action. A server action is a public POST
+    // endpoint — the guard on the page render above does not protect it, so the
+    // role check has to be repeated here. Admin-app roles only: this writes
+    // price, employeePay, tips and payment status onto any job by id
+    // (SOP §2.2/§12 — money, pay and charges are admin-only).
     const session = await auth.api.getSession({
       headers: await headers(),
     });
+    const role = (session?.user as { role?: string } | undefined)?.role;
+    if (!session || !isAdminRole(role)) {
+      // Fail closed, and hand back a destination rather than throwing an
+      // unhandled error at the client (which is what `session!.user.id` did).
+      redirect(homeForRole(role));
+    }
 
     // Get selected cleaner IDs from form
     const cleanerIds = formData.getAll("cleaners") as string[];
+
+    const editingJobId = (formData.get("jobId") as string | null) || null;
+
+    const backToForm = (reason: string) =>
+      editingJobId
+        ? `/jobs/new?edit=${encodeURIComponent(editingJobId)}&error=${reason}`
+        : `/jobs/new?error=${reason}`;
 
     // Parse all form fields according to schema
     const startDate = formData.get("startDate") as string;
@@ -126,6 +152,27 @@ export default async function JobFormPage({
       : null;
     const rawClientId = (formData.get("clientId") as string) || "";
     const clientId = rawClientId || null;
+
+    const clientName = ((formData.get("clientName") as string) || "").trim();
+    if (!clientName) {
+      redirect(backToForm("clientname"));
+    }
+
+    // jobType is an allow-listed SERVICE VALUE from the runtime catalog (the
+    // same vocabulary the booking flow writes), never free text — the crew board
+    // filters `jobType in eligibleTypes` and the equipment/kit matching keys off
+    // it, so an unknown code produces a job nobody can see or prepare for.
+    // Looked up UNFILTERED so an existing job on a retired service can still be
+    // saved without silently losing its type.
+    const rawJobType = ((formData.get("jobType") as string) || "").trim();
+    let jobType: string | null = null;
+    if (rawJobType) {
+      const cfg = await getRuntimeConfig();
+      if (!findService(cfg, rawJobType)) {
+        redirect(backToForm("service"));
+      }
+      jobType = rawJobType;
+    }
 
     const price = formData.get("price")
       ? parseFloat(formData.get("price") as string)
@@ -152,19 +199,36 @@ export default async function JobFormPage({
       }
     }
 
+    // Date + time are REQUIRED. They used to fall back to `new Date()`, which
+    // silently stamped "now" on a blank submission. Parsed in BUSINESS_TZ, not
+    // the server's timezone — `new Date("2026-07-20T09:00")` on a UTC host
+    // stored a 9 AM Toronto pick as 09:00Z (= 5 AM Toronto).
+    const parsedStart = parseBusinessDateTime(startDate, startTime);
+    const parsedJobDate = businessDateOnly(startDate);
+    if (!parsedStart || !parsedJobDate) {
+      redirect(backToForm("datetime"));
+    }
+
+    // End is optional, but if BOTH parts are supplied they must be valid and
+    // after the start — a silently-dropped end time produced open-ended jobs.
+    let parsedEnd: Date | null = null;
+    if (endDate || endTime) {
+      parsedEnd = parseBusinessDateTime(endDate, endTime);
+      if (!parsedEnd || parsedEnd <= parsedStart) {
+        redirect(backToForm("endtime"));
+      }
+    }
+
     const jobData: any = {
-      employeeId: session!.user.id,
-      clientName: formData.get("clientName") as string,
+      employeeId: session.user.id,
+      clientName,
       clientId,
       description: (formData.get("description") as string) || null,
-      jobType: (formData.get("jobType") as string) || null,
+      jobType,
       location: (formData.get("location") as string) || null,
-      jobDate: startDate ? new Date(startDate) : null,
-      startTime:
-        startDate && startTime
-          ? new Date(`${startDate}T${startTime}`)
-          : new Date(),
-      endTime: endDate && endTime ? new Date(`${endDate}T${endTime}`) : null,
+      jobDate: parsedJobDate,
+      startTime: parsedStart,
+      endTime: parsedEnd,
       price,
       employeePay: formData.get("employeePay")
         ? parseFloat(formData.get("employeePay") as string)
@@ -180,20 +244,24 @@ export default async function JobFormPage({
       notes: (formData.get("notes") as string) || null,
       paymentType,
       discountAmount,
-      bedCount: formData.get("bedCount")
-        ? parseInt(formData.get("bedCount") as string, 10)
-        : null,
-      bathCount: formData.get("bathCount")
-        ? parseInt(formData.get("bathCount") as string, 10)
-        : null,
+      // bedCount/bathCount deliberately not written — they are cleaning-era
+      // fields with no meaning for handyman work.
       payRateMultiplier: formData.get("payRateMultiplier")
         ? parseFloat(formData.get("payRateMultiplier") as string)
         : 1.0,
     };
 
-    const editingJobId = formData.get("jobId") as string | null;
-
     if (editingJobId) {
+      // Confirm the target exists before writing. Fails closed on a crafted or
+      // stale id instead of surfacing a raw Prisma P2025 to the client.
+      const target = await db.job.findUnique({
+        where: { id: editingJobId },
+        select: { id: true },
+      });
+      if (!target) {
+        redirect("/jobs");
+      }
+
       // UPDATE existing job
       await db.job.update({
         where: { id: editingJobId },
@@ -231,7 +299,89 @@ export default async function JobFormPage({
   async function deleteJob(formData: FormData) {
     "use server";
 
-    const jobId = formData.get("jobId") as string;
+    // Server actions are public POST endpoints. Before this guard, ANY caller —
+    // signed out, a CLIENT, a stale EMPLOYEE session — could permanently delete
+    // ANY job by posting its id. Admin-app roles only, checked inside the
+    // action, fail closed.
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    const role = (session?.user as { role?: string } | undefined)?.role;
+    if (!session || !isAdminRole(role)) {
+      redirect(homeForRole(role));
+    }
+
+    const jobId = ((formData.get("jobId") as string) || "").trim();
+    if (!jobId) {
+      redirect("/jobs");
+    }
+
+    // Snapshot the financially-material fields BEFORE the delete. A hard delete
+    // of a job that carried money (price, provider pay, deposit/payment state)
+    // would otherwise leave no reconstructable record of what was destroyed.
+    const target = await db.job.findUnique({
+      where: { id: jobId },
+      select: {
+        id: true,
+        jobNumber: true,
+        status: true,
+        price: true,
+        employeePay: true,
+        paymentReceived: true,
+        paymentType: true,
+        depositPaid: true,
+        depositPaidAt: true,
+        tipAmount: true,
+        invoiceSent: true,
+        stripePaymentIntentId: true,
+        depositPaymentIntentId: true,
+        clientId: true,
+        clientName: true,
+        jobType: true,
+        jobDate: true,
+        startTime: true,
+      },
+    });
+    if (!target) {
+      // Already gone (or never existed). Idempotent: same outcome, no error, and
+      // no signal to the caller about which ids exist.
+      redirect("/jobs");
+    }
+
+    // Written before the delete so the trail exists even if the delete then
+    // fails; logAudit never throws into this action.
+    await logAudit({
+      entityType: "Job",
+      entityId: target.id,
+      action: "JOB_DELETED",
+      field: "job",
+      // Full snapshot as oldValue — the deletion is reconstructable from this.
+      oldValue: JSON.stringify({
+        id: target.id,
+        jobNumber: target.jobNumber,
+        status: target.status,
+        price: target.price,
+        employeePay: target.employeePay,
+        paymentReceived: target.paymentReceived,
+        paymentType: target.paymentType,
+        depositPaid: target.depositPaid,
+        depositPaidAt: target.depositPaidAt?.toISOString() ?? null,
+        tipAmount: target.tipAmount,
+        invoiceSent: target.invoiceSent,
+        stripePaymentIntentId: target.stripePaymentIntentId,
+        depositPaymentIntentId: target.depositPaymentIntentId,
+        clientId: target.clientId,
+        clientName: target.clientName,
+        jobType: target.jobType,
+        jobDate: target.jobDate?.toISOString() ?? null,
+        startTime: target.startTime?.toISOString() ?? null,
+        deletedAt: new Date().toISOString(),
+      }),
+      newValue: null,
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      description: `Permanently deleted job #${target.jobNumber} (${target.clientName}) — status ${target.status}, price ${target.price ?? "n/a"}, provider pay ${target.employeePay ?? "n/a"}, payment received ${target.paymentReceived}.`,
+    });
 
     await db.job.delete({
       where: { id: jobId },
@@ -290,6 +440,23 @@ export default async function JobFormPage({
         </p>
       </header>
 
+      {formError && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 20,
+            padding: "12px 16px",
+            borderRadius: 12,
+            background: "rgba(220,38,38,0.06)",
+            border: "1px solid rgba(220,38,38,0.20)",
+            fontSize: 13,
+            color: "var(--error)",
+          }}
+        >
+          {FORM_ERRORS[formError] ?? "We couldn't save that job. Please review the form and try again."}
+        </div>
+      )}
+
       <form action={saveJob} className="space-y-5">
         {isEditing && existingJob && (
           <input type="hidden" name="jobId" value={existingJob.id} />
@@ -345,26 +512,32 @@ export default async function JobFormPage({
         </SectionCard>
 
         {/* Date & Time */}
-        <SectionCard title="Date & time" subtitle="Scheduled window">
+        <SectionCard
+          title="Date & time"
+          subtitle={`Scheduled window — entered and stored in ${BUSINESS_TZ.replace("_", " ")} time`}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            <FieldWrap label="Start date">
+            {/* Prefilled and submitted as BUSINESS-timezone wall clock, which is
+                how the server action parses them back. Rendering the stored
+                instant with toISOString() showed a 9 AM job as "13:00". */}
+            <FieldWrap label="Start date" required>
               <ControlledDatePicker
                 name="startDate"
                 defaultValue={
                   existingJob?.startTime
-                    ? new Date(existingJob.startTime).toISOString().split("T")[0]
+                    ? businessDateKey(new Date(existingJob.startTime))
                     : ""
                 }
                 size="md"
               />
             </FieldWrap>
 
-            <FieldWrap label="Start time">
+            <FieldWrap label="Start time" required>
               <ControlledTimePicker
                 name="startTime"
                 defaultValue={
                   existingJob?.startTime
-                    ? new Date(existingJob.startTime).toISOString().split("T")[1].slice(0, 5)
+                    ? businessTimeValue(new Date(existingJob.startTime))
                     : ""
                 }
                 size="md"
@@ -376,7 +549,7 @@ export default async function JobFormPage({
                 name="endDate"
                 defaultValue={
                   existingJob?.endTime
-                    ? new Date(existingJob.endTime).toISOString().split("T")[0]
+                    ? businessDateKey(new Date(existingJob.endTime))
                     : ""
                 }
                 size="md"
@@ -388,7 +561,7 @@ export default async function JobFormPage({
                 name="endTime"
                 defaultValue={
                   existingJob?.endTime
-                    ? new Date(existingJob.endTime).toISOString().split("T")[1].slice(0, 5)
+                    ? businessTimeValue(new Date(existingJob.endTime))
                     : ""
                 }
                 size="md"
@@ -418,29 +591,8 @@ export default async function JobFormPage({
               <PaymentTypeSelect defaultValue={existingJob?.paymentType || ""} />
             </FieldWrap>
 
-            <FieldWrap label="Bed count">
-              <Input
-                type="number"
-                min="0"
-                max="10"
-                id="bedCount"
-                name="bedCount"
-                defaultValue={existingJob?.bedCount ?? ""}
-                placeholder="0"
-              />
-            </FieldWrap>
-
-            <FieldWrap label="Bath count">
-              <Input
-                type="number"
-                min="0"
-                max="10"
-                id="bathCount"
-                name="bathCount"
-                defaultValue={existingJob?.bathCount ?? ""}
-                placeholder="0"
-              />
-            </FieldWrap>
+            {/* Bed / bath counts removed — cleaning-era fields with no meaning
+                for handyman work. Scope now comes from the service type. */}
           </div>
 
           <PriceSummary />
@@ -493,6 +645,25 @@ export default async function JobFormPage({
       </form>
     </div>
   );
+}
+
+// ─── Form-error copy ───
+// Generic, non-leaky messages keyed by the reason the server action bounced.
+const FORM_ERRORS: Record<string, string> = {
+  datetime: "Start date and start time are required. Please pick both and try again.",
+  endtime: "The end date and time must be a valid moment after the start.",
+  clientname: "Client name is required.",
+  service: "That service isn't in the catalog. Please pick a service from the list.",
+};
+
+/** Stored instant → "HH:mm" wall clock in BUSINESS_TZ, for the time picker. */
+function businessTimeValue(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: BUSINESS_TZ,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
 // ─── Section card ───

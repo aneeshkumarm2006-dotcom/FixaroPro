@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { isUpfrontMaterials } from "@/app/(book)/book/types";
+import { isUpfrontMaterials, requiresCustomQuote } from "@/app/(book)/book/types";
 import { checkServiceAreaInternal } from "@/lib/service-area";
 import { getBlockedDates, getBlockedSlots } from "@/lib/blocked-dates";
 import {
@@ -28,6 +28,8 @@ import { paintingQuoteRange, findService } from "@/lib/config/types";
 import { notifyPaintingProviders } from "@/lib/painting-workflow";
 import { notifyEligibleProviders } from "@/lib/provider-notify";
 import { isTrustedIntakePhotoUrl } from "@/lib/cloudinary-url";
+import { businessDateOnly, parseBusinessDateTime } from "@/lib/timezone";
+import { businessDateKey } from "@/lib/availability-exceptions";
 
 type Frequency =
   | "ONE_TIME"
@@ -56,6 +58,9 @@ interface SubmitBookingInput {
   acLocation?: string;
   acMountType?: string;
   clientHasAcUnit?: boolean | null;
+  // TV mounting intake — used server-side to re-evaluate the quote-only rule.
+  tvSize?: string;
+  tvWallType?: string;
   // Step 3
   date: string; // YYYY-MM-DD
   isFlexible: boolean;
@@ -80,10 +85,25 @@ interface SubmitBookingInput {
   stripePaymentMethodId?: string;
 }
 
-function parseStartTime(date: string, timeSlot: string, isFlexible: boolean): Date {
+/**
+ * Booking date + slot → the UTC instant it names IN THE BUSINESS TIMEZONE.
+ *
+ * `new Date(`${date}T${slot}:00`)` parsed in the SERVER's timezone, so on a UTC
+ * host a customer's 9:00 AM slot was stored as 09:00Z — 5:00 AM Toronto. The
+ * customer's confirmation email, the crew board and the invoice all then
+ * disagreed with the slot they actually picked.
+ *
+ * Returns null on a malformed/impossible date so the caller rejects the booking
+ * rather than silently scheduling it at the wrong moment.
+ */
+function parseStartTime(
+  date: string,
+  timeSlot: string,
+  isFlexible: boolean
+): Date | null {
   // Defaults to 9am for flexible bookings — admin sets the real time later.
   const slot = isFlexible || !timeSlot ? "09:00" : timeSlot;
-  return new Date(`${date}T${slot}:00`);
+  return parseBusinessDateTime(date, slot);
 }
 
 export async function submitBooking(input: SubmitBookingInput) {
@@ -123,6 +143,30 @@ export async function submitBooking(input: SubmitBookingInput) {
       return {
         success: false,
         error: "Sorry, that service is no longer available. Please choose another.",
+      };
+    }
+
+    // Fix #5 — quote-only work must never complete as an instant booking.
+    // The wizard already diverts these to /quote, but that guard is client-side:
+    // a crafted request could still book a quote-priced service (mouldings,
+    // weatherproofing) or an oversized/masonry TV mount and capture a deposit at
+    // the hourly rate. Re-evaluated here from the runtime config + the same
+    // predicate the UI uses. Painting is exempt (BID_FLOW_SERVICES) because it
+    // legitimately completes in the wizard via its bid/offer workflow.
+    if (
+      requiresCustomQuote(
+        {
+          serviceType: input.serviceType,
+          tvSize: input.tvSize ?? "",
+          tvWallType: input.tvWallType ?? "",
+        },
+        service.pricing
+      )
+    ) {
+      return {
+        success: false,
+        error:
+          "This job needs a custom quote. Please request a quote and we'll send you a price to approve.",
       };
     }
 
@@ -257,6 +301,12 @@ export async function submitBooking(input: SubmitBookingInput) {
       input.timeSlot,
       input.isFlexible
     );
+    // Business-tz calendar date, stored date-only (midnight UTC of that date) so
+    // it doesn't render as the PREVIOUS day for anyone east of UTC.
+    const jobDate = businessDateOnly(input.date);
+    if (!startTime || !jobDate) {
+      return { success: false, error: "Please choose a valid date and time" };
+    }
     const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
     const recentDuplicate = await db.job.findFirst({
       where: {
@@ -298,7 +348,7 @@ export async function submitBooking(input: SubmitBookingInput) {
         location: input.address.trim(),
         description: `${input.serviceType} — ${input.hours}h`,
         jobType: input.serviceType,
-        jobDate: startTime,
+        jobDate,
         startTime,
         status: input.isFlexible ? "CREATED" : "SCHEDULED",
         isFlexible: input.isFlexible,
@@ -448,9 +498,21 @@ export async function submitBooking(input: SubmitBookingInput) {
           )
         : pricing;
 
+      // The wall-clock slot every occurrence should land on. `nextOccurrence`
+      // advances by whole days, which shifts the LOCAL time by an hour across a
+      // DST boundary — so each occurrence is re-anchored to this slot in the
+      // business timezone. A 9 AM weekly visit stays 9 AM in November.
+      const recurringSlot =
+        input.isFlexible || !input.timeSlot ? "09:00" : input.timeSlot;
+
       let cursor = startTime;
       for (let i = 0; i < recurrences; i++) {
         cursor = nextOccurrence(cursor, input.frequency);
+        const childDateKey = businessDateKey(cursor);
+        const childStart =
+          parseBusinessDateTime(childDateKey, recurringSlot) ?? cursor;
+        const childJobDate = businessDateOnly(childDateKey) ?? childStart;
+        cursor = childStart;
         const child = await db.job.create({
           data: {
             clientName: client.name,
@@ -458,8 +520,8 @@ export async function submitBooking(input: SubmitBookingInput) {
             location: input.address.trim(),
             description: `${input.serviceType} — ${input.hours}h`,
             jobType: input.serviceType,
-            jobDate: cursor,
-            startTime: cursor,
+            jobDate: childJobDate,
+            startTime: childStart,
             status: input.isFlexible ? "CREATED" : "SCHEDULED",
             isFlexible: input.isFlexible,
             requiredCleaners: 1,

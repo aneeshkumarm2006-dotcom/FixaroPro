@@ -22,6 +22,7 @@ import {
   SERVICE_CATALOG,
   SERVICE_CATEGORIES,
   MATERIALS_PRICING,
+  CUSTOMER_PART_DEFAULTS,
   SILICONE_PRICE_PER_ROOM,
   WEATHERPROOFING_FIXED_PRICE,
 } from "@/app/(book)/book/types";
@@ -81,6 +82,11 @@ export const DEFAULT_SERVICES: ServiceConfigItem[] = SERVICE_CATALOG.map(
       materialsAmount: materials?.amount ?? null,
       materialsType: (materials?.type as MaterialsType | undefined) ?? null,
       materialsNote: MATERIALS_NOTE_DEFAULTS[s.value] ?? null,
+      // Phase 2C — the customer-supplied replacement item. Seeded from the
+      // catalog default so ops can retune it per service in the admin editor
+      // rather than at the call site.
+      requiresCustomerPart: CUSTOMER_PART_DEFAULTS[s.value] != null,
+      customerPartNote: CUSTOMER_PART_DEFAULTS[s.value] ?? null,
     };
   }
 );

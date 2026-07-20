@@ -5,12 +5,20 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { CreditCard, Loader2, ShieldCheck, Tag, CheckCircle2, Banknote } from "lucide-react";
 import { applyPromoCode } from "../../actions/applyPromoCode";
-import { BookingDraft, FREQUENCIES } from "../types";
+import Link from "next/link";
+import {
+  BookingDraft,
+  FREQUENCIES,
+  quoteReason,
+  quoteRedirectHref,
+  requiresCustomQuote,
+} from "../types";
 import {
   useService,
   useMaterialsPricing,
   usePolicy,
 } from "@/lib/config/ServiceConfigProvider";
+import { customerPartOf } from "@/lib/config/types";
 import { calculateTax } from "@/lib/tax";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -25,6 +33,17 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   const service = useService(draft.serviceType);
   const configuredMaterials = useMaterialsPricing(draft.serviceType);
   const policy = usePolicy();
+  // Phase 2C — the replacement item the CUSTOMER must buy. Distinct from the
+  // materials line below (which is Fixaro-supplied consumables + a surcharge),
+  // and it carries no price: it is a readiness requirement, not a charge.
+  const customerPart = customerPartOf(service);
+
+  // Defence in depth. The wizard already refuses to advance a quote-routed
+  // service past Step 2, so this should be unreachable — but if it ever is
+  // reached, we show the quote CTA instead of a deposit block and never create a
+  // PaymentIntent. (Painting is not quote-routed: it keeps its bid workflow and
+  // its flat $119 materials charge, and still renders the card form below.)
+  const needsQuote = requiresCustomQuote(draft, service?.pricing);
 
   // Materials/equipment line (SOP §4/§5) — only when the customer opted in.
   const materials = draft.customerRequestsMaterials ? configuredMaterials : null;
@@ -75,6 +94,7 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
   // server-authoritative and depends on the service + materials choice, so we
   // re-create it if those change (e.g. selecting painting → $119 materials charge).
   useEffect(() => {
+    if (needsQuote) return; // never request a deposit for a quote-routed service
     if (!draft.email || !draft.name) return;
     setStripeLoading(true);
     setStripeError(null);
@@ -101,7 +121,35 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
       .catch(() => setStripeError("Could not initialise payment. Please refresh."))
       .finally(() => setStripeLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.email, draft.name, draft.serviceType, draft.customerRequestsMaterials]);
+  }, [needsQuote, draft.email, draft.name, draft.serviceType, draft.customerRequestsMaterials]);
+
+  if (needsQuote) {
+    return (
+      <div className="cl-stack-32">
+        <header className="cl-stack-8">
+          <p className="cl-eyebrow">Quote required</p>
+          <h1 className="cl-display" style={{ fontSize: "clamp(34px, 4.4vw, 52px)" }}>
+            We&apos;ll price
+            <br />
+            <em>this one first.</em>
+          </h1>
+          <p className="cl-subtitle">{quoteReason(draft)}</p>
+        </header>
+        <div className="cl-card-soft cl-stack-12">
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", lineHeight: 1.6 }}>
+            Nothing is charged and no card is needed. Send us the details and
+            we&apos;ll come back within one business day with a price to approve.
+          </p>
+          <Link
+            href={quoteRedirectHref(draft)}
+            className="cl-btn cl-btn-primary"
+            style={{ alignSelf: "flex-start" }}>
+            Request a quote →
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const freq = FREQUENCIES.find((f) => f.value === draft.frequency);
 
@@ -142,7 +190,27 @@ export default function Step5Review({ draft, basePrice, onChange }: Props) {
           <Row dt="Frequency" dd={freq?.label ?? "—"} />
           <Row dt="Address" dd={draft.address || "—"} />
           <Row dt="Date" dd={dateLine} />
+          {customerPart ? <Row dt="You supply" dd={customerPart.note} /> : null}
         </dl>
+        {customerPart ? (
+          <div
+            style={{
+              marginTop: 14,
+              background: "rgba(217,119,6,0.07)",
+              border: "1px solid rgba(217,119,6,0.28)",
+              borderRadius: 12,
+              padding: "12px 14px",
+            }}>
+            <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: "var(--ink)", lineHeight: 1.5 }}>
+              Please have {customerPart.note} on site before your appointment.
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--primary-70)", lineHeight: 1.55 }}>
+              This isn&apos;t included in your price and Fixaro doesn&apos;t buy
+              it for you. We&apos;ll send a reminder to confirm it has arrived —
+              if it hasn&apos;t, your Pro can&apos;t complete the work.
+            </p>
+          </div>
+        ) : null}
         {draft.photoUrls.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <span className="cl-label" style={{ display: "block", marginBottom: 8 }}>

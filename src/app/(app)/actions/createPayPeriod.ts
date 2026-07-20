@@ -4,6 +4,14 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { revalidatePath } from "next/cache";
+import {
+  clockedHours,
+  computeProviderJobPay,
+  getDefaultProviderHourlyRate,
+  perPersonHours,
+  perPersonTip,
+  resolveProviderHourlyRate,
+} from "@/lib/provider-pay";
 
 export async function createPayPeriod(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -37,10 +45,15 @@ export async function createPayPeriod(formData: FormData) {
   rangeEnd.setHours(23, 59, 59, 999);
 
   try {
+    // Provider pay is hourly (Fix #3 / #8): rate × clocked hours + tip share.
+    // `payMultiplier` / `payRateMultiplier` are deprecated and deliberately not
+    // selected here so they cannot creep back into the money math.
     const employees = await db.user.findMany({
       where: { role: { in: ["EMPLOYEE", "ADMIN", "OWNER"] } },
-      select: { id: true, payMultiplier: true },
+      select: { id: true, hourlyRate: true },
     });
+    const providerRateMap = new Map(employees.map((e) => [e.id, e.hourlyRate]));
+    const defaultRate = await getDefaultProviderHourlyRate();
 
     const jobs = await db.job.findMany({
       where: {
@@ -58,9 +71,8 @@ export async function createPayPeriod(formData: FormData) {
       select: {
         id: true,
         employeeId: true,
-        employeePay: true,
         totalTip: true,
-        payRateMultiplier: true,
+        providerHourlyRate: true,
         clockInTime: true,
         clockOutTime: true,
         startTime: true,
@@ -68,6 +80,25 @@ export async function createPayPeriod(formData: FormData) {
         cleaners: { select: { id: true } },
       },
     });
+
+    // A participant on a job may not be in the role-filtered list above (e.g. a
+    // role changed since). Resolve their rate too rather than silently paying
+    // them the default.
+    const participantIdsAll = new Set<string>();
+    for (const job of jobs) {
+      if (job.employeeId) participantIdsAll.add(job.employeeId);
+      for (const c of job.cleaners) participantIdsAll.add(c.id);
+    }
+    const missingIds = Array.from(participantIdsAll).filter(
+      (id) => !providerRateMap.has(id)
+    );
+    if (missingIds.length > 0) {
+      const extra = await db.user.findMany({
+        where: { id: { in: missingIds } },
+        select: { id: true, hourlyRate: true },
+      });
+      for (const e of extra) providerRateMap.set(e.id, e.hourlyRate);
+    }
 
     const payoutMap = new Map<
       string,
@@ -88,32 +119,34 @@ export async function createPayPeriod(formData: FormData) {
       );
       if (participantIds.length === 0) continue;
 
-      const basePay = (job.employeePay || 0) + (job.totalTip || 0);
-      const multiplier = job.payRateMultiplier ?? 1;
-      const jobPay = basePay * multiplier;
-      const perPerson = jobPay / participantIds.length;
-
+      // Hours come from the clock record; the scheduled start/end is the
+      // fallback for a job that was completed without a clock (unchanged).
       const start = job.clockInTime ?? job.startTime;
       const end = job.clockOutTime ?? job.endTime;
-      let hours = 0;
-      if (start && end) {
-        hours = Math.max(
-          0,
-          (new Date(end).getTime() - new Date(start).getTime()) / 3_600_000
-        );
-      }
-      const perPersonHours = hours / participantIds.length;
+      const hours = clockedHours(start, end);
+      const hoursEach = perPersonHours(hours, participantIds.length);
+      const tipEach = perPersonTip(job.totalTip || 0, participantIds.length);
 
       for (const pid of participantIds) {
         if (!payoutMap.has(pid)) {
           payoutMap.set(pid, { base: 0, jobCount: 0, hours: 0 });
         }
         const entry = payoutMap.get(pid)!;
-        const empMultiplier =
-          employees.find((e) => e.id === pid)?.payMultiplier ?? 1;
-        entry.base += perPerson * empMultiplier;
+        // Each provider is paid at THEIR OWN resolved rate for THEIR share of
+        // the clocked hours, plus an even share of the tip.
+        const hourlyRate = resolveProviderHourlyRate({
+          jobRate: job.providerHourlyRate,
+          providerRate: providerRateMap.get(pid),
+          defaultRate,
+        });
+        const pay = computeProviderJobPay({
+          hourlyRate,
+          hours: hoursEach,
+          tipShare: tipEach,
+        });
+        entry.base += pay.total;
         entry.jobCount += 1;
-        entry.hours += perPersonHours;
+        entry.hours += hoursEach;
       }
     }
 

@@ -127,7 +127,7 @@ export default function KitsAdminClient({ cleaners, products }: Props) {
           <div style={{ padding: 12, borderBottom: "1px solid var(--primary-10)" }}>
             <input
               type="text"
-              placeholder="Search cleaners…"
+              placeholder="Search pros…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{

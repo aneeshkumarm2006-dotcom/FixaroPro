@@ -10,6 +10,11 @@ import { cancelPaintingNoAnswer } from "../../actions/cancelPaintingNoAnswer";
 import { logPaintingCallAttempt, type CallOutcome } from "../../actions/logPaintingCallAttempt";
 import { adjustMaterialsDeposit } from "../../actions/adjustMaterialsDeposit";
 import { adjustClockTimes, getJobClockTimes } from "../../actions/adjustClockTimes";
+import {
+  fmtDateTime,
+  toBusinessDateTimeInput,
+  parseBusinessDateTimeInput,
+} from "@/lib/timezone";
 
 export interface OpsBilling {
   pricingModel: "hourly" | "fixed" | "quote";
@@ -81,16 +86,15 @@ function money(n: number | null | undefined) {
   return `$${(n ?? 0).toFixed(2)}`;
 }
 
-// ISO timestamp → value for a datetime-local input, in the admin's timezone.
+// ISO timestamp → value for a datetime-local input, in BUSINESS_TZ (not the
+// admin's browser timezone) so the edit box matches the times shown on the page.
+// Parsed back with parseBusinessDateTimeInput to close the round-trip.
 function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return toBusinessDateTimeInput(iso);
 }
 
 function fmtClock(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? fmtDateTime(iso) : "—";
 }
 
 function PaintingOps({
@@ -399,10 +403,12 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
     };
   }, [jobId]);
 
-  const editedHours =
-    clockIn && clockOut
-      ? (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 3_600_000
-      : null;
+  const editedHours = (() => {
+    const inAt = parseBusinessDateTimeInput(clockIn);
+    const outAt = parseBusinessDateTimeInput(clockOut);
+    if (!inAt || !outAt) return null;
+    return (outAt.getTime() - inAt.getTime()) / 3_600_000;
+  })();
 
   const hasMaterialsDeposit = billing.materialsType === "deposit" && billing.depositCollected > 0;
 
@@ -435,7 +441,16 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
       setMsg({ ok: false, text: "A reason is required for clock corrections." });
       return;
     }
-    if (clockIn && clockOut && new Date(clockOut).getTime() <= new Date(clockIn).getTime()) {
+    // Parse the timezone-naive input as BUSINESS_TZ wall-clock, not the admin's
+    // browser timezone, so an ops user outside Toronto can't silently shift a
+    // clock record just by editing it.
+    const newIn = parseBusinessDateTimeInput(clockIn);
+    const newOut = parseBusinessDateTimeInput(clockOut);
+    if ((clockIn && !newIn) || (clockOut && !newOut)) {
+      setMsg({ ok: false, text: "Enter a valid date and time." });
+      return;
+    }
+    if (newIn && newOut && newOut.getTime() <= newIn.getTime()) {
       setMsg({ ok: false, text: "Clock-out must be after clock-in." });
       return;
     }
@@ -443,8 +458,8 @@ function BillingReview({ jobId, billing }: { jobId: string; billing: OpsBilling 
     start(async () => {
       const res = await adjustClockTimes({
         jobId,
-        clockInTime: inChanged ? new Date(clockIn).toISOString() : undefined,
-        clockOutTime: outChanged ? new Date(clockOut).toISOString() : undefined,
+        clockInTime: inChanged && newIn ? newIn.toISOString() : undefined,
+        clockOutTime: outChanged && newOut ? newOut.toISOString() : undefined,
         reason: clockReason,
       });
       if (res.success) {

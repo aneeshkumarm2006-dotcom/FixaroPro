@@ -9,6 +9,9 @@ import { StatusBadge, DateBadge } from "@/components/customer/atoms";
 import { Banner } from "@/components/customer/Field";
 import RequestActions from "./RequestActions";
 import PaintingOfferActions from "./PaintingOfferActions";
+import PriceRevisionActions from "./PriceRevisionActions";
+import CustomerPartConfirm from "./CustomerPartConfirm";
+import { customerPartFor } from "@/lib/config/types";
 import JobChatPanel from "@/app/(app)/jobs/[id]/JobChatPanel";
 import {
 } from "@/lib/policy";
@@ -65,10 +68,22 @@ export default async function BookingDetailPage({
         orderBy: { createdAt: "desc" },
         take: 10,
       },
+      // Phase 2B — the customer approves/rejects a pending scope change here.
+      priceRevisions: {
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
   });
 
   if (!job || job.clientId !== client.id) notFound();
+
+  // Phase 2B/2C — a pending scope change awaiting this customer's approval, and
+  // whether this service needs a part they must have on site. The portal isn't
+  // wrapped in ServiceConfigProvider, so the note is resolved server-side.
+  const pendingRevision = job.priceRevisions[0] ?? null;
+  const customerPart = customerPartFor(await getRuntimeConfig(), job.jobType);
 
   const isUpcoming = new Date(job.startTime) >= new Date();
   const isCompletedOrPaid = job.status === "COMPLETED" || job.status === "PAID";
@@ -287,6 +302,27 @@ export default async function BookingDetailPage({
 
         {/* Right column */}
         <div className="cl-stack-16">
+          {/* Phase 2B — a Pro found out-of-scope work and proposed a new price.
+              Nothing is charged until the customer approves it here. */}
+          {pendingRevision ? (
+            <PriceRevisionActions
+              revisionId={pendingRevision.id}
+              previousPrice={pendingRevision.previousPrice}
+              proposedPrice={pendingRevision.proposedPrice}
+              reason={pendingRevision.reason}
+              requestedByName={pendingRevision.requestedByName}
+            />
+          ) : null}
+          {/* Phase 2C — this service needs a part the customer supplies; ask
+              them to confirm it's on site before the appointment. */}
+          {customerPart ? (
+            <CustomerPartConfirm
+              jobId={job.id}
+              partNote={customerPart.note}
+              confirmedAt={job.customerPartConfirmedAt?.toISOString() ?? null}
+              startTime={job.startTime.toISOString()}
+            />
+          ) : null}
           {/* Painting bid workflow (SOP §6) */}
           {job.paintingStatus === "OFFER_SENT" && job.paintingFinalAmount ? (
             <PaintingOfferActions jobId={job.id} finalAmount={job.paintingFinalAmount} />

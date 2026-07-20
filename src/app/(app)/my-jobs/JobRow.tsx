@@ -6,6 +6,7 @@ import { MapPin, Clock } from "lucide-react";
 import PayBreakdownModal from "./PayBreakdownModal";
 import { WARNING_VISUAL, jobStatusLabel, jobStatusSlug } from "@/lib/status-icons";
 import { useJobTypeLabel } from "@/components/calendar/use-job-type-label";
+import { fmtDate, fmtTime } from "@/lib/timezone";
 
 const WarningIcon = WARNING_VISUAL.Icon;
 
@@ -49,9 +50,9 @@ export function JobRow({
   const sc = jobStatusSlug(job.status);
 
   const date = job.jobDate ? new Date(job.jobDate) : null;
-  const mo = date ? date.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : null;
-  const day = date ? date.getDate() : null;
-  const wd = date ? date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase() : null;
+  const mo = date ? fmtDate(date, { month: "short" }).toUpperCase() : null;
+  const day = date ? fmtDate(date, { day: "numeric" }) : null;
+  const wd = date ? fmtDate(date, { weekday: "short" }).toUpperCase() : null;
 
   return (
     <>
@@ -114,8 +115,8 @@ export function JobRow({
             {job.startTime && (
               <span className="row">
                 <Clock size={13} className="icon" />
-                {new Date(job.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                {job.endTime && <> – {new Date(job.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</>}
+                {fmtTime(job.startTime)}
+                {job.endTime && <> – {fmtTime(job.endTime)}</>}
               </span>
             )}
           </div>

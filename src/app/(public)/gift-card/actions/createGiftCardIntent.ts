@@ -1,7 +1,14 @@
 "use server";
 
+import { headers } from "next/headers";
 import { db } from "@/db";
-import { stripe } from "@/lib/stripe";
+import { stripe, STATEMENT_DESCRIPTOR_SUFFIX } from "@/lib/stripe";
+import {
+  rateLimitAny,
+  clientIpFromHeaders,
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGE,
+} from "@/lib/rate-limit";
 import { generateGiftCardCode } from "@/lib/gift-cards/code";
 import {
   GIFT_CARD_COVERS,
@@ -48,6 +55,20 @@ export async function createGiftCardIntent(input: CreateGiftCardInput) {
     return { success: false, error: "Recipient email is required" };
   }
 
+  // Denial-of-wallet / junk-data guard. Unauthenticated by design (anyone can
+  // buy a gift card), but each call writes a GiftCard row AND creates a real
+  // Stripe PaymentIntent. Budgeted by IP and purchaser email; runs after cheap
+  // validation but before the first write, so rejected calls cost nothing.
+  // Server action → IP must come from `headers()`, not a request object.
+  // NOTE: in-process only — see the caveats in @/lib/rate-limit.
+  const limited = rateLimitAny(
+    [`ip:${clientIpFromHeaders(await headers())}`, `email:${purchaserEmail}`],
+    { name: "gift-card-intent", ...RATE_LIMITS.paymentIntent }
+  );
+  if (!limited.ok) {
+    return { success: false, error: RATE_LIMIT_MESSAGE };
+  }
+
   const coverKey =
     GIFT_CARD_COVERS.find((c) => c.key === input.coverKey)?.key ?? "default";
 
@@ -85,6 +106,7 @@ export async function createGiftCardIntent(input: CreateGiftCardInput) {
       currency: "cad",
       automatic_payment_methods: { enabled: true },
       receipt_email: purchaserEmail,
+      statement_descriptor_suffix: STATEMENT_DESCRIPTOR_SUFFIX,
       description: `Fixaro gift card — ${recipientName} ($${amount})`,
       metadata: {
         giftCardId: giftCard.id,
@@ -105,10 +127,12 @@ export async function createGiftCardIntent(input: CreateGiftCardInput) {
       where: { id: giftCard.id },
       data: { status: "CANCELLED" },
     });
-    const msg =
-      (err as { raw?: { message?: string }; message?: string })?.raw?.message ??
-      (err as { message?: string })?.message ??
-      "Stripe error";
-    return { success: false, error: msg };
+    // Keep the Stripe detail in server logs only — the raw message can expose
+    // account/config state to an unauthenticated buyer.
+    console.error("createGiftCardIntent stripe error:", err);
+    return {
+      success: false,
+      error: "We couldn't start that payment. Please try again.",
+    };
   }
 }

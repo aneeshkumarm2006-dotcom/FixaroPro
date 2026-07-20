@@ -13,6 +13,10 @@ export default async function RequestsPage() {
       OR: [
         { cancellationRequestedAt: { not: null } },
         { rescheduleRequestedAt: { not: null } },
+        // Phase 2B — an on-site price revision the Pro raised and the customer
+        // has not answered yet. Ops can approve/reject on the customer's behalf
+        // (phone agreement) or cancel a request raised in error.
+        { priceRevisions: { some: { status: "PENDING" } } },
       ],
     },
     orderBy: [
@@ -22,6 +26,11 @@ export default async function RequestsPage() {
     include: {
       client: { select: { id: true, name: true, email: true, phone: true } },
       cleaners: { select: { id: true, name: true } },
+      priceRevisions: {
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
     take: 200,
   });
@@ -31,7 +40,18 @@ export default async function RequestsPage() {
     // the one-click "Refund deposit" action on cancellation cards (D0.6 / 4.1).
     const collected = depositCollected(j, cfg);
     const refunded = j.refundedAmount ?? 0;
+    const revision = j.priceRevisions[0] ?? null;
     return {
+      priceRevision: revision
+        ? {
+            id: revision.id,
+            previousPrice: revision.previousPrice,
+            proposedPrice: revision.proposedPrice,
+            reason: revision.reason,
+            requestedByName: revision.requestedByName,
+            createdAt: revision.createdAt.toISOString(),
+          }
+        : null,
       id: j.id,
       jobNumber: j.jobNumber,
       status: j.status,
